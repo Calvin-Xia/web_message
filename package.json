@@ -18,7 +18,7 @@
     "d1",
     "message-board"
   ],
-  "author": "",
+  "author": "Tim",
   "license": "MIT",
   "devDependencies": {
     "wrangler": "^4.50.0"

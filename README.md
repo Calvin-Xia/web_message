@@ -45,7 +45,7 @@ npm install
 ### 2. 登录 Cloudflare
 
 ```bash
-npx wrangler login
+wrangler login
 ```
 
 这会打开浏览器让你登录到 Cloudflare 账户。
@@ -53,7 +53,7 @@ npx wrangler login
 ### 3. 创建 D1 数据库
 
 ```bash
-npx wrangler d1 create message-board-db
+wrangler d1 create message-board-db
 ```
 
 执行后，命令会返回数据库的 ID，类似：
@@ -83,7 +83,10 @@ database_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # 替换为实际的 ID
 执行 SQL 脚本创建数据库表：
 
 ```bash
-npx wrangler d1 execute message-board-db --remote --file=./schema.sql
+wrangler d1 execute message-board-db --remote --file=./schema.sql
+
+// 或本地
+wrangler d1 execute message-board-db --local --file=./schema.sql
 ```
 
 你应该看到类似输出：
@@ -118,7 +121,7 @@ npm run deploy
 或者：
 
 ```bash
-npx wrangler deploy
+wrangler deploy
 ```
 
 部署成功后，你会看到应用的 URL，类似：
