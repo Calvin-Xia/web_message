@@ -5,14 +5,12 @@ export default {
     const url = new URL(request.url);
     const path = url.pathname;
 
-    // CORS headers
     const corsHeaders = {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type',
     };
 
-    // Handle CORS preflight requests
     if (request.method === 'OPTIONS') {
       return new Response(null, {
         headers: corsHeaders,
@@ -20,7 +18,6 @@ export default {
     }
 
     try {
-      // Serve HTML page
       if (path === '/' || path === '/index.html') {
         return new Response(indexHtml, {
           headers: {
@@ -29,10 +26,9 @@ export default {
         });
       }
 
-      // API: Get all messages
-      if (path === '/api/messages' && request.method === 'GET') {
+      if (path === '/api/issues' && request.method === 'GET') {
         const { results } = await env.DB.prepare(
-          'SELECT id, content, email, created_at FROM messages ORDER BY created_at ASC LIMIT 10'
+          'SELECT id, issue, created_at FROM issues ORDER BY created_at ASC LIMIT 100'
         ).all();
 
         return new Response(JSON.stringify({ messages: results }), {
@@ -43,15 +39,13 @@ export default {
         });
       }
 
-      // API: Create new message
-      if (path === '/api/messages' && request.method === 'POST') {
+      if (path === '/api/issues' && request.method === 'POST') {
         const data = await request.json();
-        const { content, email } = data;
+        const { issue, name, student_id, isInformationPublic, isReport } = data;
 
-        // Validation
-        if (!content || !email) {
+        if (!issue) {
           return new Response(
-            JSON.stringify({ error: '留言内容和邮箱不能为空' }),
+            JSON.stringify({ error: '问题内容不能为空' }),
             {
               status: 400,
               headers: {
@@ -62,11 +56,9 @@ export default {
           );
         }
 
-        // Email validation
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
+        if (!name) {
           return new Response(
-            JSON.stringify({ error: '邮箱格式不正确' }),
+            JSON.stringify({ error: '姓名不能为空' }),
             {
               status: 400,
               headers: {
@@ -77,10 +69,9 @@ export default {
           );
         }
 
-        // Content length validation
-        if (content.length > 1000) {
+        if (!student_id) {
           return new Response(
-            JSON.stringify({ error: '留言内容不能超过1000个字符' }),
+            JSON.stringify({ error: '学号不能为空' }),
             {
               status: 400,
               headers: {
@@ -91,18 +82,30 @@ export default {
           );
         }
 
-        // Insert message
+        if (issue.length > 1000) {
+          return new Response(
+            JSON.stringify({ error: '问题内容不能超过1000个字符' }),
+            {
+              status: 400,
+              headers: {
+                'Content-Type': 'application/json',
+                ...corsHeaders,
+              },
+            }
+          );
+        }
+
         const result = await env.DB.prepare(
-          'INSERT INTO messages (content, email, created_at) VALUES (?, ?, datetime("now"))'
+          'INSERT INTO issues (issue, isInformationPublic, name, student_id, isReport, created_at) VALUES (?, ?, ?, ?, ?, datetime("now"))'
         )
-          .bind(content, email)
+          .bind(issue, isInformationPublic || 'no', name, student_id, isReport || 'no')
           .run();
 
         if (result.success) {
           return new Response(
             JSON.stringify({
               success: true,
-              message: '留言发送成功',
+              message: '问题提交成功',
             }),
             {
               headers: {
@@ -112,11 +115,10 @@ export default {
             }
           );
         } else {
-          throw new Error('保存留言失败');
+          throw new Error('保存问题失败');
         }
       }
 
-      // 404 Not Found
       return new Response('Not Found', {
         status: 404,
         headers: corsHeaders,

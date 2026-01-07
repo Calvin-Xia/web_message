@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>在线留言板</title>
+    <title>问题反馈系统</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -26,54 +26,99 @@
         <!-- 标题 -->
         <div class="text-center mb-6">
             <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
-                在线留言板
+                问题反馈系统
             </h1>
-            <p class="text-fb-gray text-sm md:text-base">分享你的想法和反馈</p>
+            <p class="text-fb-gray text-sm md:text-base">提交您的问题和反馈</p>
         </div>
 
-        <!-- 留言表单 -->
+        <!-- 问题表单 -->
         <div class="bg-white rounded-lg shadow-md p-6 md:p-8 mb-4">
             <div id="notification"></div>
             <form id="messageForm" class="space-y-4">
                 <div>
-                    <label for="content" class="block text-sm font-medium text-gray-700 mb-2">
-                        留言内容
+                    <label for="issue" class="block text-sm font-medium text-gray-700 mb-2">
+                        问题
                     </label>
                     <textarea
-                        id="content"
-                        name="content"
+                        id="issue"
+                        name="issue"
                         required
                         rows="4"
-                        placeholder="分享你的想法..."
+                        placeholder="描述您的问题..."
                         class="w-full px-3 py-2 border border-fb-gray-light rounded-lg bg-fb-bg focus:bg-white focus:outline-none focus:ring-2 focus:ring-fb-blue focus:border-transparent transition-all resize-none"
                     ></textarea>
                 </div>
                 <div>
-                    <label for="email" class="block text-sm font-medium text-gray-700 mb-2">
-                        邮箱地址
+                    <label for="name" class="block text-sm font-medium text-gray-700 mb-2">
+                        姓名
                     </label>
                     <input
-                        type="email"
-                        id="email"
-                        name="email"
+                        type="text"
+                        id="name"
+                        name="name"
                         required
-                        placeholder="your@email.com"
+                        placeholder="请输入姓名"
                         class="w-full px-3 py-2 border border-fb-gray-light rounded-lg bg-fb-bg focus:bg-white focus:outline-none focus:ring-2 focus:ring-fb-blue focus:border-transparent transition-all"
                     >
+                </div>
+                <div>
+                    <label for="student_id" class="block text-sm font-medium text-gray-700 mb-2">
+                        学号
+                    </label>
+                    <input
+                        type="text"
+                        id="student_id"
+                        name="student_id"
+                        required
+                        placeholder="请输入学号"
+                        class="w-full px-3 py-2 border border-fb-gray-light rounded-lg bg-fb-bg focus:bg-white focus:outline-none focus:ring-2 focus:ring-fb-blue focus:border-transparent transition-all"
+                    >
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        是否实名
+                    </label>
+                    <div class="flex items-center">
+                        <input
+                            type="checkbox"
+                            id="isInformationPublic"
+                            name="isInformationPublic"
+                            class="w-4 h-4 text-fb-blue border-fb-gray-light rounded focus:ring-fb-blue"
+                        >
+                        <label for="isInformationPublic" class="ml-2 text-sm text-gray-700">
+                            是的，我愿意公开实名信息
+                        </label>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        是否上报
+                    </label>
+                    <div class="flex items-center">
+                        <input
+                            type="checkbox"
+                            id="isReport"
+                            name="isReport"
+                            class="w-4 h-4 text-fb-blue border-fb-gray-light rounded focus:ring-fb-blue"
+                        >
+                        <label for="isReport" class="ml-2 text-sm text-gray-700">
+                            是的，请将此问题上报
+                        </label>
+                    </div>
                 </div>
                 <button
                     type="submit"
                     class="w-full bg-fb-blue hover:bg-fb-blue-dark text-white font-semibold py-2.5 px-4 rounded-lg transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                    发送留言
+                    提交问题
                 </button>
             </form>
         </div>
 
-        <!-- 历史留言列表 -->
+        <!-- 历史问题列表 -->
         <div class="bg-white rounded-lg shadow-md p-6 md:p-8">
             <h2 class="text-xl md:text-2xl font-bold text-gray-900 mb-4">
-                所有留言
+                所有问题
             </h2>
             <div id="messagesList">
                 <div class="text-center text-fb-gray py-8">加载中...</div>
@@ -84,76 +129,77 @@
     <script>
         const API_URL = '/api';
 
-        // 加载留言列表
+        // 加载问题列表
         async function loadMessages() {
             try {
-                const response = await fetch(`${API_URL}/messages`);
+                const response = await fetch(`${API_URL}/issues`);
                 const data = await response.json();
 
                 const messagesList = document.getElementById('messagesList');
 
                 if (!data.messages || data.messages.length === 0) {
-                    messagesList.innerHTML = '<div class="text-center text-fb-gray py-12 text-sm">暂无留言，成为第一个留言的人吧！</div>';
+                    messagesList.innerHTML = '<div class="text-center text-fb-gray py-12 text-sm">暂无问题，成为第一个提交问题的人吧！</div>';
                     return;
                 }
 
                 messagesList.innerHTML = data.messages.map(msg => `
                     <div class="bg-fb-bg rounded-lg p-4 mb-3 hover:bg-gray-100 transition-colors">
-                        <div class="text-gray-900 text-base mb-2 leading-relaxed">${escapeHtml(msg.content)}</div>
+                        <div class="text-gray-900 text-base mb-2 leading-relaxed">${escapeHtml(msg.issue)}</div>
                         <div class="flex flex-wrap items-center gap-2 text-xs text-fb-gray">
-                            <span class="font-medium">${escapeHtml(msg.email)}</span>
-                            <span>·</span>
                             <span>${formatDate(msg.created_at)}</span>
                         </div>
                     </div>
                 `).join('');
             } catch (error) {
-                console.error('加载留言失败:', error);
+                console.error('加载问题失败:', error);
                 document.getElementById('messagesList').innerHTML =
-                    '<div class="bg-red-50 text-red-600 p-3 rounded-lg text-sm">加载留言失败，请刷新页面重试</div>';
+                    '<div class="bg-red-50 text-red-600 p-3 rounded-lg text-sm">加载问题失败，请刷新页面重试</div>';
             }
         }
 
-        // 提交留言
+        // 提交问题
         document.getElementById('messageForm').addEventListener('submit', async (e) => {
             e.preventDefault();
 
             const submitBtn = e.target.querySelector('button[type="submit"]');
             const notification = document.getElementById('notification');
-            const content = document.getElementById('content').value;
-            const email = document.getElementById('email').value;
+            const issue = document.getElementById('issue').value;
+            const name = document.getElementById('name').value;
+            const student_id = document.getElementById('student_id').value;
+            const isInformationPublic = document.getElementById('isInformationPublic').checked ? 'yes' : 'no';
+            const isReport = document.getElementById('isReport').checked ? 'yes' : 'no';
 
             submitBtn.disabled = true;
-            submitBtn.textContent = '发送中...';
+            submitBtn.textContent = '提交中...';
             notification.innerHTML = '';
 
             try {
-                const response = await fetch(`${API_URL}/messages`, {
+                const response = await fetch(`${API_URL}/issues`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ content, email })
+                    body: JSON.stringify({ issue, name, student_id, isInformationPublic, isReport })
                 });
 
                 const data = await response.json();
 
                 if (response.ok) {
-                    notification.innerHTML = '<div class="bg-green-50 text-green-700 p-3 rounded-lg mb-4 text-sm font-medium">留言发送成功！</div>';
+                    notification.innerHTML = '<div class="bg-green-50 text-green-700 p-3 rounded-lg mb-4 text-sm font-medium">问题提交成功！</div>';
                     document.getElementById('messageForm').reset();
                     await loadMessages();
                     setTimeout(() => {
                         notification.innerHTML = '';
                     }, 3000);
                 } else {
-                    notification.innerHTML = `<div class="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm font-medium">${data.error || '发送失败，请重试'}</div>`;
+                    notification.innerHTML = `<div class="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm font-medium">${data.error || '提交失败，请重试'}</div>`;
                 }
             } catch (error) {
-                console.error('发送留言失败:', error);
-                notification.innerHTML = '<div class="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm font-medium">发送失败，请检查网络连接</div>';
+                console.error('提交问题失败:', error);
+                notification.innerHTML = '<div class="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm font-medium">提交失败，请检查网络连接</div>';
             } finally {
                 submitBtn.disabled = false;
-                submitBtn.textContent = '发送留言';
+                submitBtn.textContent = '提交问题';
             }
         });
 
@@ -177,7 +223,7 @@
             return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
         }
 
-        // 页面加载时获取留言列表
+        // 页面加载时获取问题列表
         loadMessages();
     </script>
 </body>

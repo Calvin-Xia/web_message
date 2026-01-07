@@ -5,8 +5,8 @@ compatibility_date = "2024-01-01"
 # D1 Database binding
 [[d1_databases]]
 binding = "DB"
-database_name = "message-board-db"
-database_id = "b75aabf3-b0c7-4621-afc3-691587ec5e2e"  #  D1 数据库 ID
+database_name = "issue-board-db"
+database_id = "58c85d18-4868-4580-ad22-7767fccfc729"  #  D1 数据库 ID
 
 # Rules for importing HTML file
 [[rules]]
