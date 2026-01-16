@@ -1,14 +1,22 @@
 name = "web-message-board"
-main = "src/index.js"
 compatibility_date = "2024-01-01"
 
-# D1 Database binding
-[[d1_databases]]
+# Pages configuration
+pages_build_output_dir = "./"
+
+# Pages Functions configuration
+[env.production]
+vars = { ENVIRONMENT = "production" }
+
+[[env.production.d1_databases]]
 binding = "DB"
 database_name = "issue-board-db"
-database_id = "58c85d18-4868-4580-ad22-7767fccfc729"  #  D1 数据库 ID
+database_id = "58c85d18-4868-4580-ad22-7767fccfc729"
 
-# Rules for importing HTML file
-[[rules]]
-type = "Text"
-globs = ["**/*.html"]
+[env.preview]
+vars = { ENVIRONMENT = "preview" }
+
+[[env.preview.d1_databases]]
+binding = "DB"
+database_name = "issue-board-db"
+database_id = "58c85d18-4868-4580-ad22-7767fccfc729"

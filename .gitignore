@@ -1,4 +1,8 @@
-.idea
-.claude
-.wrangler
 node_modules
+.wrangler
+dist
+.env
+.env.local
+*.log
+.DS_Store
+Thumbs.db

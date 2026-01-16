@@ -1,11 +1,13 @@
 {
   "name": "web-message-board",
   "version": "1.0.0",
-  "description": "问题反馈系统 - Cloudflare Workers",
+  "description": "问题反馈系统 - Cloudflare Pages",
   "main": "src/index.js",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
+    "pages:dev": "wrangler pages dev",
+    "pages:deploy": "wrangler pages deploy",
     "d1:create": "wrangler d1 create issue-board-db",
     "d1:init": "wrangler d1 execute issue-board-db --remote --file=./schema.sql",
     "d1:init:local": "wrangler d1 execute issue-board-db --local --file=./schema.sql",
@@ -14,7 +16,8 @@
   },
   "keywords": [
     "cloudflare",
-    "workers",
+    "pages",
+    "functions",
     "d1",
     "issue-board"
   ],
