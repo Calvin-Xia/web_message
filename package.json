@@ -4,6 +4,8 @@
   "description": "问题反馈系统 - Cloudflare Pages",
   "main": "src/index.js",
   "scripts": {
+    "build:css": "npx tailwindcss -i ./src/input.css -o ./styles.css --minify",
+    "dev:css": "npx tailwindcss -i ./src/input.css -o ./styles.css --watch",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "pages:dev": "wrangler pages dev",
@@ -24,6 +26,8 @@
   "author": "Calvin-Xia",
   "license": "MIT",
   "devDependencies": {
+    "@tailwindcss/cli": "^4.1.18",
+    "tailwindcss": "^4.1.18",
     "wrangler": "^4.57.0"
   }
 }

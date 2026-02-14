@@ -1,0 +1,9 @@
+@import "tailwindcss";
+
+@theme {
+  --color-fb-blue: #1877F2;
+  --color-fb-blue-dark: #166FE5;
+  --color-fb-bg: #F0F2F5;
+  --color-fb-gray: #65676B;
+  --color-fb-gray-light: #E4E6EB;
+}

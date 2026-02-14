@@ -1,4 +1,5 @@
 import indexHtml from '../index.html';
+import stylesCss from '../styles.css';
 
 export default {
   async fetch(request, env) {
@@ -22,6 +23,15 @@ export default {
         return new Response(indexHtml, {
           headers: {
             'Content-Type': 'text/html;charset=UTF-8',
+          },
+        });
+      }
+
+      if (path === '/styles.css') {
+        return new Response(stylesCss, {
+          headers: {
+            'Content-Type': 'text/css;charset=UTF-8',
+            'Cache-Control': 'public, max-age=31536000, immutable',
           },
         });
       }

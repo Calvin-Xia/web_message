@@ -25,6 +25,16 @@ export default {
         });
       }
 
+      if (path === '/styles.css') {
+        const css = await env.ASSETS.fetch(new Request('https://example.com/styles.css'));
+        return new Response(css.body, {
+          headers: {
+            'Content-Type': 'text/css;charset=UTF-8',
+            'Cache-Control': 'public, max-age=31536000, immutable',
+          },
+        });
+      }
+
       if (path === '/api/issues' && request.method === 'GET') {
         const { results } = await env.DB.prepare(
           'SELECT id, issue, created_at FROM issues ORDER BY created_at ASC LIMIT 100'
