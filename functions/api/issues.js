@@ -142,8 +142,11 @@ export async function onRequest(context) {
     });
   } catch (error) {
     console.error('Error:', error);
+    const isProduction = env.ENVIRONMENT === 'production';
     return new Response(
-      JSON.stringify({ error: '服务器错误: ' + error.message }),
+      JSON.stringify({ 
+        error: isProduction ? '服务器内部错误' : '服务器错误: ' + error.message 
+      }),
       {
         status: 500,
         headers: {
