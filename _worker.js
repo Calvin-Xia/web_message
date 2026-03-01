@@ -78,9 +78,36 @@ export default {
           );
         }
 
+        if (name.length > 20) {
+          return new Response(
+            JSON.stringify({ error: '姓名不能超过20个字符' }),
+            {
+              status: 400,
+              headers: {
+                'Content-Type': 'application/json',
+                ...corsHeaders,
+              },
+            }
+          );
+        }
+
         if (!student_id) {
           return new Response(
             JSON.stringify({ error: '学号不能为空' }),
+            {
+              status: 400,
+              headers: {
+                'Content-Type': 'application/json',
+                ...corsHeaders,
+              },
+            }
+          );
+        }
+
+        const studentIdPattern = /^\d{4}$|^\d{5}$|^\d{13}$/;
+        if (!studentIdPattern.test(student_id)) {
+          return new Response(
+            JSON.stringify({ error: '学号必须为4位、5位或13位数字' }),
             {
               status: 400,
               headers: {

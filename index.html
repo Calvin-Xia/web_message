@@ -165,6 +165,17 @@
             const isInformationPublic = document.getElementById('isInformationPublic').checked ? 'yes' : 'no';
             const isReport = document.getElementById('isReport').checked ? 'yes' : 'no';
 
+            if (name.length > 20) {
+                notification.innerHTML = '<div class="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm font-medium">姓名不能超过20个字符</div>';
+                return;
+            }
+
+            const studentIdPattern = /^\d{4}$|^\d{5}$|^\d{13}$/;
+            if (!studentIdPattern.test(student_id)) {
+                notification.innerHTML = '<div class="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm font-medium">学号必须为4位、5位或13位数字</div>';
+                return;
+            }
+
             submitBtn.disabled = true;
             submitBtn.textContent = '提交中...';
             notification.innerHTML = '';

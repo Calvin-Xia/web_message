@@ -45,8 +45,8 @@ web_message/
 | `id` | INTEGER | Primary key, auto-increment |
 | `issue` | TEXT | Issue content (required, max 1000 chars) |
 | `isInformationPublic` | TEXT | Whether to public real-name ('yes'/'no') |
-| `name` | TEXT | User name (required) |
-| `student_id` | TEXT | Student ID (required) |
+| `name` | TEXT | User name (required, max 20 chars) |
+| `student_id` | TEXT | Student ID (required, must be 4/5/13 digits) |
 | `isReport` | TEXT | Whether to report this issue ('yes'/'no') |
 | `created_at` | DATETIME | Creation timestamp (UTC) |
 
@@ -59,7 +59,10 @@ web_message/
 ### POST `/api/issues`
 - Create a new issue
 - Required body: `{ issue, name, student_id, isInformationPublic, isReport }`
-- Validation: issue ≤ 1000 chars, all fields required
+- Validation:
+  - issue: required, max 1000 chars
+  - name: required, max 20 chars
+  - student_id: required, must be 4/5/13 digits
 
 ### OPTIONS `/api/issues`
 - CORS preflight handler
@@ -157,8 +160,12 @@ npm run d1:query:local "SELECT * FROM issues"
 
 1. **XSS Prevention**: `escapeHtml()` function sanitizes user input
 2. **Input Validation**: Server-side validation for all required fields
-3. **Length Limits**: Issue content limited to 1000 characters
-4. **Privacy**: Personal info (name, student_id) never exposed in GET responses
+3. **Length Limits**:
+   - Issue content: max 1000 characters
+   - Name: max 20 characters
+4. **Format Validation**:
+   - Student ID: must be 4, 5, or 13 digits
+5. **Privacy**: Personal info (name, student_id) never exposed in GET responses
 
 ## Deployment Notes
 
