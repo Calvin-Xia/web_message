@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>后台管理 - 问题反馈系统</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body class="min-h-screen bg-fb-bg p-4 md:p-8">
+    <div class="max-w-6xl mx-auto">
+        <div class="text-center mb-6">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
+                后台管理系统
+            </h1>
+            <p class="text-fb-gray text-sm md:text-base">查看所有问题反馈数据</p>
+        </div>
+
+        <div id="loginSection" class="bg-white rounded-lg shadow-md p-6 md:p-8 mb-4 max-w-sm mx-auto">
+            <h2 class="text-xl font-bold text-gray-900 mb-4 text-center">管理员登录</h2>
+            <div id="loginError" hidden class="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm"></div>
+            <form id="loginForm" class="space-y-4">
+                <div>
+                    <label for="secretKey" class="block text-sm font-medium text-gray-700 mb-2">
+                        管理密钥
+                    </label>
+                    <input
+                        type="password"
+                        id="secretKey"
+                        name="secretKey"
+                        required
+                        placeholder="请输入管理密钥"
+                        class="w-full px-3 py-2 border border-fb-gray-light rounded-lg bg-fb-bg focus:bg-white focus:outline-none focus:ring-2 focus:ring-fb-blue focus:border-transparent transition-all"
+                    >
+                </div>
+                <button
+                    type="submit"
+                    id="loginBtn"
+                    class="w-full bg-fb-blue hover:bg-fb-blue-dark text-white font-semibold py-2.5 px-4 rounded-lg transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                    登录
+                </button>
+            </form>
+        </div>
+
+        <div id="adminSection" hidden>
+            <div class="bg-white rounded-lg shadow-md p-6 md:p-8 mb-4">
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+                    <h2 class="text-xl md:text-2xl font-bold text-gray-900">
+                        所有问题反馈
+                    </h2>
+                    <div class="flex gap-2 ml-auto">
+                        <button
+                            id="logoutBtn"
+                            class="bg-gray-500 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded-lg transition-colors text-sm"
+                        >
+                            退出登录
+                        </button>
+                        <button
+                            id="refreshBtn"
+                            class="bg-fb-blue hover:bg-fb-blue-dark text-white font-medium py-2 px-4 rounded-lg transition-colors text-sm"
+                        >
+                            刷新数据
+                        </button>
+                    </div>
+                </div>
+                <div id="statsSection" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-fb-bg rounded-lg p-4 text-center">
+                        <div class="text-2xl font-bold text-fb-blue" id="totalCount">0</div>
+                        <div class="text-sm text-fb-gray">总问题数</div>
+                    </div>
+                    <div class="bg-fb-bg rounded-lg p-4 text-center">
+                        <div class="text-2xl font-bold text-green-600" id="publicCount">0</div>
+                        <div class="text-sm text-fb-gray">公开实名</div>
+                    </div>
+                    <div class="bg-fb-bg rounded-lg p-4 text-center">
+                        <div class="text-2xl font-bold text-orange-600" id="reportCount">0</div>
+                        <div class="text-sm text-fb-gray">请求上报</div>
+                    </div>
+                    <div class="bg-fb-bg rounded-lg p-4 text-center">
+                        <div class="text-2xl font-bold text-purple-600" id="todayCount">0</div>
+                        <div class="text-sm text-fb-gray">今日新增</div>
+                    </div>
+                </div>
+                <div id="issuesList">
+                    <div class="text-center text-fb-gray py-8">请先登录查看数据</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="text-right py-6 mt-8 border-t border-gray-200">
+            <p class="text-fb-gray text-sm">
+                <a href="/" class="text-fb-blue hover:underline">返回首页</a>
+            </p>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = '/api';
+        const REQUEST_TIMEOUT = 15000;
+        let currentSecretKey = null;
+
+        async function fetchWithTimeout(url, options = {}, timeout = REQUEST_TIMEOUT) {
+            const controller = new AbortController();
+            const id = setTimeout(() => controller.abort(), timeout);
+            try {
+                const response = await fetch(url, {
+                    ...options,
+                    signal: controller.signal
+                });
+                return response;
+            } finally {
+                clearTimeout(id);
+            }
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function formatDate(dateString) {
+            if (!dateString) return '-';
+            const date = new Date(dateString);
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            const seconds = String(date.getSeconds()).padStart(2, '0');
+            return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+        }
+
+        function isToday(dateString) {
+            if (!dateString) return false;
+            const date = new Date(dateString);
+            const today = new Date();
+            return date.toDateString() === today.toDateString();
+        }
+
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const secretKey = document.getElementById('secretKey').value;
+            const loginBtn = document.getElementById('loginBtn');
+            const loginError = document.getElementById('loginError');
+
+            loginBtn.disabled = true;
+            loginBtn.textContent = '验证中...';
+            loginError.hidden = true;
+
+            try {
+                const response = await fetchWithTimeout(`${API_URL}/admin/issues`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${secretKey}`,
+                    },
+                });
+
+                if (response.ok) {
+                    currentSecretKey = secretKey;
+                    document.getElementById('loginSection').hidden = true;
+                    document.getElementById('adminSection').hidden = false;
+                    const data = await response.json();
+                    renderIssues(data.issues);
+                } else {
+                    const data = await response.json();
+                    loginError.textContent = data.error || '登录失败，请检查密钥';
+                    loginError.hidden = false;
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                const errorMsg = error.name === 'AbortError' ? '请求超时，请重试' : '网络错误，请重试';
+                loginError.textContent = errorMsg;
+                loginError.hidden = false;
+            } finally {
+                loginBtn.disabled = false;
+                loginBtn.textContent = '登录';
+            }
+        });
+
+        document.getElementById('refreshBtn').addEventListener('click', async () => {
+            if (!currentSecretKey) return;
+            
+            const refreshBtn = document.getElementById('refreshBtn');
+            refreshBtn.disabled = true;
+            refreshBtn.textContent = '刷新中...';
+
+            try {
+                const response = await fetchWithTimeout(`${API_URL}/admin/issues`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${currentSecretKey}`,
+                    },
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    renderIssues(data.issues);
+                } else {
+                    alert('刷新失败，请重试');
+                }
+            } catch (error) {
+                console.error('Refresh error:', error);
+                alert('刷新失败，请检查网络');
+            } finally {
+                refreshBtn.disabled = false;
+                refreshBtn.textContent = '刷新数据';
+            }
+        });
+
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            currentSecretKey = null;
+            document.getElementById('secretKey').value = '';
+            document.getElementById('adminSection').hidden = true;
+            document.getElementById('loginSection').hidden = false;
+        });
+
+        function renderIssues(issues) {
+            const issuesList = document.getElementById('issuesList');
+            
+            document.getElementById('totalCount').textContent = issues.length;
+            document.getElementById('publicCount').textContent = issues.filter(i => i.isInformationPublic === 'yes').length;
+            document.getElementById('reportCount').textContent = issues.filter(i => i.isReport === 'yes').length;
+            document.getElementById('todayCount').textContent = issues.filter(i => isToday(i.created_at)).length;
+
+            if (!issues || issues.length === 0) {
+                issuesList.innerHTML = '<div class="text-center text-fb-gray py-12 text-sm">暂无问题反馈数据</div>';
+                return;
+            }
+
+            issuesList.innerHTML = `
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-fb-gray-light">
+                                <th class="text-left py-3 px-2 font-semibold text-gray-700">ID</th>
+                                <th class="text-left py-3 px-2 font-semibold text-gray-700">问题内容</th>
+                                <th class="text-left py-3 px-2 font-semibold text-gray-700">姓名</th>
+                                <th class="text-left py-3 px-2 font-semibold text-gray-700">学号</th>
+                                <th class="text-center py-3 px-2 font-semibold text-gray-700">公开实名</th>
+                                <th class="text-center py-3 px-2 font-semibold text-gray-700">请求上报</th>
+                                <th class="text-left py-3 px-2 font-semibold text-gray-700">提交时间(UTC)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${issues.map(issue => `
+                                <tr class="border-b border-fb-gray-light hover:bg-fb-bg transition-colors">
+                                    <td class="py-3 px-2 text-fb-gray">${issue.id}</td>
+                                    <td class="py-3 px-2 text-gray-900 max-w-xs">
+                                        <div class="break-words">${escapeHtml(issue.issue)}</div>
+                                    </td>
+                                    <td class="py-3 px-2 text-gray-900">${escapeHtml(issue.name)}</td>
+                                    <td class="py-3 px-2 text-gray-900">${escapeHtml(issue.student_id)}</td>
+                                    <td class="py-3 px-2 text-center">
+                                        ${issue.isInformationPublic === 'yes' 
+                                            ? '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">是</span>'
+                                            : '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">否</span>'
+                                        }
+                                    </td>
+                                    <td class="py-3 px-2 text-center">
+                                        ${issue.isReport === 'yes'
+                                            ? '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">是</span>'
+                                            : '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">否</span>'
+                                        }
+                                    </td>
+                                    <td class="py-3 px-2 text-fb-gray whitespace-nowrap">${formatDate(issue.created_at)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>

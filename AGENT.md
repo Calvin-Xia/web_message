@@ -19,13 +19,19 @@ This is a **Feedback Issue System** (问题反馈系统) built with Cloudflare P
 ```
 web_message/
 ├── index.html              # Main frontend page (single-page app)
+├── admin.html              # Admin backend management page
 ├── styles.css              # Compiled Tailwind CSS (generated)
 ├── functions/
 │   └── api/
-│       └── issues.js       # API endpoint for Pages Functions
+│       ├── issues.js       # API endpoint for Pages Functions
+│       └── admin/
+│           └── issues.js   # Admin API endpoint (requires authentication)
 ├── src/
 │   ├── index.js            # Workers entry point (imports HTML/CSS)
-│   └── input.css           # Tailwind CSS source file
+│   ├── input.css           # Tailwind CSS source file
+│   └── shared/
+│       ├── auth.js         # Authentication module for admin API
+│       └── rateLimit.js   # Rate limiting module
 ├── storage/
 │   └── Beian.png           # ICP filing badge image
 ├── schema.sql              # Database schema definition
@@ -67,18 +73,32 @@ web_message/
 ### OPTIONS `/api/issues`
 - CORS preflight handler
 
+### GET `/api/admin/issues`
+- Returns list of all issues with complete data (including personal info)
+- Requires `Authorization: Bearer <ADMIN_SECRET_KEY>` header
+- Max 100 records, ordered by `created_at DESC`
+- Response includes: `id`, `issue`, `name`, `student_id`, `isInformationPublic`, `isReport`, `created_at`
+- Returns 401 Unauthorized if missing or invalid key
+
+### OPTIONS `/api/admin/issues`
+- CORS preflight handler for admin API
+- CORS only allows: `https://web-message-board.pages.dev`, `https://issue.calvin-xia.cn` (production)
+- Local development allows all origins (`*`)
+
 ### Static Files
 - `GET /` or `GET /index.html` - Main HTML page
+- `GET /admin.html` - Admin backend management page
 - `GET /styles.css` - Compiled CSS (cached for 1 year)
 
 ## Key Features
 
 1. **Real-name Required**: Name and student_id are mandatory fields
 2. **Privacy Protection**: Frontend only displays issue content and timestamp
-3. **XSS Prevention**: All user input is HTML-escaped before display
-4. **Responsive Design**: Mobile-friendly with Tailwind CSS
-5. **CORS Enabled**: Allows cross-origin requests
-6. **Compiled CSS**: Uses Tailwind CSS v4 with custom theme
+3. **Admin Backend**: Secure admin panel with secret key authentication
+4. **XSS Prevention**: All user input is HTML-escaped before display
+5. **Responsive Design**: Mobile-friendly with Tailwind CSS
+6. **CORS Enabled**: Allows cross-origin requests
+7. **Compiled CSS**: Uses Tailwind CSS v4 with custom theme
 
 ## Development Commands
 
@@ -125,6 +145,19 @@ npm run d1:query:local "SELECT * FROM issues"
 | Variable | Environment | Description |
 |----------|-------------|-------------|
 | `ENVIRONMENT` | production/preview | Current environment name |
+| `ADMIN_SECRET_KEY` | production/preview/local | Secret key for admin API authentication (min 32 chars) |
+
+### Admin Secret Key Configuration
+
+**Local Development:**
+1. Copy `.dev.vars.example` to `.dev.vars`
+2. Set `ADMIN_SECRET_KEY=your-secret-key-here` in `.dev.vars`
+3. The `.dev.vars` file is ignored by git (see `.gitignore`)
+
+**Production (Cloudflare Pages):**
+1. Go to Cloudflare Pages Dashboard > Your Project > Settings > Environment Variables
+2. Add `ADMIN_SECRET_KEY` with a strong secret key (at least 32 characters)
+3. Set for both Production and Preview environments
 
 ## Code Conventions
 
@@ -166,6 +199,8 @@ npm run d1:query:local "SELECT * FROM issues"
 4. **Format Validation**:
    - Student ID: must be 4, 5, or 13 digits
 5. **Privacy**: Personal info (name, student_id) never exposed in GET responses
+6. **Admin Authentication**: Secret key required for admin API access
+7. **CORS Security**: Admin API only allows specific origins in production
 
 ## Rate Limiting Configuration
 
@@ -237,11 +272,15 @@ npm run d1:query:local "SELECT * FROM issues"
 ## File References
 
 - Main page: [index.html](file:///c:/Users/Calvin-Xia/Documents/GitHub/web_message/index.html)
+- Admin page: [admin.html](file:///c:/Users/Calvin-Xia/Documents/GitHub/web_message/admin.html)
 - Compiled CSS: [styles.css](file:///c:/Users/Calvin-Xia/Documents/GitHub/web_message/styles.css)
 - CSS source: [src/input.css](file:///c:/Users/Calvin-Xia/Documents/GitHub/web_message/src/input.css)
 - Workers entry: [src/index.js](file:///c:/Users/Calvin-Xia/Documents/GitHub/web_message/src/index.js)
+- Auth module: [src/shared/auth.js](file:///c:/Users/Calvin-Xia/Documents/GitHub/web_message/src/shared/auth.js)
+- Rate limit module: [src/shared/rateLimit.js](file:///c:/Users/Calvin-Xia/Documents/GitHub/web_message/src/shared/rateLimit.js)
 - Pages Worker: [_worker.js](file:///c:/Users/Calvin-Xia/Documents/GitHub/web_message/_worker.js)
 - API handler: [functions/api/issues.js](file:///c:/Users/Calvin-Xia/Documents/GitHub/web_message/functions/api/issues.js)
+- Admin API handler: [functions/api/admin/issues.js](file:///c:/Users/Calvin-Xia/Documents/GitHub/web_message/functions/api/admin/issues.js)
 - Database schema: [schema.sql](file:///c:/Users/Calvin-Xia/Documents/GitHub/web_message/schema.sql)
 - Cloudflare config: [wrangler.toml](file:///c:/Users/Calvin-Xia/Documents/GitHub/web_message/wrangler.toml)
 

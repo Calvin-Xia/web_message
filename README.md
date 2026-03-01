@@ -14,11 +14,13 @@
 - 基于 Cloudflare D1 数据库存储
 - 防 XSS 攻击
 - 表单验证（内容长度限制、实名信息必填验证）
+- 限流保护（Rate Limiting）
+- 后台管理页面（需管理员密钥）
 
 ## 技术栈
 
-- **前端**: HTML + CSS + JavaScript
-- **后端**: Cloudflare Pages Functions
+- **前端**: HTML + Tailwind CSS v4 + JavaScript
+- **后端**: Cloudflare Pages Functions / Workers
 - **数据库**: Cloudflare D1 (SQLite)
 - **部署**: Cloudflare Pages
 
@@ -41,13 +43,26 @@
 
 ```
 web_message/
-├── src/
-│   └── index.js        # Cloudflare Workers 主文件
 ├── index.html          # 前端页面
+├── admin.html          # 后台管理页面
+├── styles.css          # 编译后的 Tailwind CSS
+├── functions/
+│   └── api/
+│       ├── issues.js       # API 端点
+│       └── admin/
+│           └── issues.js   # 管理 API 端点
+├── src/
+│   ├── index.js        # Cloudflare Workers 主文件
+│   ├── input.css       # Tailwind CSS 源文件
+│   └── shared/
+│       ├── auth.js     # 认证模块
+│       └── rateLimit.js # 限流模块
+├── storage/
+│   └── Beian.png       # 备案图片
 ├── schema.sql          # 数据库表结构
 ├── wrangler.toml       # Cloudflare 配置文件
 ├── package.json        # 项目依赖配置
-├── .gitignore         # Git 忽略文件配置
+├── .gitignore          # Git 忽略文件配置
 └── README.md           # 说明文档
 ```
 
@@ -100,15 +115,35 @@ database_name = "issue-board-db"
 database_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 ```
 
-### 4. 更新 wrangler.toml
+### 4. 创建 KV Namespace（用于限流）
 
-将上一步获得的 `database_id` 复制到 `wrangler.toml` 文件中，替换 `YOUR_DATABASE_ID`：
+```bash
+wrangler kv namespace create RATE_LIMIT_KV
+```
+
+执行后，命令会返回 namespace 的 ID，类似：
+
+```
+✅ Successfully created namespace "RATE_LIMIT_KV"
+
+[[kv_namespaces]]
+binding = "RATE_LIMIT_KV"
+id = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+```
+
+### 5. 更新 wrangler.toml
+
+将上一步获得的 `database_id` 和 `kv_id` 复制到 `wrangler.toml` 文件中：
 
 ```toml
 [[d1_databases]]
 binding = "DB"
 database_name = "issue-board-db"
 database_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"  # 替换为实际的 ID
+
+[[kv_namespaces]]
+binding = "RATE_LIMIT_KV"
+id = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"  # 替换为实际的 ID
 ```
 
 ### 5. 初始化数据库表结构
@@ -129,7 +164,27 @@ wrangler d1 execute issue-board-db --local --file=./schema.sql
 🚣 Executed 2 commands in 0.123ms
 ```
 
-### 6. 本地开发测试
+### 6. 配置管理员密钥（可选，用于后台管理）
+
+后台管理页面需要管理员密钥才能访问。
+
+**本地开发：**
+
+创建 `.dev.vars` 文件（已包含在 `.gitignore` 中）：
+
+```bash
+ADMIN_SECRET_KEY=your-secret-key-here-min-32-chars
+```
+
+**生产环境：**
+
+在 Cloudflare Dashboard 中设置：
+1. 进入你的 Pages 项目
+2. 选择 **Settings** → **Environment Variables**
+3. 添加变量 `ADMIN_SECRET_KEY`，值设置为至少 32 位的密钥
+4. 保存并重新部署
+
+### 7. 本地开发测试
 
 启动本地开发服务器：
 
@@ -145,7 +200,9 @@ npx wrangler dev
 
 访问 `http://localhost:8787` 查看应用。
 
-### 7. 部署到 Cloudflare Workers
+后台管理页面访问：`http://localhost:8787/admin.html`
+
+### 8. 部署到 Cloudflare Workers
 
 ```bash
 npm run deploy

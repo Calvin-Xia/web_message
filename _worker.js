@@ -1,4 +1,5 @@
 import { checkRateLimit } from './src/shared/rateLimit.js';
+import { verifyAdminKey, getCorsHeaders, createUnauthorizedResponse } from './src/shared/auth.js';
 
 const cspHeader = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
 
@@ -22,6 +23,16 @@ export default {
     try {
       if (path === '/' || path === '/index.html') {
         const html = await env.ASSETS.fetch(new Request('https://example.com/index.html'));
+        return new Response(html.body, {
+          headers: {
+            'Content-Type': 'text/html;charset=UTF-8',
+            'Content-Security-Policy': cspHeader,
+          },
+        });
+      }
+
+      if (path === '/admin.html') {
+        const html = await env.ASSETS.fetch(new Request('https://example.com/admin.html'));
         return new Response(html.body, {
           headers: {
             'Content-Type': 'text/html;charset=UTF-8',
@@ -178,6 +189,54 @@ export default {
         } else {
           throw new Error('保存问题失败');
         }
+      }
+
+      if (path === '/api/admin/issues' && request.method === 'GET') {
+        const origin = request.headers.get('Origin');
+        const adminCorsHeaders = getCorsHeaders(origin, env);
+
+        const authHeader = request.headers.get('Authorization');
+        const authResult = verifyAdminKey(authHeader, env);
+
+        if (!authResult.valid) {
+          return createUnauthorizedResponse(authResult.error, adminCorsHeaders);
+        }
+
+        try {
+          const { results } = await env.DB.prepare(
+            'SELECT id, issue, name, student_id, isInformationPublic, isReport, created_at FROM issues ORDER BY created_at DESC LIMIT 100'
+          ).all();
+
+          return new Response(JSON.stringify({ issues: results }), {
+            headers: {
+              'Content-Type': 'application/json',
+              ...adminCorsHeaders,
+            },
+          });
+        } catch (error) {
+          console.error('Database error:', error);
+          const isProduction = env.ENVIRONMENT === 'production';
+          return new Response(
+            JSON.stringify({ 
+              error: isProduction ? '服务器内部错误' : '数据库错误: ' + error.message 
+            }),
+            {
+              status: 500,
+              headers: {
+                'Content-Type': 'application/json',
+                ...adminCorsHeaders,
+              },
+            }
+          );
+        }
+      }
+
+      if (path === '/api/admin/issues' && request.method === 'OPTIONS') {
+        const origin = request.headers.get('Origin');
+        const adminCorsHeaders = getCorsHeaders(origin, env);
+        return new Response(null, {
+          headers: adminCorsHeaders,
+        });
       }
 
       return new Response('Not Found', {

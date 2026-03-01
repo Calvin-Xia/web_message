@@ -4,6 +4,11 @@ compatibility_date = "2024-01-01"
 # Pages configuration
 pages_build_output_dir = "./"
 
+# Environment Variables Configuration
+# For local development: Create .dev.vars file with ADMIN_SECRET_KEY=your-key
+# For production: Set ADMIN_SECRET_KEY in Cloudflare Pages Dashboard > Settings > Environment Variables
+# The ADMIN_SECRET_KEY must be at least 32 characters for security
+
 # KV namespace binding (for rate limiting)
 [[kv_namespaces]]
 binding = "RATE_LIMIT_KV"
@@ -11,7 +16,7 @@ id = "a0ce17a6fd044feba155039a078e9620"
 
 # Pages Functions configuration
 [env.production]
-vars = { ENVIRONMENT = "production" }
+vars = { ENVIRONMENT = "production", ADMIN_SECRET_KEY = "A?xK#8mP&2qR@5tL$9vN%1aB^3cD*6eF" }
 
 [[env.production.d1_databases]]
 binding = "DB"
@@ -23,7 +28,7 @@ binding = "RATE_LIMIT_KV"
 id = "a0ce17a6fd044feba155039a078e9620"
 
 [env.preview]
-vars = { ENVIRONMENT = "preview" }
+vars = { ENVIRONMENT = "preview", ADMIN_SECRET_KEY = "A?xK#8mP&2qR@5tL$9vN%1aB^3cD*6eF" }
 
 [[env.preview.d1_databases]]
 binding = "DB"
