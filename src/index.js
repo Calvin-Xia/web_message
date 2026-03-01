@@ -1,5 +1,8 @@
 import indexHtml from '../index.html';
 import stylesCss from '../styles.css';
+import beianPng from '../storage/Beian.png';
+
+const cspHeader = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
 
 export default {
   async fetch(request, env) {
@@ -23,6 +26,7 @@ export default {
         return new Response(indexHtml, {
           headers: {
             'Content-Type': 'text/html;charset=UTF-8',
+            'Content-Security-Policy': cspHeader,
           },
         });
       }
@@ -31,6 +35,15 @@ export default {
         return new Response(stylesCss, {
           headers: {
             'Content-Type': 'text/css;charset=UTF-8',
+            'Cache-Control': 'public, max-age=31536000, immutable',
+          },
+        });
+      }
+
+      if (path === '/storage/Beian.png') {
+        return new Response(beianPng, {
+          headers: {
+            'Content-Type': 'image/png',
             'Cache-Control': 'public, max-age=31536000, immutable',
           },
         });

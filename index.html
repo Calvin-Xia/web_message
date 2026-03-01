@@ -115,7 +115,7 @@
                 <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener" class="text-fb-gray hover:text-fb-blue transition-colors">渝ICP备2026000319号</a>
                 <br>
                 <a href="https://beian.mps.gov.cn/#/query/webSearch?code=50010102001439" rel="noreferrer" target="_blank" class="inline-flex items-center text-fb-gray hover:text-fb-blue transition-colors">
-                    <img src="https://beian.mps.gov.cn/web/assets/logo01.6189a29f.png" alt="公安备案" class="w-5 h-5 ml-1">
+                    <img src="/storage/Beian.png" alt="公安备案" class="w-5 h-5 ml-1">
                     渝公网安备50010102001439号
                 </a>
             </p>
@@ -124,11 +124,26 @@
 
     <script>
         const API_URL = '/api';
+        const REQUEST_TIMEOUT = 10000;
+
+        async function fetchWithTimeout(url, options = {}, timeout = REQUEST_TIMEOUT) {
+            const controller = new AbortController();
+            const id = setTimeout(() => controller.abort(), timeout);
+            try {
+                const response = await fetch(url, {
+                    ...options,
+                    signal: controller.signal
+                });
+                return response;
+            } finally {
+                clearTimeout(id);
+            }
+        }
 
         // 加载问题列表
         async function loadMessages() {
             try {
-                const response = await fetch(`${API_URL}/issues`);
+                const response = await fetchWithTimeout(`${API_URL}/issues`);
                 const data = await response.json();
 
                 const messagesList = document.getElementById('messagesList');
@@ -148,8 +163,9 @@
                 `).join('');
             } catch (error) {
                 console.error('加载问题失败:', error);
+                const errorMsg = error.name === 'AbortError' ? '加载超时，请刷新页面重试' : '加载问题失败，请刷新页面重试';
                 document.getElementById('messagesList').innerHTML =
-                    '<div class="bg-red-50 text-red-600 p-3 rounded-lg text-sm">加载问题失败，请刷新页面重试</div>';
+                    `<div class="bg-red-50 text-red-600 p-3 rounded-lg text-sm">${errorMsg}</div>`;
             }
         }
 
@@ -181,7 +197,7 @@
             notification.innerHTML = '';
 
             try {
-                const response = await fetch(`${API_URL}/issues`, {
+                const response = await fetchWithTimeout(`${API_URL}/issues`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -203,7 +219,8 @@
                 }
             } catch (error) {
                 console.error('提交问题失败:', error);
-                notification.innerHTML = '<div class="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm font-medium">提交失败，请检查网络连接</div>';
+                const errorMsg = error.name === 'AbortError' ? '请求超时，请重试' : '提交失败，请检查网络连接';
+                notification.innerHTML = `<div class="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm font-medium">${errorMsg}</div>`;
             } finally {
                 submitBtn.disabled = false;
                 submitBtn.textContent = '提交问题';

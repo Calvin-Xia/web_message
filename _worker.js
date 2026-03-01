@@ -1,3 +1,5 @@
+const cspHeader = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -21,6 +23,7 @@ export default {
         return new Response(html.body, {
           headers: {
             'Content-Type': 'text/html;charset=UTF-8',
+            'Content-Security-Policy': cspHeader,
           },
         });
       }
@@ -30,6 +33,16 @@ export default {
         return new Response(css.body, {
           headers: {
             'Content-Type': 'text/css;charset=UTF-8',
+            'Cache-Control': 'public, max-age=31536000, immutable',
+          },
+        });
+      }
+
+      if (path === '/storage/Beian.png') {
+        const png = await env.ASSETS.fetch(new Request('https://example.com/storage/Beian.png'));
+        return new Response(png.body, {
+          headers: {
+            'Content-Type': 'image/png',
             'Cache-Control': 'public, max-age=31536000, immutable',
           },
         });
