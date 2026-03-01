@@ -4,6 +4,11 @@ compatibility_date = "2024-01-01"
 # Pages configuration
 pages_build_output_dir = "./"
 
+# KV namespace binding (for rate limiting)
+[[kv_namespaces]]
+binding = "RATE_LIMIT_KV"
+id = "a0ce17a6fd044feba155039a078e9620"
+
 # Pages Functions configuration
 [env.production]
 vars = { ENVIRONMENT = "production" }
@@ -13,6 +18,10 @@ binding = "DB"
 database_name = "issue-board-db"
 database_id = "58c85d18-4868-4580-ad22-7767fccfc729"
 
+[[env.production.kv_namespaces]]
+binding = "RATE_LIMIT_KV"
+id = "a0ce17a6fd044feba155039a078e9620"
+
 [env.preview]
 vars = { ENVIRONMENT = "preview" }
 
@@ -20,3 +29,7 @@ vars = { ENVIRONMENT = "preview" }
 binding = "DB"
 database_name = "issue-board-db"
 database_id = "58c85d18-4868-4580-ad22-7767fccfc729"
+
+[[env.preview.kv_namespaces]]
+binding = "RATE_LIMIT_KV"
+id = "a0ce17a6fd044feba155039a078e9620"

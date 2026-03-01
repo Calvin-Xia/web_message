@@ -167,6 +167,37 @@ npm run d1:query:local "SELECT * FROM issues"
    - Student ID: must be 4, 5, or 13 digits
 5. **Privacy**: Personal info (name, student_id) never exposed in GET responses
 
+## Rate Limiting Configuration
+
+本项目采用应用层 Rate Limiting 策略：
+
+### 实现方式
+- **Method**: Pages Functions + KV
+- **Storage**: Cloudflare KV (`RATE_LIMIT_KV`)
+
+### 限制配置
+| 端点 | 限制 | 封禁时间 |
+|------|------|----------|
+| POST `/api/issues` | 10 次/分钟/IP | 5 分钟 |
+| GET `/api/issues` | 60 次/分钟/IP | 1 分钟 |
+
+### 配置文件
+- **KV 绑定**: `wrangler.toml` 中的 `RATE_LIMIT_KV`
+- **限制参数**: `src/shared/rateLimit.js` 中的 `RATE_LIMIT_CONFIG`
+
+### 响应格式
+超限时返回 HTTP 429：
+```json
+{
+  "error": "请求过于频繁，请稍后再试",
+  "retryAfter": 300
+}
+```
+
+### 注意事项
+- Rate Limiting 失败时不会阻止请求（降级策略）
+- KV 计数器自动过期，无需手动清理
+
 ## Deployment Notes
 
 ### Cloudflare Pages Setup

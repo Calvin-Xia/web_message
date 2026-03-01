@@ -1,3 +1,5 @@
+import { checkRateLimit } from './src/shared/rateLimit.js';
+
 const cspHeader = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
 
 export default {
@@ -49,6 +51,11 @@ export default {
       }
 
       if (path === '/api/issues' && request.method === 'GET') {
+        const rateLimitResponse = await checkRateLimit(env, request, 'getIssues', corsHeaders);
+        if (rateLimitResponse) {
+          return rateLimitResponse;
+        }
+
         const { results } = await env.DB.prepare(
           'SELECT id, issue, created_at FROM issues ORDER BY created_at ASC LIMIT 100'
         ).all();
@@ -62,6 +69,11 @@ export default {
       }
 
       if (path === '/api/issues' && request.method === 'POST') {
+        const rateLimitResponse = await checkRateLimit(env, request, 'postIssue', corsHeaders);
+        if (rateLimitResponse) {
+          return rateLimitResponse;
+        }
+
         const data = await request.json();
         const { issue, name, student_id, isInformationPublic, isReport } = data;
 

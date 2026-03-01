@@ -1,3 +1,5 @@
+import { checkRateLimit } from '../../src/shared/rateLimit.js';
+
 export async function onRequest(context) {
   const { request, env } = context;
   const url = new URL(request.url);
@@ -17,6 +19,11 @@ export async function onRequest(context) {
 
   try {
     if (path === '/api/issues' && request.method === 'GET') {
+      const rateLimitResponse = await checkRateLimit(env, request, 'getIssues', corsHeaders);
+      if (rateLimitResponse) {
+        return rateLimitResponse;
+      }
+
       const { results } = await env.DB.prepare(
         'SELECT id, issue, created_at FROM issues ORDER BY created_at ASC LIMIT 100'
       ).all();
@@ -30,6 +37,11 @@ export async function onRequest(context) {
     }
 
     if (path === '/api/issues' && request.method === 'POST') {
+      const rateLimitResponse = await checkRateLimit(env, request, 'postIssue', corsHeaders);
+      if (rateLimitResponse) {
+        return rateLimitResponse;
+      }
+
       const data = await request.json();
       const { issue, name, student_id, isInformationPublic, isReport } = data;
 
