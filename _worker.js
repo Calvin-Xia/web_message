@@ -61,6 +61,55 @@ export default {
         });
       }
 
+      if (path === '/health' || path === '/health.html') {
+        const html = await env.ASSETS.fetch(new Request('https://example.com/health.html'));
+        return new Response(html.body, {
+          headers: {
+            'Content-Type': 'text/html;charset=UTF-8',
+            'Content-Security-Policy': cspHeader,
+          },
+        });
+      }
+
+      if (path === '/api/health' && request.method === 'GET') {
+        try {
+          await env.DB.prepare('SELECT 1').first();
+          return new Response(
+            JSON.stringify({
+              status: 'ok',
+              timestamp: new Date().toISOString(),
+              services: {
+                database: 'connected',
+              },
+            }),
+            {
+              headers: {
+                'Content-Type': 'application/json',
+                ...corsHeaders,
+              },
+            }
+          );
+        } catch (error) {
+          return new Response(
+            JSON.stringify({
+              status: 'degraded',
+              timestamp: new Date().toISOString(),
+              services: {
+                database: 'error',
+              },
+              error: env.ENVIRONMENT === 'production' ? 'Database connection failed' : error.message,
+            }),
+            {
+              status: 503,
+              headers: {
+                'Content-Type': 'application/json',
+                ...corsHeaders,
+              },
+            }
+          );
+        }
+      }
+
       if (path === '/api/issues' && request.method === 'GET') {
         const rateLimitResponse = await checkRateLimit(env, request, 'getIssues', corsHeaders);
         if (rateLimitResponse) {

@@ -1,6 +1,7 @@
 import indexHtml from '../index.html';
 import stylesCss from '../styles.css';
 import beianPng from '../storage/Beian.png';
+import healthHtml from '../health.html';
 import { checkRateLimit } from './shared/rateLimit.js';
 
 const cspHeader = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
@@ -48,6 +49,54 @@ export default {
             'Cache-Control': 'public, max-age=31536000, immutable',
           },
         });
+      }
+
+      if (path === '/health' || path === '/health.html') {
+        return new Response(healthHtml, {
+          headers: {
+            'Content-Type': 'text/html;charset=UTF-8',
+            'Content-Security-Policy': cspHeader,
+          },
+        });
+      }
+
+      if (path === '/api/health' && request.method === 'GET') {
+        try {
+          await env.DB.prepare('SELECT 1').first();
+          return new Response(
+            JSON.stringify({
+              status: 'ok',
+              timestamp: new Date().toISOString(),
+              services: {
+                database: 'connected',
+              },
+            }),
+            {
+              headers: {
+                'Content-Type': 'application/json',
+                ...corsHeaders,
+              },
+            }
+          );
+        } catch (error) {
+          return new Response(
+            JSON.stringify({
+              status: 'degraded',
+              timestamp: new Date().toISOString(),
+              services: {
+                database: 'error',
+              },
+              error: env.ENVIRONMENT === 'production' ? 'Database connection failed' : error.message,
+            }),
+            {
+              status: 503,
+              headers: {
+                'Content-Type': 'application/json',
+                ...corsHeaders,
+              },
+            }
+          );
+        }
       }
 
       if (path === '/api/issues' && request.method === 'GET') {
