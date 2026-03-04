@@ -108,6 +108,7 @@
             <div id="messagesList">
                 <div class="text-center text-fb-gray py-8">加载中...</div>
             </div>
+            <div id="paginationContainer" class="mt-4"></div>
         </div>
 
         <div class="text-right py-6 mt-8 border-t border-gray-200">
@@ -125,6 +126,8 @@
     <script>
         const API_URL = '/api';
         const REQUEST_TIMEOUT = 10000;
+        let currentPage = 1;
+        const pageSize = 20;
 
         async function fetchWithTimeout(url, options = {}, timeout = REQUEST_TIMEOUT) {
             const controller = new AbortController();
@@ -140,16 +143,104 @@
             }
         }
 
+        function renderPagination(container, currentPage, totalPages, onPageChange) {
+            if (totalPages <= 1) {
+                container.innerHTML = '';
+                return;
+            }
+
+            const maxVisiblePages = 5;
+            let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+            let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+            
+            if (endPage - startPage + 1 < maxVisiblePages) {
+                startPage = Math.max(1, endPage - maxVisiblePages + 1);
+            }
+
+            let paginationHtml = `
+                <div class="flex items-center justify-center gap-1 flex-wrap">
+                    <button 
+                        class="px-3 py-2 text-sm rounded-lg border border-fb-gray-light bg-white hover:bg-fb-bg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        ${currentPage === 1 ? 'disabled' : ''}
+                        data-page="${currentPage - 1}"
+                    >
+                        上一页
+                    </button>
+            `;
+
+            if (startPage > 1) {
+                paginationHtml += `
+                    <button class="px-3 py-2 text-sm rounded-lg border border-fb-gray-light bg-white hover:bg-fb-bg transition-colors" data-page="1">1</button>
+                `;
+                if (startPage > 2) {
+                    paginationHtml += `<span class="px-2 text-fb-gray">...</span>`;
+                }
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                const isActive = i === currentPage;
+                paginationHtml += `
+                    <button 
+                        class="px-3 py-2 text-sm rounded-lg border transition-colors ${
+                            isActive 
+                                ? 'bg-fb-blue text-white border-fb-blue' 
+                                : 'border-fb-gray-light bg-white hover:bg-fb-bg'
+                        }"
+                        data-page="${i}"
+                        ${isActive ? 'disabled' : ''}
+                    >
+                        ${i}
+                    </button>
+                `;
+            }
+
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) {
+                    paginationHtml += `<span class="px-2 text-fb-gray">...</span>`;
+                }
+                paginationHtml += `
+                    <button class="px-3 py-2 text-sm rounded-lg border border-fb-gray-light bg-white hover:bg-fb-bg transition-colors" data-page="${totalPages}">${totalPages}</button>
+                `;
+            }
+
+            paginationHtml += `
+                    <button 
+                        class="px-3 py-2 text-sm rounded-lg border border-fb-gray-light bg-white hover:bg-fb-bg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        ${currentPage === totalPages ? 'disabled' : ''}
+                        data-page="${currentPage + 1}"
+                    >
+                        下一页
+                    </button>
+                </div>
+            `;
+
+            container.innerHTML = paginationHtml;
+
+            container.querySelectorAll('button[data-page]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const page = parseInt(btn.dataset.page);
+                    if (page !== currentPage && page >= 1 && page <= totalPages) {
+                        onPageChange(page);
+                    }
+                });
+            });
+        }
+
         // 加载问题列表
-        async function loadMessages() {
+        async function loadMessages(page = 1) {
             try {
-                const response = await fetchWithTimeout(`${API_URL}/issues`);
+                const response = await fetchWithTimeout(`${API_URL}/issues?page=${page}&pageSize=${pageSize}`);
                 const data = await response.json();
 
                 const messagesList = document.getElementById('messagesList');
+                const paginationContainer = document.getElementById('paginationContainer');
+
+                currentPage = page;
+                const totalPages = data.pagination?.totalPages || 1;
 
                 if (!data.messages || data.messages.length === 0) {
                     messagesList.innerHTML = '<div class="text-center text-fb-gray py-12 text-sm">暂无问题，成为第一个提交问题的人吧！</div>';
+                    paginationContainer.innerHTML = '';
                     return;
                 }
 
@@ -161,6 +252,11 @@
                         </div>
                     </div>
                 `).join('');
+
+                renderPagination(paginationContainer, currentPage, totalPages, (newPage) => {
+                    loadMessages(newPage);
+                });
+
             } catch (error) {
                 console.error('加载问题失败:', error);
                 const errorMsg = error.name === 'AbortError' ? '加载超时，请刷新页面重试' : '加载问题失败，请刷新页面重试';
@@ -210,7 +306,7 @@
                 if (response.ok) {
                     notification.innerHTML = '<div class="bg-green-50 text-green-700 p-3 rounded-lg mb-4 text-sm font-medium">问题提交成功！</div>';
                     document.getElementById('messageForm').reset();
-                    await loadMessages();
+                    await loadMessages(1);
                     setTimeout(() => {
                         notification.innerHTML = '';
                     }, 3000);

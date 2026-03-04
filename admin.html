@@ -84,6 +84,7 @@
                 <div id="issuesList">
                     <div class="text-center text-fb-gray py-8">请先登录查看数据</div>
                 </div>
+                <div id="adminPaginationContainer" class="mt-4"></div>
             </div>
         </div>
 
@@ -98,6 +99,8 @@
         const API_URL = '/api';
         const REQUEST_TIMEOUT = 15000;
         let currentSecretKey = null;
+        let adminCurrentPage = 1;
+        const adminPageSize = 20;
 
         async function fetchWithTimeout(url, options = {}, timeout = REQUEST_TIMEOUT) {
             const controller = new AbortController();
@@ -139,6 +142,115 @@
             return date.toDateString() === today.toDateString();
         }
 
+        function renderPagination(container, currentPage, totalPages, onPageChange) {
+            if (totalPages <= 1) {
+                container.innerHTML = '';
+                return;
+            }
+
+            const maxVisiblePages = 5;
+            let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+            let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+            
+            if (endPage - startPage + 1 < maxVisiblePages) {
+                startPage = Math.max(1, endPage - maxVisiblePages + 1);
+            }
+
+            let paginationHtml = `
+                <div class="flex items-center justify-center gap-1 flex-wrap">
+                    <button 
+                        class="px-3 py-2 text-sm rounded-lg border border-fb-gray-light bg-white hover:bg-fb-bg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        ${currentPage === 1 ? 'disabled' : ''}
+                        data-page="${currentPage - 1}"
+                    >
+                        上一页
+                    </button>
+            `;
+
+            if (startPage > 1) {
+                paginationHtml += `
+                    <button class="px-3 py-2 text-sm rounded-lg border border-fb-gray-light bg-white hover:bg-fb-bg transition-colors" data-page="1">1</button>
+                `;
+                if (startPage > 2) {
+                    paginationHtml += `<span class="px-2 text-fb-gray">...</span>`;
+                }
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                const isActive = i === currentPage;
+                paginationHtml += `
+                    <button 
+                        class="px-3 py-2 text-sm rounded-lg border transition-colors ${
+                            isActive 
+                                ? 'bg-fb-blue text-white border-fb-blue' 
+                                : 'border-fb-gray-light bg-white hover:bg-fb-bg'
+                        }"
+                        data-page="${i}"
+                        ${isActive ? 'disabled' : ''}
+                    >
+                        ${i}
+                    </button>
+                `;
+            }
+
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) {
+                    paginationHtml += `<span class="px-2 text-fb-gray">...</span>`;
+                }
+                paginationHtml += `
+                    <button class="px-3 py-2 text-sm rounded-lg border border-fb-gray-light bg-white hover:bg-fb-bg transition-colors" data-page="${totalPages}">${totalPages}</button>
+                `;
+            }
+
+            paginationHtml += `
+                    <button 
+                        class="px-3 py-2 text-sm rounded-lg border border-fb-gray-light bg-white hover:bg-fb-bg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        ${currentPage === totalPages ? 'disabled' : ''}
+                        data-page="${currentPage + 1}"
+                    >
+                        下一页
+                    </button>
+                </div>
+            `;
+
+            container.innerHTML = paginationHtml;
+
+            container.querySelectorAll('button[data-page]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const page = parseInt(btn.dataset.page);
+                    if (page !== currentPage && page >= 1 && page <= totalPages) {
+                        onPageChange(page);
+                    }
+                });
+            });
+        }
+
+        async function loadAdminIssues(page = 1) {
+            if (!currentSecretKey) return;
+            
+            try {
+                const response = await fetchWithTimeout(
+                    `${API_URL}/admin/issues?page=${page}&pageSize=${adminPageSize}`,
+                    {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${currentSecretKey}`,
+                        },
+                    }
+                );
+
+                if (!response.ok) {
+                    throw new Error('Failed to load issues');
+                }
+
+                const data = await response.json();
+                renderIssues(data.issues, data.pagination, page);
+            } catch (error) {
+                console.error('Load admin issues error:', error);
+                alert('加载数据失败，请重试');
+            }
+        }
+
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const secretKey = document.getElementById('secretKey').value;
@@ -150,7 +262,8 @@
             loginError.hidden = true;
 
             try {
-                const response = await fetchWithTimeout(`${API_URL}/admin/issues`, {
+                currentSecretKey = secretKey;
+                const response = await fetchWithTimeout(`${API_URL}/admin/issues?page=1&pageSize=${adminPageSize}`, {
                     method: 'GET',
                     headers: {
                         'Authorization': `Bearer ${secretKey}`,
@@ -158,18 +271,19 @@
                 });
 
                 if (response.ok) {
-                    currentSecretKey = secretKey;
                     document.getElementById('loginSection').hidden = true;
                     document.getElementById('adminSection').hidden = false;
                     const data = await response.json();
-                    renderIssues(data.issues);
+                    renderIssues(data.issues, data.pagination, 1);
                 } else {
+                    currentSecretKey = null;
                     const data = await response.json();
                     loginError.textContent = data.error || '登录失败，请检查密钥';
                     loginError.hidden = false;
                 }
             } catch (error) {
                 console.error('Login error:', error);
+                currentSecretKey = null;
                 const errorMsg = error.name === 'AbortError' ? '请求超时，请重试' : '网络错误，请重试';
                 loginError.textContent = errorMsg;
                 loginError.hidden = false;
@@ -187,19 +301,7 @@
             refreshBtn.textContent = '刷新中...';
 
             try {
-                const response = await fetchWithTimeout(`${API_URL}/admin/issues`, {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': `Bearer ${currentSecretKey}`,
-                    },
-                });
-
-                if (response.ok) {
-                    const data = await response.json();
-                    renderIssues(data.issues);
-                } else {
-                    alert('刷新失败，请重试');
-                }
+                await loadAdminIssues(adminCurrentPage);
             } catch (error) {
                 console.error('Refresh error:', error);
                 alert('刷新失败，请检查网络');
@@ -211,21 +313,28 @@
 
         document.getElementById('logoutBtn').addEventListener('click', () => {
             currentSecretKey = null;
+            adminCurrentPage = 1;
             document.getElementById('secretKey').value = '';
             document.getElementById('adminSection').hidden = true;
             document.getElementById('loginSection').hidden = false;
         });
 
-        function renderIssues(issues) {
+        function renderIssues(issues, pagination, page = 1) {
             const issuesList = document.getElementById('issuesList');
+            const paginationContainer = document.getElementById('adminPaginationContainer');
             
-            document.getElementById('totalCount').textContent = issues.length;
+            adminCurrentPage = page;
+            const totalPages = pagination?.totalPages || 1;
+            const totalCount = pagination?.total || 0;
+            
+            document.getElementById('totalCount').textContent = totalCount;
             document.getElementById('publicCount').textContent = issues.filter(i => i.isInformationPublic === 'yes').length;
             document.getElementById('reportCount').textContent = issues.filter(i => i.isReport === 'yes').length;
             document.getElementById('todayCount').textContent = issues.filter(i => isToday(i.created_at)).length;
 
             if (!issues || issues.length === 0) {
                 issuesList.innerHTML = '<div class="text-center text-fb-gray py-12 text-sm">暂无问题反馈数据</div>';
+                paginationContainer.innerHTML = '';
                 return;
             }
 
@@ -271,6 +380,10 @@
                     </table>
                 </div>
             `;
+
+            renderPagination(paginationContainer, adminCurrentPage, totalPages, (newPage) => {
+                loadAdminIssues(newPage);
+            });
         }
     </script>
 </body>

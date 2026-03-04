@@ -16,6 +16,7 @@
 - 表单验证（内容长度限制、实名信息必填验证）
 - 限流保护（Rate Limiting）
 - 后台管理页面（需管理员密钥）
+- 健康检查页面 `/health`（无需认证）
 
 ## 技术栈
 
@@ -45,10 +46,12 @@
 web_message/
 ├── index.html          # 前端页面
 ├── admin.html          # 后台管理页面
+├── health.html         # 健康检查页面
 ├── styles.css          # 编译后的 Tailwind CSS
 ├── functions/
 │   └── api/
 │       ├── issues.js       # API 端点
+│       ├── health.js       # 健康检查 API
 │       └── admin/
 │           └── issues.js   # 管理 API 端点
 ├── src/

@@ -21,11 +21,29 @@ export async function onRequest(context) {
     }
 
     try {
-      const { results } = await env.DB.prepare(
-        'SELECT id, issue, name, student_id, isInformationPublic, isReport, created_at FROM issues ORDER BY created_at DESC LIMIT 100'
-      ).all();
+      const page = Math.max(1, parseInt(url.searchParams.get('page')) || 1);
+      const pageSize = Math.min(100, Math.max(1, parseInt(url.searchParams.get('pageSize')) || 20));
+      const offset = (page - 1) * pageSize;
 
-      return new Response(JSON.stringify({ issues: results }), {
+      const countResult = await env.DB.prepare(
+        'SELECT COUNT(*) as total FROM issues'
+      ).first();
+      const total = countResult?.total || 0;
+      const totalPages = Math.ceil(total / pageSize);
+
+      const { results } = await env.DB.prepare(
+        'SELECT id, issue, name, student_id, isInformationPublic, isReport, created_at FROM issues ORDER BY created_at DESC LIMIT ? OFFSET ?'
+      ).bind(pageSize, offset).all();
+
+      return new Response(JSON.stringify({ 
+        issues: results,
+        pagination: {
+          page,
+          pageSize,
+          total,
+          totalPages
+        }
+      }), {
         headers: {
           'Content-Type': 'application/json',
           ...corsHeaders,
