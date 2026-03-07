@@ -29,11 +29,12 @@ id = "xxxx-xxxx-xxxx-xxxx-xxxx"
 
 [env.preview]
 vars = { ENVIRONMENT = "preview" }
+# Preview must use a different D1 database_id from production.
 
 [[env.preview.d1_databases]]
 binding = "DB"
-database_name = "issue-board-db"
-database_id = "xxxx-xxxx-xxxx-xxxx-xxxx"
+database_name = "issue-board-db-preview"
+database_id = "yyyy-yyyy-yyyy-yyyy-yyyy"
 
 [[env.preview.kv_namespaces]]
 binding = "RATE_LIMIT_KV"

@@ -40,8 +40,8 @@ vars = { ENVIRONMENT = "preview" }
 
 [[env.preview.d1_databases]]
 binding = "DB"
-database_name = "issue-board-db"
-database_id = "58c85d18-4868-4580-ad22-7767fccfc729"
+database_name = "issue-board-db-preview"
+database_id = "306b101d-e613-4623-bc85-90b7c46808fa"
 
 [[env.preview.kv_namespaces]]
 binding = "RATE_LIMIT_KV"

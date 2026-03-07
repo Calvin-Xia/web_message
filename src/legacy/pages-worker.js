@@ -4,7 +4,7 @@
  * This file is not part of the supported deployment path.
  */
 import { checkRateLimit } from '../shared/rateLimit.js';
-import { verifyAdminKey, getCorsHeaders, createUnauthorizedResponse } from '../shared/auth.js';
+import { verifyAdminKey, getAdminCorsPolicy, createUnauthorizedResponse, createForbiddenOriginResponse } from '../shared/auth.js';
 import { parseJsonBody } from '../shared/request.js';
 
 const cspHeader = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
@@ -253,7 +253,12 @@ export default {
 
       if (path === '/api/admin/issues' && request.method === 'GET') {
         const origin = request.headers.get('Origin');
-        const adminCorsHeaders = getCorsHeaders(origin, env);
+        const adminCorsPolicy = getAdminCorsPolicy(origin, env);
+        const adminCorsHeaders = adminCorsPolicy.headers;
+
+        if (adminCorsPolicy.hasOrigin && !adminCorsPolicy.isOriginAllowed) {
+          return createForbiddenOriginResponse(adminCorsHeaders);
+        }
 
         const authHeader = request.headers.get('Authorization');
         const authResult = verifyAdminKey(authHeader, env);
@@ -327,7 +332,13 @@ export default {
 
       if (path === '/api/admin/issues' && request.method === 'OPTIONS') {
         const origin = request.headers.get('Origin');
-        const adminCorsHeaders = getCorsHeaders(origin, env);
+        const adminCorsPolicy = getAdminCorsPolicy(origin, env);
+        const adminCorsHeaders = adminCorsPolicy.headers;
+
+        if (adminCorsPolicy.hasOrigin && !adminCorsPolicy.isOriginAllowed) {
+          return createForbiddenOriginResponse(adminCorsHeaders);
+        }
+
         return new Response(null, {
           headers: adminCorsHeaders,
         });
@@ -355,4 +366,5 @@ export default {
     }
   },
 };
+
 

@@ -1,10 +1,20 @@
-import { verifyAdminKey, getCorsHeaders, createUnauthorizedResponse } from '../../../src/shared/auth.js';
+import {
+  verifyAdminKey,
+  getAdminCorsPolicy,
+  createUnauthorizedResponse,
+  createForbiddenOriginResponse,
+} from '../../../src/shared/auth.js';
 
 export async function onRequest(context) {
   const { request, env } = context;
   const url = new URL(request.url);
   const origin = request.headers.get('Origin');
-  const corsHeaders = getCorsHeaders(origin, env);
+  const corsPolicy = getAdminCorsPolicy(origin, env);
+  const corsHeaders = corsPolicy.headers;
+
+  if (corsPolicy.hasOrigin && !corsPolicy.isOriginAllowed) {
+    return createForbiddenOriginResponse(corsHeaders);
+  }
 
   if (request.method === 'OPTIONS') {
     return new Response(null, {
@@ -50,15 +60,15 @@ export async function onRequest(context) {
         'SELECT id, issue, name, student_id, isInformationPublic, isReport, created_at FROM issues ORDER BY created_at DESC LIMIT ? OFFSET ?'
       ).bind(pageSize, offset).all();
 
-      return new Response(JSON.stringify({ 
+      return new Response(JSON.stringify({
         issues: results,
         pagination: {
           page,
           pageSize,
           total: stats.total,
-          totalPages
+          totalPages,
         },
-        stats
+        stats,
       }), {
         headers: {
           'Content-Type': 'application/json',
@@ -69,8 +79,8 @@ export async function onRequest(context) {
       console.error('Database error:', error);
       const isProduction = env.ENVIRONMENT === 'production';
       return new Response(
-        JSON.stringify({ 
-          error: isProduction ? '服务器内部错误' : '数据库错误: ' + error.message 
+        JSON.stringify({
+          error: isProduction ? '服务器内部错误' : '数据库错误: ' + error.message,
         }),
         {
           status: 500,

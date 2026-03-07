@@ -73,6 +73,7 @@ web_message/
 - 返回后台问题列表
 - 需要 `Authorization: Bearer <ADMIN_SECRET_KEY>`
 - 响应字段：`issues`、`pagination`、`stats`
+- 带 `Origin` 时仅接受受信任来源；不可信来源返回 `403`
 
 ### `GET /api/health`
 
@@ -108,11 +109,19 @@ npx wrangler login
 
 ### 3. 创建 D1 数据库
 
+生产环境数据库：
+
 ```bash
 npx wrangler d1 create issue-board-db
 ```
 
-将返回的 `database_id` 写入 `wrangler.toml` 的对应环境配置。
+预发布环境数据库：
+
+```bash
+npx wrangler d1 create issue-board-db-preview
+```
+
+将返回的 `database_id` 分别写入 `wrangler.toml` 中 `env.production.d1_databases` 和 `env.preview.d1_databases`。preview 必须使用独立于 production 的 D1。
 
 ### 4. 创建 KV namespace
 
@@ -124,8 +133,16 @@ npx wrangler kv namespace create RATE_LIMIT_KV
 
 ### 5. 初始化数据库
 
+生产数据库初始化：
+
 ```bash
 npx wrangler d1 execute issue-board-db --remote --file=./schema.sql
+```
+
+预发布数据库初始化：
+
+```bash
+npx wrangler d1 execute issue-board-db-preview --remote --file=./schema.sql
 ```
 
 本地数据库初始化：
@@ -133,6 +150,8 @@ npx wrangler d1 execute issue-board-db --remote --file=./schema.sql
 ```bash
 npx wrangler d1 execute issue-board-db --local --file=./schema.sql
 ```
+
+当前仅隔离 D1；`env.preview.kv_namespaces` 仍暂时复用 production 的 `RATE_LIMIT_KV`。
 
 ### 6. 配置环境变量
 
@@ -180,6 +199,9 @@ npm run deploy
 - 实名信息仅在后台接口返回
 - 限流位于应用层，存储在 KV
 - 管理接口依赖管理员密钥校验与受控 CORS
+- `ENVIRONMENT=production` 时仅信任 `https://issue.calvin-xia.cn`、`https://issue-origin.calvin-xia.cn`、`https://web-message-board.pages.dev` 与单层子域 `https://<branch>.web-message-board.pages.dev`
+- `ENVIRONMENT=local` / `preview` 时仅信任 `localhost` 与 `127.0.0.1`，协议允许 `http` / `https`，端口不限
+- 管理接口响应统一带 `Vary: Origin`；没有 `Origin` 的请求不会被拒绝，但不会返回 `Access-Control-Allow-Origin`
 
 ## 历史实现说明
 
@@ -190,3 +212,4 @@ npm run deploy
 ## License
 
 MIT
+
