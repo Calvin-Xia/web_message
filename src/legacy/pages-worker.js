@@ -1,5 +1,11 @@
-import { checkRateLimit } from './src/shared/rateLimit.js';
-import { verifyAdminKey, getCorsHeaders, createUnauthorizedResponse } from './src/shared/auth.js';
+/*
+ * Archived former root-level _worker.js entry.
+ * Kept only as historical reference after the repo was standardized on Pages Functions.
+ * This file is not part of the supported deployment path.
+ */
+import { checkRateLimit } from '../shared/rateLimit.js';
+import { verifyAdminKey, getCorsHeaders, createUnauthorizedResponse } from '../shared/auth.js';
+import { parseJsonBody } from '../shared/request.js';
 
 const cspHeader = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
 
@@ -134,7 +140,12 @@ export default {
           return rateLimitResponse;
         }
 
-        const data = await request.json();
+        const parsedBody = await parseJsonBody(request, corsHeaders);
+        if (!parsedBody.ok) {
+          return parsedBody.response;
+        }
+
+        const data = parsedBody.data;
         const { issue, name, student_id, isInformationPublic, isReport } = data;
 
         if (!issue) {
@@ -252,11 +263,45 @@ export default {
         }
 
         try {
-          const { results } = await env.DB.prepare(
-            'SELECT id, issue, name, student_id, isInformationPublic, isReport, created_at FROM issues ORDER BY created_at DESC LIMIT 100'
-          ).all();
+          const page = Math.max(1, parseInt(url.searchParams.get('page')) || 1);
+          const pageSize = Math.min(100, Math.max(1, parseInt(url.searchParams.get('pageSize')) || 20));
+          const offset = (page - 1) * pageSize;
 
-          return new Response(JSON.stringify({ issues: results }), {
+          const statsResult = await env.DB.prepare(
+            `SELECT
+              COUNT(*) as total,
+              SUM(CASE WHEN isInformationPublic = 'yes' THEN 1 ELSE 0 END) as publicCount,
+              SUM(CASE WHEN isReport = 'yes' THEN 1 ELSE 0 END) as reportCount,
+              SUM(CASE
+                WHEN created_at >= datetime('now', 'start of day')
+                 AND created_at < datetime('now', 'start of day', '+1 day') THEN 1
+                ELSE 0
+              END) as todayCount
+            FROM issues`
+          ).first();
+          const stats = {
+            total: Number(statsResult?.total) || 0,
+            publicCount: Number(statsResult?.publicCount) || 0,
+            reportCount: Number(statsResult?.reportCount) || 0,
+            todayCount: Number(statsResult?.todayCount) || 0,
+            todayTimezone: 'UTC',
+          };
+          const totalPages = Math.ceil(stats.total / pageSize);
+
+          const { results } = await env.DB.prepare(
+            'SELECT id, issue, name, student_id, isInformationPublic, isReport, created_at FROM issues ORDER BY created_at DESC LIMIT ? OFFSET ?'
+          ).bind(pageSize, offset).all();
+
+          return new Response(JSON.stringify({
+            issues: results,
+            pagination: {
+              page,
+              pageSize,
+              total: stats.total,
+              totalPages,
+            },
+            stats,
+          }), {
             headers: {
               'Content-Type': 'application/json',
               ...adminCorsHeaders,
@@ -310,3 +355,4 @@ export default {
     }
   },
 };
+

@@ -1,4 +1,5 @@
 import { checkRateLimit } from '../../src/shared/rateLimit.js';
+import { parseJsonBody } from '../../src/shared/request.js';
 
 export async function onRequest(context) {
   const { request, env } = context;
@@ -60,7 +61,12 @@ export async function onRequest(context) {
         return rateLimitResponse;
       }
 
-      const data = await request.json();
+      const parsedBody = await parseJsonBody(request, corsHeaders);
+      if (!parsedBody.ok) {
+        return parsedBody.response;
+      }
+
+      const data = parsedBody.data;
       const { issue, name, student_id, isInformationPublic, isReport } = data;
 
       if (!issue) {

@@ -1,8 +1,14 @@
+/*
+ * Historical Worker prototype kept for reference only.
+ * The supported runtime is Cloudflare Pages Functions under /functions.
+ * Do not treat this file as deployable or keep it in contract sync by default.
+ */
 import indexHtml from '../index.html';
 import stylesCss from '../styles.css';
 import beianPng from '../storage/Beian.png';
 import healthHtml from '../health.html';
 import { checkRateLimit } from './shared/rateLimit.js';
+import { parseJsonBody } from './shared/request.js';
 
 const cspHeader = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'";
 
@@ -123,7 +129,12 @@ export default {
           return rateLimitResponse;
         }
 
-        const data = await request.json();
+        const parsedBody = await parseJsonBody(request, corsHeaders);
+        if (!parsedBody.ok) {
+          return parsedBody.response;
+        }
+
+        const data = parsedBody.data;
         const { issue, name, student_id, isInformationPublic, isReport } = data;
 
         if (!issue) {
@@ -251,3 +262,4 @@ export default {
     }
   },
 };
+

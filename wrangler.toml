@@ -4,6 +4,14 @@ compatibility_date = "2024-01-01"
 # Pages configuration
 pages_build_output_dir = "./"
 
+# Local/default development bindings
+vars = { ENVIRONMENT = "local" }
+
+[[d1_databases]]
+binding = "DB"
+database_name = "issue-board-db"
+database_id = "58c85d18-4868-4580-ad22-7767fccfc729"
+
 # Environment Variables Configuration
 # For local development: Create .dev.vars file with ADMIN_SECRET_KEY=your-key
 # For production: Set ADMIN_SECRET_KEY in Cloudflare Pages Dashboard > Settings > Environment Variables

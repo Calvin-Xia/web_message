@@ -78,7 +78,7 @@
                     </div>
                     <div class="bg-fb-bg rounded-lg p-4 text-center">
                         <div class="text-2xl font-bold text-purple-600" id="todayCount">0</div>
-                        <div class="text-sm text-fb-gray">今日新增</div>
+                        <div class="text-sm text-fb-gray">今日新增（UTC）</div>
                     </div>
                 </div>
                 <div id="issuesList">
@@ -135,12 +135,6 @@
             return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
         }
 
-        function isToday(dateString) {
-            if (!dateString) return false;
-            const date = new Date(dateString);
-            const today = new Date();
-            return date.toDateString() === today.toDateString();
-        }
 
         function renderPagination(container, currentPage, totalPages, onPageChange) {
             if (totalPages <= 1) {
@@ -244,7 +238,7 @@
                 }
 
                 const data = await response.json();
-                renderIssues(data.issues, data.pagination, page);
+                renderIssues(data.issues, data.pagination, data.stats, page);
             } catch (error) {
                 console.error('Load admin issues error:', error);
                 alert('加载数据失败，请重试');
@@ -274,7 +268,7 @@
                     document.getElementById('loginSection').hidden = true;
                     document.getElementById('adminSection').hidden = false;
                     const data = await response.json();
-                    renderIssues(data.issues, data.pagination, 1);
+                    renderIssues(data.issues, data.pagination, data.stats, 1);
                 } else {
                     currentSecretKey = null;
                     const data = await response.json();
@@ -319,18 +313,22 @@
             document.getElementById('loginSection').hidden = false;
         });
 
-        function renderIssues(issues, pagination, page = 1) {
+        function renderIssues(issues, pagination, stats, page = 1) {
             const issuesList = document.getElementById('issuesList');
             const paginationContainer = document.getElementById('adminPaginationContainer');
             
             adminCurrentPage = page;
             const totalPages = pagination?.totalPages || 1;
-            const totalCount = pagination?.total || 0;
+            const resolvedStats = stats || {};
+            const totalCount = resolvedStats.total ?? pagination?.total ?? 0;
+            const publicCount = resolvedStats.publicCount ?? 0;
+            const reportCount = resolvedStats.reportCount ?? 0;
+            const todayCount = resolvedStats.todayCount ?? 0;
             
             document.getElementById('totalCount').textContent = totalCount;
-            document.getElementById('publicCount').textContent = issues.filter(i => i.isInformationPublic === 'yes').length;
-            document.getElementById('reportCount').textContent = issues.filter(i => i.isReport === 'yes').length;
-            document.getElementById('todayCount').textContent = issues.filter(i => isToday(i.created_at)).length;
+            document.getElementById('publicCount').textContent = publicCount;
+            document.getElementById('reportCount').textContent = reportCount;
+            document.getElementById('todayCount').textContent = todayCount;
 
             if (!issues || issues.length === 0) {
                 issuesList.innerHTML = '<div class="text-center text-fb-gray py-12 text-sm">暂无问题反馈数据</div>';

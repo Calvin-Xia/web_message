@@ -25,11 +25,26 @@ export async function onRequest(context) {
       const pageSize = Math.min(100, Math.max(1, parseInt(url.searchParams.get('pageSize')) || 20));
       const offset = (page - 1) * pageSize;
 
-      const countResult = await env.DB.prepare(
-        'SELECT COUNT(*) as total FROM issues'
+      const statsResult = await env.DB.prepare(
+        `SELECT
+          COUNT(*) as total,
+          SUM(CASE WHEN isInformationPublic = 'yes' THEN 1 ELSE 0 END) as publicCount,
+          SUM(CASE WHEN isReport = 'yes' THEN 1 ELSE 0 END) as reportCount,
+          SUM(CASE
+            WHEN created_at >= datetime('now', 'start of day')
+             AND created_at < datetime('now', 'start of day', '+1 day') THEN 1
+            ELSE 0
+          END) as todayCount
+        FROM issues`
       ).first();
-      const total = countResult?.total || 0;
-      const totalPages = Math.ceil(total / pageSize);
+      const stats = {
+        total: Number(statsResult?.total) || 0,
+        publicCount: Number(statsResult?.publicCount) || 0,
+        reportCount: Number(statsResult?.reportCount) || 0,
+        todayCount: Number(statsResult?.todayCount) || 0,
+        todayTimezone: 'UTC',
+      };
+      const totalPages = Math.ceil(stats.total / pageSize);
 
       const { results } = await env.DB.prepare(
         'SELECT id, issue, name, student_id, isInformationPublic, isReport, created_at FROM issues ORDER BY created_at DESC LIMIT ? OFFSET ?'
@@ -40,9 +55,10 @@ export async function onRequest(context) {
         pagination: {
           page,
           pageSize,
-          total,
+          total: stats.total,
           totalPages
-        }
+        },
+        stats
       }), {
         headers: {
           'Content-Type': 'application/json',

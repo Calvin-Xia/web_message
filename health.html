@@ -47,18 +47,39 @@
                 const response = await fetch('/api/health');
                 const data = await response.json();
                 
+                const apiReachable = true;
                 const isOk = data.status === 'ok';
                 const dbConnected = data.services?.database === 'connected';
+                const overallStatusText = isOk ? '运行中' : '降级';
+                const overallStatusClass = isOk ? 'text-green-600' : 'text-orange-600';
+                const overallDotClass = isOk ? 'bg-green-500' : 'bg-orange-500';
+                const errorDetail = data.error
+                    ? `
+                        <div class="p-4 bg-orange-50 rounded-lg border border-orange-200">
+                            <p class="text-orange-700 text-sm">错误详情: ${escapeHtml(data.error)}</p>
+                        </div>
+                    `
+                    : '';
                 
                 content.innerHTML = `
                     <div class="space-y-4">
                         <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                             <div class="flex items-center">
-                                <div class="w-3 h-3 rounded-full ${isOk ? 'bg-green-500' : 'bg-red-500'} mr-3"></div>
-                                <span class="font-medium text-gray-700">服务状态：</span>
+                                <div class="w-3 h-3 rounded-full ${apiReachable ? 'bg-green-500' : 'bg-red-500'} mr-3"></div>
+                                <span class="font-medium text-gray-700">API：</span>
                             </div>
-                            <span class="${isOk ? 'text-green-600' : 'text-red-600'} font-semibold">
-                                ${isOk ? '运行中' : '异常'}
+                            <span class="${apiReachable ? 'text-green-600' : 'text-red-600'} font-semibold">
+                                ${apiReachable ? '可访问' : '不可访问'}
+                            </span>
+                        </div>
+
+                        <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                            <div class="flex items-center">
+                                <div class="w-3 h-3 rounded-full ${overallDotClass} mr-3"></div>
+                                <span class="font-medium text-gray-700">整体状态：</span>
+                            </div>
+                            <span class="${overallStatusClass} font-semibold">
+                                ${overallStatusText}
                             </span>
                         </div>
                         
@@ -81,6 +102,8 @@
                             <span class="font-medium text-gray-700">响应状态：</span>
                             <span class="text-fb-gray">${response.status} ${response.statusText}</span>
                         </div>
+
+                        ${errorDetail}
                     </div>
                 `;
             } catch (error) {
@@ -89,9 +112,17 @@
                         <div class="flex items-center justify-between p-4 bg-red-50 rounded-lg border border-red-200">
                             <div class="flex items-center">
                                 <div class="w-3 h-3 rounded-full bg-red-500 mr-3"></div>
-                                <span class="font-medium text-gray-700">服务状态：</span>
+                                <span class="font-medium text-gray-700">API：</span>
                             </div>
                             <span class="text-red-600 font-semibold">无法访问</span>
+                        </div>
+
+                        <div class="flex items-center justify-between p-4 bg-red-50 rounded-lg border border-red-200">
+                            <div class="flex items-center">
+                                <div class="w-3 h-3 rounded-full bg-red-500 mr-3"></div>
+                                <span class="font-medium text-gray-700">整体状态：</span>
+                            </div>
+                            <span class="text-red-600 font-semibold">未知</span>
                         </div>
                         
                         <div class="flex items-center justify-between p-4 bg-red-50 rounded-lg border border-red-200">
@@ -103,11 +134,18 @@
                         </div>
                         
                         <div class="p-4 bg-red-50 rounded-lg border border-red-200">
-                            <p class="text-red-600 text-sm">错误: ${error.message}</p>
+                            <p class="text-red-600 text-sm">错误: ${escapeHtml(error.message)}</p>
                         </div>
                     </div>
                 `;
             }
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
 
         function formatTimestamp(timestamp) {
