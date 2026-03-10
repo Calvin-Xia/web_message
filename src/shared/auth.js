@@ -6,6 +6,7 @@ const PRODUCTION_ADMIN_EXACT_ORIGINS = new Set([
 
 const PRODUCTION_PAGES_HOST = 'web-message-board.pages.dev';
 const LOOPBACK_ADMIN_HOSTS = new Set(['localhost', '127.0.0.1']);
+const DEFAULT_ADMIN_METHODS = 'GET, POST, PATCH, OPTIONS';
 
 export function getAdminKeyFromEnv(env) {
   return env.ADMIN_SECRET_KEY || null;
@@ -28,20 +29,18 @@ export function verifyAdminKey(authHeader, env) {
     return { valid: false, error: '授权格式错误' };
   }
 
-  const providedKey = parts[1];
-
-  if (providedKey === adminKey) {
+  if (parts[1] === adminKey) {
     return { valid: true };
   }
 
   return { valid: false, error: '密钥无效' };
 }
 
-function buildAdminCorsHeaders(allowedOrigin = null) {
+function buildAdminCorsHeaders(allowedOrigin = null, methods = DEFAULT_ADMIN_METHODS) {
   const headers = {
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Methods': methods,
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Vary': 'Origin',
+    Vary: 'Origin',
   };
 
   if (allowedOrigin) {
@@ -85,13 +84,8 @@ function isTrustedProductionOrigin(url) {
     return false;
   }
 
-  const normalizedOrigin = url.origin;
   const hostname = url.hostname.toLowerCase();
-
-  return (
-    PRODUCTION_ADMIN_EXACT_ORIGINS.has(normalizedOrigin) ||
-    hasSingleLevelSubdomain(hostname, PRODUCTION_PAGES_HOST)
-  );
+  return PRODUCTION_ADMIN_EXACT_ORIGINS.has(url.origin) || hasSingleLevelSubdomain(hostname, PRODUCTION_PAGES_HOST);
 }
 
 function isTrustedNonProductionOrigin(url) {
@@ -99,7 +93,7 @@ function isTrustedNonProductionOrigin(url) {
   return LOOPBACK_ADMIN_HOSTS.has(hostname);
 }
 
-export function getAdminCorsPolicy(origin, env) {
+export function getAdminCorsPolicy(origin, env, methods = DEFAULT_ADMIN_METHODS) {
   const hasOrigin = typeof origin === 'string' && origin.trim() !== '';
 
   if (!hasOrigin) {
@@ -107,44 +101,37 @@ export function getAdminCorsPolicy(origin, env) {
       hasOrigin: false,
       isOriginAllowed: false,
       normalizedOrigin: null,
-      headers: buildAdminCorsHeaders(),
+      headers: buildAdminCorsHeaders(null, methods),
     };
   }
 
   const normalizedOrigin = normalizeOrigin(origin);
-
   if (!normalizedOrigin) {
     return {
       hasOrigin: true,
       isOriginAllowed: false,
       normalizedOrigin: null,
-      headers: buildAdminCorsHeaders(),
+      headers: buildAdminCorsHeaders(null, methods),
     };
   }
 
   const url = new URL(normalizedOrigin);
   const isProduction = env.ENVIRONMENT === 'production';
-  const isOriginAllowed = isProduction
-    ? isTrustedProductionOrigin(url)
-    : isTrustedNonProductionOrigin(url);
+  const isOriginAllowed = isProduction ? isTrustedProductionOrigin(url) : isTrustedNonProductionOrigin(url);
 
   return {
     hasOrigin: true,
     isOriginAllowed,
     normalizedOrigin,
-    headers: buildAdminCorsHeaders(isOriginAllowed ? normalizedOrigin : null),
+    headers: buildAdminCorsHeaders(isOriginAllowed ? normalizedOrigin : null, methods),
   };
 }
 
-export function getCorsHeaders(origin, env) {
-  return getAdminCorsPolicy(origin, env).headers;
-}
-
 function createJsonErrorResponse(error, status, corsHeaders) {
-  return new Response(JSON.stringify({ error }), {
+  return new Response(JSON.stringify({ success: false, error }), {
     status,
     headers: {
-      'Content-Type': 'application/json',
+      'Content-Type': 'application/json; charset=UTF-8',
       ...corsHeaders,
     },
   });
@@ -156,6 +143,34 @@ export function createUnauthorizedResponse(error, corsHeaders) {
 
 export function createForbiddenOriginResponse(corsHeaders) {
   return createJsonErrorResponse('来源不受信任', 403, corsHeaders);
+}
+
+export function authorizeAdminRequest(request, env, methods = DEFAULT_ADMIN_METHODS) {
+  const origin = request.headers.get('Origin');
+  const corsPolicy = getAdminCorsPolicy(origin, env, methods);
+
+  if (corsPolicy.hasOrigin && !corsPolicy.isOriginAllowed) {
+    return {
+      ok: false,
+      corsHeaders: corsPolicy.headers,
+      response: createForbiddenOriginResponse(corsPolicy.headers),
+    };
+  }
+
+  const authResult = verifyAdminKey(request.headers.get('Authorization'), env);
+  if (!authResult.valid) {
+    return {
+      ok: false,
+      corsHeaders: corsPolicy.headers,
+      response: createUnauthorizedResponse(authResult.error, corsPolicy.headers),
+    };
+  }
+
+  return {
+    ok: true,
+    corsHeaders: corsPolicy.headers,
+    actor: 'admin',
+  };
 }
 
 export {

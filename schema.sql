@@ -1,17 +1,69 @@
--- 创建问题表
--- 字段约束说明:
---   issue: 最大1000字符
---   name: 最大20字符
---   student_id: 必须为4位、5位或13位数字
+PRAGMA foreign_keys = ON;
+
 CREATE TABLE IF NOT EXISTS issues (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    issue TEXT NOT NULL,
-    isInformationPublic TEXT NOT NULL,
-    name TEXT NOT NULL,
-    student_id TEXT NOT NULL,
-    isReport TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tracking_code TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  student_id TEXT NOT NULL,
+  content TEXT NOT NULL,
+  is_public INTEGER NOT NULL DEFAULT 0,
+  is_reported INTEGER NOT NULL DEFAULT 0,
+  category TEXT NOT NULL DEFAULT 'other' CHECK (category IN ('academic', 'facility', 'service', 'complaint', 'counseling', 'other')),
+  priority TEXT NOT NULL DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
+  status TEXT NOT NULL DEFAULT 'submitted' CHECK (status IN ('submitted', 'in_review', 'in_progress', 'resolved', 'closed')),
+  public_summary TEXT,
+  assigned_to TEXT,
+  first_response_at DATETIME,
+  resolved_at DATETIME,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- 创建索引以提高查询性能
-CREATE INDEX IF NOT EXISTS idx_created_at ON issues(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_issues_tracking_code ON issues(tracking_code);
+CREATE INDEX IF NOT EXISTS idx_issues_status ON issues(status);
+CREATE INDEX IF NOT EXISTS idx_issues_category ON issues(category);
+CREATE INDEX IF NOT EXISTS idx_issues_created_at ON issues(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_issues_updated_at ON issues(updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_issues_is_public ON issues(is_public);
+
+CREATE TABLE IF NOT EXISTS issue_updates (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  issue_id INTEGER NOT NULL,
+  update_type TEXT NOT NULL CHECK (update_type IN ('status_change', 'public_reply')),
+  old_value TEXT,
+  new_value TEXT,
+  content TEXT,
+  is_public INTEGER NOT NULL DEFAULT 0,
+  created_by TEXT NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (issue_id) REFERENCES issues(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_issue_updates_issue_id ON issue_updates(issue_id);
+CREATE INDEX IF NOT EXISTS idx_issue_updates_created_at ON issue_updates(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS issue_internal_notes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  issue_id INTEGER NOT NULL,
+  content TEXT NOT NULL,
+  created_by TEXT NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (issue_id) REFERENCES issues(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_internal_notes_issue_id ON issue_internal_notes(issue_id);
+
+CREATE TABLE IF NOT EXISTS admin_actions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  action_type TEXT NOT NULL,
+  target_type TEXT,
+  target_id INTEGER,
+  details TEXT,
+  performed_by TEXT NOT NULL,
+  performed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  ip_address TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_actions_performed_at ON admin_actions(performed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_admin_actions_type ON admin_actions(action_type);
+CREATE INDEX IF NOT EXISTS idx_admin_actions_target ON admin_actions(target_type, target_id);

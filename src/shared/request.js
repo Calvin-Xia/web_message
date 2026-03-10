@@ -6,11 +6,11 @@ export async function parseJsonBody(request, corsHeaders = {}) {
     return {
       ok: false,
       response: new Response(
-        JSON.stringify({ error: '请求体不是合法 JSON' }),
+        JSON.stringify({ success: false, error: '请求体不是合法 JSON' }),
         {
           status: 400,
           headers: {
-            'Content-Type': 'application/json',
+            'Content-Type': 'application/json; charset=UTF-8',
             ...corsHeaders,
           },
         }

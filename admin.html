@@ -1,389 +1,575 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>后台管理 - 问题反馈系统</title>
-    <link rel="stylesheet" href="/styles.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>管理后台</title>
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    :root {
+      --ink: #172033;
+      --ink-soft: #4c566b;
+      --line: rgba(23, 32, 51, 0.12);
+      --shadow: 0 24px 70px rgba(18, 26, 44, 0.14);
+    }
+
+    body {
+      font-family: "Aptos", "Segoe UI", "PingFang SC", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(36, 87, 214, 0.1), transparent 35%),
+        radial-gradient(circle at bottom right, rgba(217, 138, 23, 0.08), transparent 30%),
+        linear-gradient(180deg, #f8f3ea 0%, #ede6d7 100%);
+    }
+
+    .display-font { font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif; }
+    .surface-panel {
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(255, 252, 246, 0.86) 100%);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(20px);
+    }
+    .field-shell {
+      border: 1px solid rgba(23, 32, 51, 0.12);
+      background: rgba(255, 255, 255, 0.84);
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .field-shell:focus {
+      border-color: rgba(36, 87, 214, 0.5);
+      box-shadow: 0 0 0 4px rgba(36, 87, 214, 0.12);
+      outline: none;
+    }
+    .ghost-button {
+      border: 1px solid rgba(23, 32, 51, 0.12);
+      background: rgba(255, 255, 255, 0.78);
+    }
+    .ghost-button:hover { background: rgba(255, 255, 255, 0.96); }
+    .issue-card {
+      border: 1px solid rgba(23, 32, 51, 0.08);
+      background: rgba(255, 255, 255, 0.76);
+      transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .issue-card:hover {
+      transform: translateY(-3px);
+      border-color: rgba(36, 87, 214, 0.22);
+      box-shadow: 0 18px 40px rgba(18, 26, 44, 0.1);
+    }
+    .status-token, .priority-token, .category-token {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 0.35rem 0.75rem;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .status-token[data-status="submitted"] { background: rgba(36, 87, 214, 0.1); color: #2046a2; }
+    .status-token[data-status="in_review"] { background: rgba(217, 138, 23, 0.14); color: #8b5a12; }
+    .status-token[data-status="in_progress"] { background: rgba(96, 92, 189, 0.12); color: #4f43a8; }
+    .status-token[data-status="resolved"] { background: rgba(19, 121, 91, 0.14); color: #0b6a4e; }
+    .status-token[data-status="closed"] { background: rgba(23, 32, 51, 0.1); color: #374151; }
+    .priority-token[data-priority="urgent"] { background: rgba(178, 58, 50, 0.15); color: #b23a32; }
+    .priority-token[data-priority="high"] { background: rgba(217, 138, 23, 0.16); color: #9b5f12; }
+    .priority-token[data-priority="normal"] { background: rgba(36, 87, 214, 0.1); color: #2147ac; }
+    .priority-token[data-priority="low"] { background: rgba(19, 121, 91, 0.12); color: #13795b; }
+    .category-token { background: rgba(23, 32, 51, 0.08); color: #4c566b; }
+    .drawer-scroll { scrollbar-width: thin; scrollbar-color: rgba(23, 32, 51, 0.22) transparent; }
+    .timeline-item { position: relative; padding-left: 2.8rem; }
+    .timeline-item::before {
+      content: "";
+      position: absolute;
+      left: 0.85rem;
+      top: 1.4rem;
+      bottom: -1.4rem;
+      width: 1px;
+      background: rgba(23, 32, 51, 0.12);
+    }
+    .timeline-item:last-child::before { display: none; }
+    .timeline-dot {
+      position: absolute;
+      left: 0;
+      top: 0.05rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.7rem;
+      height: 1.7rem;
+      border-radius: 999px;
+      background: rgba(36, 87, 214, 0.12);
+      color: #2147ac;
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+  </style>
 </head>
-<body class="min-h-screen bg-fb-bg p-4 md:p-8">
-    <div class="max-w-6xl mx-auto">
-        <div class="text-center mb-6">
-            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
-                后台管理系统
-            </h1>
-            <p class="text-fb-gray text-sm md:text-base">查看所有问题反馈数据</p>
+<body class="min-h-screen px-4 py-5 md:px-8 md:py-8">
+  <header class="mx-auto flex max-w-7xl flex-col gap-4 md:flex-row md:items-center md:justify-between">
+    <div>
+      <div class="text-xs font-semibold uppercase tracking-[0.35em] text-[#5f6b80]">Admin Console</div>
+      <h1 class="display-font mt-2 text-3xl md:text-4xl">留言后台</h1>
+    </div>
+    <nav class="flex flex-wrap gap-2 text-sm text-[#445069]">
+      <a class="ghost-button rounded-full px-4 py-2 transition" href="/">返回首页</a>
+      <a class="ghost-button rounded-full px-4 py-2 transition" href="/tracking.html">追踪页</a>
+    </nav>
+  </header>
+
+  <main class="mx-auto mt-6 max-w-7xl space-y-6 md:mt-8">
+    <section id="loginSection" class="surface-panel mx-auto max-w-lg rounded-[2rem] p-6 md:p-8">
+      <div class="text-xs font-semibold uppercase tracking-[0.3em] text-[#72809a]">Secure Entry</div>
+      <h2 class="display-font mt-3 text-3xl">管理员登录</h2>
+      <p class="mt-3 text-sm leading-7 text-[#4c566b]">输入共享密钥后即可查看列表、编辑状态、添加内部备注和公开回复。</p>
+      <div id="loginNotification" class="mt-4"></div>
+      <form id="loginForm" class="mt-5 space-y-4">
+        <label class="space-y-2 text-sm font-medium text-[#25314a]">
+          <span>Bearer 密钥</span>
+          <input id="secretKey" name="secretKey" type="password" class="field-shell h-12 w-full rounded-2xl px-4" placeholder="请输入管理密钥" required>
+        </label>
+        <button id="loginButton" type="submit" class="inline-flex h-12 w-full items-center justify-center rounded-full bg-[#2457d6] px-5 text-sm font-semibold text-white transition hover:bg-[#1e47b0] disabled:cursor-not-allowed disabled:opacity-60">登录并加载问题列表</button>
+      </form>
+    </section>
+
+    <section id="adminShell" hidden class="space-y-6">
+      <div class="grid gap-4 md:grid-cols-4">
+        <article class="surface-panel rounded-[1.8rem] p-5"><div class="text-xs font-semibold uppercase tracking-[0.28em] text-[#72809a]">Pending</div><div id="pendingCount" class="mt-3 text-4xl font-black text-[#172033]">0</div><div class="mt-1 text-sm text-[#5f6b80]">待处理总数</div></article>
+        <article class="surface-panel rounded-[1.8rem] p-5"><div class="text-xs font-semibold uppercase tracking-[0.28em] text-[#72809a]">Today</div><div id="todayNewCount" class="mt-3 text-4xl font-black text-[#2457d6]">0</div><div class="mt-1 text-sm text-[#5f6b80]">今日新增</div></article>
+        <article class="surface-panel rounded-[1.8rem] p-5"><div class="text-xs font-semibold uppercase tracking-[0.28em] text-[#72809a]">Resolved</div><div id="weekResolvedCount" class="mt-3 text-4xl font-black text-[#13795b]">0</div><div class="mt-1 text-sm text-[#5f6b80]">近 7 天解决</div></article>
+        <article class="surface-panel rounded-[1.8rem] p-5"><div class="text-xs font-semibold uppercase tracking-[0.28em] text-[#72809a]">Total</div><div id="totalCount" class="mt-3 text-4xl font-black text-[#8b5a12]">0</div><div class="mt-1 text-sm text-[#5f6b80]">全部问题</div></article>
+      </div>
+
+      <section class="surface-panel rounded-[2rem] p-6 md:p-7">
+        <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div><div class="text-xs font-semibold uppercase tracking-[0.3em] text-[#72809a]">Issue Queue</div><h2 class="display-font mt-2 text-3xl">后台问题列表</h2></div>
+          <div class="flex flex-wrap gap-2"><button id="refreshButton" class="ghost-button rounded-full px-4 py-2 text-sm font-semibold text-[#172033] transition">刷新数据</button><button id="logoutButton" class="rounded-full bg-[#172033] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#0c1424]">退出登录</button></div>
         </div>
 
-        <div id="loginSection" class="bg-white rounded-lg shadow-md p-6 md:p-8 mb-4 max-w-sm mx-auto">
-            <h2 class="text-xl font-bold text-gray-900 mb-4 text-center">管理员登录</h2>
-            <div id="loginError" hidden class="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm"></div>
-            <form id="loginForm" class="space-y-4">
-                <div>
-                    <label for="secretKey" class="block text-sm font-medium text-gray-700 mb-2">
-                        管理密钥
-                    </label>
-                    <input
-                        type="password"
-                        id="secretKey"
-                        name="secretKey"
-                        required
-                        placeholder="请输入管理密钥"
-                        class="w-full px-3 py-2 border border-fb-gray-light rounded-lg bg-fb-bg focus:bg-white focus:outline-none focus:ring-2 focus:ring-fb-blue focus:border-transparent transition-all"
-                    >
-                </div>
-                <button
-                    type="submit"
-                    id="loginBtn"
-                    class="w-full bg-fb-blue hover:bg-fb-blue-dark text-white font-semibold py-2.5 px-4 rounded-lg transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                    登录
-                </button>
-            </form>
-        </div>
+        <div id="adminNotification" class="mt-4"></div>
 
-        <div id="adminSection" hidden>
-            <div class="bg-white rounded-lg shadow-md p-6 md:p-8 mb-4">
-                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
-                    <h2 class="text-xl md:text-2xl font-bold text-gray-900">
-                        所有问题反馈
-                    </h2>
-                    <div class="flex gap-2 ml-auto">
-                        <button
-                            id="logoutBtn"
-                            class="bg-gray-500 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded-lg transition-colors text-sm"
-                        >
-                            退出登录
-                        </button>
-                        <button
-                            id="refreshBtn"
-                            class="bg-fb-blue hover:bg-fb-blue-dark text-white font-medium py-2 px-4 rounded-lg transition-colors text-sm"
-                        >
-                            刷新数据
-                        </button>
-                    </div>
-                </div>
-                <div id="statsSection" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                    <div class="bg-fb-bg rounded-lg p-4 text-center">
-                        <div class="text-2xl font-bold text-fb-blue" id="totalCount">0</div>
-                        <div class="text-sm text-fb-gray">总问题数</div>
-                    </div>
-                    <div class="bg-fb-bg rounded-lg p-4 text-center">
-                        <div class="text-2xl font-bold text-green-600" id="publicCount">0</div>
-                        <div class="text-sm text-fb-gray">公开实名</div>
-                    </div>
-                    <div class="bg-fb-bg rounded-lg p-4 text-center">
-                        <div class="text-2xl font-bold text-orange-600" id="reportCount">0</div>
-                        <div class="text-sm text-fb-gray">请求上报</div>
-                    </div>
-                    <div class="bg-fb-bg rounded-lg p-4 text-center">
-                        <div class="text-2xl font-bold text-purple-600" id="todayCount">0</div>
-                        <div class="text-sm text-fb-gray">今日新增（UTC）</div>
-                    </div>
-                </div>
-                <div id="issuesList">
-                    <div class="text-center text-fb-gray py-8">请先登录查看数据</div>
-                </div>
-                <div id="adminPaginationContainer" class="mt-4"></div>
-            </div>
-        </div>
+        <form id="filterForm" class="mt-6 grid gap-3 xl:grid-cols-[1.2fr_0.9fr_0.9fr_0.9fr_0.9fr_0.8fr_auto]">
+          <input id="searchInput" name="q" class="field-shell h-11 rounded-2xl px-4 text-sm" placeholder="搜索追踪码、姓名、学号、内容">
+          <select id="statusFilter" name="status" class="field-shell h-11 rounded-2xl px-4 text-sm"><option value="">全部状态</option><option value="submitted">已提交</option><option value="in_review">审核中</option><option value="in_progress">处理中</option><option value="resolved">已解决</option><option value="closed">已关闭</option></select>
+          <select id="categoryFilter" name="category" class="field-shell h-11 rounded-2xl px-4 text-sm"><option value="">全部分类</option><option value="academic">学业相关</option><option value="facility">设施问题</option><option value="service">服务咨询</option><option value="complaint">投诉建议</option><option value="counseling">心理咨询</option><option value="other">其他</option></select>
+          <select id="priorityFilter" name="priority" class="field-shell h-11 rounded-2xl px-4 text-sm"><option value="">全部优先级</option><option value="urgent">紧急</option><option value="high">高</option><option value="normal">普通</option><option value="low">低</option></select>
+          <input id="assignedToFilter" name="assignedTo" class="field-shell h-11 rounded-2xl px-4 text-sm" placeholder="按指派人筛选">
+          <select id="sortFilter" name="sort" class="field-shell h-11 rounded-2xl px-4 text-sm"><option value="newest">最新提交</option><option value="updated">最近更新</option><option value="oldest">最早提交</option></select>
+          <div class="flex gap-2"><button class="inline-flex h-11 flex-1 items-center justify-center rounded-full bg-[#2457d6] px-4 text-sm font-semibold text-white transition hover:bg-[#1e47b0]" type="submit">筛选</button><button id="resetFilters" class="ghost-button inline-flex h-11 items-center justify-center rounded-full px-4 text-sm font-semibold text-[#172033] transition" type="button">重置</button></div>
+        </form>
 
-        <div class="text-right py-6 mt-8 border-t border-gray-200">
-            <p class="text-fb-gray text-sm">
-                <a href="/" class="text-fb-blue hover:underline">返回首页</a>
-            </p>
+        <div id="issuesList" class="mt-6 grid gap-4"></div>
+        <div id="paginationContainer" class="mt-6"></div>
+      </section>
+    </section>
+  </main>
+
+  <div id="drawerBackdrop" hidden class="fixed inset-0 z-40 bg-[#172033]/35 backdrop-blur-sm"></div>
+  <aside id="issueDrawer" hidden class="drawer-scroll fixed inset-y-0 right-0 z-50 h-full w-full max-w-2xl overflow-y-auto bg-[#f8f4ec] shadow-[0_30px_80px_rgba(11,18,31,0.34)]">
+    <div class="sticky top-0 z-10 border-b border-[rgba(23,32,51,0.08)] bg-[#f8f4ec]/92 px-6 py-5 backdrop-blur">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <div class="text-xs font-semibold uppercase tracking-[0.3em] text-[#72809a]">Issue Detail</div>
+          <h2 id="drawerTitle" class="display-font mt-2 text-3xl">选择一条问题查看详情</h2>
+          <div id="drawerMeta" class="mt-2 text-sm text-[#5f6b80]"></div>
         </div>
+        <button id="closeDrawer" class="ghost-button inline-flex h-11 w-11 items-center justify-center rounded-full text-lg font-semibold text-[#172033] transition" type="button">×</button>
+      </div>
     </div>
 
-    <script>
-        const API_URL = '/api';
-        const REQUEST_TIMEOUT = 15000;
-        let currentSecretKey = null;
-        let adminCurrentPage = 1;
-        const adminPageSize = 20;
+    <div id="drawerContent" class="space-y-6 px-6 py-6">
+      <div class="rounded-[1.5rem] border border-dashed border-[rgba(23,32,51,0.16)] bg-white/60 px-5 py-8 text-center text-sm leading-7 text-[#5f6b80]">从左侧列表选择问题后，这里会加载完整详情。</div>
+    </div>
+  </aside>
 
-        async function fetchWithTimeout(url, options = {}, timeout = REQUEST_TIMEOUT) {
-            const controller = new AbortController();
-            const id = setTimeout(() => controller.abort(), timeout);
-            try {
-                const response = await fetch(url, {
-                    ...options,
-                    signal: controller.signal
-                });
-                return response;
-            } finally {
-                clearTimeout(id);
-            }
-        }
+  <script>
+    const API_BASE = '/api';
+    const REQUEST_TIMEOUT = 15000;
+    const STORAGE_KEY = 'issue-admin-secret';
+    const statusLabels = { submitted: '已提交', in_review: '审核中', in_progress: '处理中', resolved: '已解决', closed: '已关闭' };
+    const categoryLabels = { academic: '学业相关', facility: '设施问题', service: '服务咨询', complaint: '投诉建议', counseling: '心理咨询', other: '其他' };
+    const priorityLabels = { low: '低', normal: '普通', high: '高', urgent: '紧急' };
+    const statusTransitions = {
+      submitted: ['submitted', 'in_review', 'closed'],
+      in_review: ['in_review', 'in_progress', 'closed'],
+      in_progress: ['in_progress', 'resolved', 'closed'],
+      resolved: ['resolved', 'closed', 'in_progress'],
+      closed: ['closed'],
+    };
+    const state = { token: null, page: 1, pageSize: 20, activeIssueId: null, activeIssue: null };
 
-        function escapeHtml(text) {
-            if (!text) return '';
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
+    function escapeHtml(value) {
+      const div = document.createElement('div');
+      div.textContent = value ?? '';
+      return div.innerHTML;
+    }
 
-        function formatDate(dateString) {
-            if (!dateString) return '-';
-            const date = new Date(dateString);
-            const year = date.getUTCFullYear();
-            const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-            const day = String(date.getUTCDate()).padStart(2, '0');
-            const hours = String(date.getUTCHours()).padStart(2, '0');
-            const minutes = String(date.getUTCMinutes()).padStart(2, '0');
-            const seconds = String(date.getUTCSeconds()).padStart(2, '0');
-            return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-        }
+    function formatDate(value) {
+      if (!value) return '-';
+      return new Date(value).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+    }
 
+    async function fetchWithTimeout(url, options = {}, timeout = REQUEST_TIMEOUT) {
+      const controller = new AbortController();
+      const timer = window.setTimeout(() => controller.abort(), timeout);
+      try { return await fetch(url, { ...options, signal: controller.signal }); }
+      finally { clearTimeout(timer); }
+    }
 
-        function renderPagination(container, currentPage, totalPages, onPageChange) {
-            if (totalPages <= 1) {
-                container.innerHTML = '';
-                return;
-            }
+    async function apiFetch(path, options = {}) {
+      const response = await fetchWithTimeout(`${API_BASE}${path}`, { ...options, headers: { ...(options.headers || {}), Authorization: `Bearer ${state.token}` } });
+      let payload = null;
+      try { payload = await response.json(); } catch { payload = null; }
+      if (!response.ok || !payload?.success) throw new Error(payload?.error || '请求失败');
+      return payload.data;
+    }
 
-            const maxVisiblePages = 5;
-            let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-            let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
-            
-            if (endPage - startPage + 1 < maxVisiblePages) {
-                startPage = Math.max(1, endPage - maxVisiblePages + 1);
-            }
+    function setNotification(targetId, message = '', type = 'info') {
+      const palette = {
+        success: 'border-[rgba(19,121,91,0.2)] bg-[rgba(19,121,91,0.12)] text-[#0f6b50]',
+        error: 'border-[rgba(178,58,50,0.2)] bg-[rgba(178,58,50,0.12)] text-[#8f2d27]',
+        info: 'border-[rgba(36,87,214,0.16)] bg-[rgba(36,87,214,0.1)] text-[#2147ac]',
+      };
+      const target = document.getElementById(targetId);
+      if (!message) { target.innerHTML = ''; return; }
+      target.innerHTML = `<div class="rounded-[1.2rem] border px-4 py-3 text-sm ${palette[type] || palette.info}">${escapeHtml(message)}</div>`;
+    }
 
-            let paginationHtml = `
-                <div class="flex items-center justify-center gap-1 flex-wrap">
-                    <button 
-                        class="px-3 py-2 text-sm rounded-lg border border-fb-gray-light bg-white hover:bg-fb-bg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                        ${currentPage === 1 ? 'disabled' : ''}
-                        data-page="${currentPage - 1}"
-                    >
-                        上一页
-                    </button>
-            `;
+    function serializeFilters(page = 1) {
+      const params = new URLSearchParams();
+      const form = new FormData(document.getElementById('filterForm'));
+      params.set('page', String(page));
+      params.set('pageSize', String(state.pageSize));
+      for (const [key, rawValue] of form.entries()) {
+        const value = String(rawValue).trim();
+        if (value) params.set(key, value);
+      }
+      return params.toString();
+    }
 
-            if (startPage > 1) {
-                paginationHtml += `
-                    <button class="px-3 py-2 text-sm rounded-lg border border-fb-gray-light bg-white hover:bg-fb-bg transition-colors" data-page="1">1</button>
-                `;
-                if (startPage > 2) {
-                    paginationHtml += `<span class="px-2 text-fb-gray">...</span>`;
-                }
-            }
-
-            for (let i = startPage; i <= endPage; i++) {
-                const isActive = i === currentPage;
-                paginationHtml += `
-                    <button 
-                        class="px-3 py-2 text-sm rounded-lg border transition-colors ${
-                            isActive 
-                                ? 'bg-fb-blue text-white border-fb-blue' 
-                                : 'border-fb-gray-light bg-white hover:bg-fb-bg'
-                        }"
-                        data-page="${i}"
-                        ${isActive ? 'disabled' : ''}
-                    >
-                        ${i}
-                    </button>
-                `;
-            }
-
-            if (endPage < totalPages) {
-                if (endPage < totalPages - 1) {
-                    paginationHtml += `<span class="px-2 text-fb-gray">...</span>`;
-                }
-                paginationHtml += `
-                    <button class="px-3 py-2 text-sm rounded-lg border border-fb-gray-light bg-white hover:bg-fb-bg transition-colors" data-page="${totalPages}">${totalPages}</button>
-                `;
-            }
-
-            paginationHtml += `
-                    <button 
-                        class="px-3 py-2 text-sm rounded-lg border border-fb-gray-light bg-white hover:bg-fb-bg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                        ${currentPage === totalPages ? 'disabled' : ''}
-                        data-page="${currentPage + 1}"
-                    >
-                        下一页
-                    </button>
-                </div>
-            `;
-
-            container.innerHTML = paginationHtml;
-
-            container.querySelectorAll('button[data-page]').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const page = parseInt(btn.dataset.page);
-                    if (page !== currentPage && page >= 1 && page <= totalPages) {
-                        onPageChange(page);
-                    }
-                });
-            });
-        }
-
-        async function loadAdminIssues(page = 1) {
-            if (!currentSecretKey) return;
-            
-            try {
-                const response = await fetchWithTimeout(
-                    `${API_URL}/admin/issues?page=${page}&pageSize=${adminPageSize}`,
-                    {
-                        method: 'GET',
-                        headers: {
-                            'Authorization': `Bearer ${currentSecretKey}`,
-                        },
-                    }
-                );
-
-                if (!response.ok) {
-                    throw new Error('Failed to load issues');
-                }
-
-                const data = await response.json();
-                renderIssues(data.issues, data.pagination, data.stats, page);
-            } catch (error) {
-                console.error('Load admin issues error:', error);
-                alert('加载数据失败，请重试');
-            }
-        }
-
-        document.getElementById('loginForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const secretKey = document.getElementById('secretKey').value;
-            const loginBtn = document.getElementById('loginBtn');
-            const loginError = document.getElementById('loginError');
-
-            loginBtn.disabled = true;
-            loginBtn.textContent = '验证中...';
-            loginError.hidden = true;
-
-            try {
-                currentSecretKey = secretKey;
-                const response = await fetchWithTimeout(`${API_URL}/admin/issues?page=1&pageSize=${adminPageSize}`, {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': `Bearer ${secretKey}`,
-                    },
-                });
-
-                if (response.ok) {
-                    document.getElementById('loginSection').hidden = true;
-                    document.getElementById('adminSection').hidden = false;
-                    const data = await response.json();
-                    renderIssues(data.issues, data.pagination, data.stats, 1);
-                } else {
-                    currentSecretKey = null;
-                    const data = await response.json();
-                    loginError.textContent = data.error || '登录失败，请检查密钥';
-                    loginError.hidden = false;
-                }
-            } catch (error) {
-                console.error('Login error:', error);
-                currentSecretKey = null;
-                const errorMsg = error.name === 'AbortError' ? '请求超时，请重试' : '网络错误，请重试';
-                loginError.textContent = errorMsg;
-                loginError.hidden = false;
-            } finally {
-                loginBtn.disabled = false;
-                loginBtn.textContent = '登录';
-            }
+    function renderPagination(container, pagination, onChange) {
+      if (!pagination || pagination.totalPages <= 1) { container.innerHTML = ''; return; }
+      const { page, totalPages } = pagination;
+      const start = Math.max(1, page - 2);
+      const end = Math.min(totalPages, start + 4);
+      const buttons = [`<button class="ghost-button rounded-full px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-40" data-page="${page - 1}" ${page === 1 ? 'disabled' : ''}>上一页</button>`];
+      for (let current = start; current <= end; current += 1) {
+        const active = current === page;
+        buttons.push(`<button class="rounded-full px-4 py-2 text-sm font-semibold ${active ? 'bg-[#172033] text-white' : 'ghost-button text-[#172033]'}" data-page="${current}" ${active ? 'disabled' : ''}>${current}</button>`);
+      }
+      buttons.push(`<button class="ghost-button rounded-full px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-40" data-page="${page + 1}" ${page === totalPages ? 'disabled' : ''}>下一页</button>`);
+      container.innerHTML = `<div class="flex flex-wrap items-center justify-center gap-2">${buttons.join('')}</div>`;
+      container.querySelectorAll('button[data-page]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const nextPage = Number(button.dataset.page);
+          if (Number.isFinite(nextPage) && nextPage >= 1 && nextPage <= totalPages && nextPage !== page) onChange(nextPage);
         });
+      });
+    }
 
-        document.getElementById('refreshBtn').addEventListener('click', async () => {
-            if (!currentSecretKey) return;
-            
-            const refreshBtn = document.getElementById('refreshBtn');
-            refreshBtn.disabled = true;
-            refreshBtn.textContent = '刷新中...';
+    function renderStats(stats) {
+      document.getElementById('pendingCount').textContent = stats.pendingCount || 0;
+      document.getElementById('todayNewCount').textContent = stats.todayNewCount || 0;
+      document.getElementById('weekResolvedCount').textContent = stats.weekResolvedCount || 0;
+      document.getElementById('totalCount').textContent = stats.total || 0;
+    }
 
-            try {
-                await loadAdminIssues(adminCurrentPage);
-            } catch (error) {
-                console.error('Refresh error:', error);
-                alert('刷新失败，请检查网络');
-            } finally {
-                refreshBtn.disabled = false;
-                refreshBtn.textContent = '刷新数据';
-            }
-        });
+    function renderIssueList(items, pagination) {
+      const container = document.getElementById('issuesList');
+      if (!items || items.length === 0) {
+        container.innerHTML = '<div class="rounded-[1.5rem] border border-dashed border-[rgba(23,32,51,0.16)] bg-white/55 px-5 py-8 text-center text-sm leading-7 text-[#5f6b80]">当前筛选条件下没有问题。</div>';
+        document.getElementById('paginationContainer').innerHTML = '';
+        return;
+      }
 
-        document.getElementById('logoutBtn').addEventListener('click', () => {
-            currentSecretKey = null;
-            adminCurrentPage = 1;
-            document.getElementById('secretKey').value = '';
-            document.getElementById('adminSection').hidden = true;
-            document.getElementById('loginSection').hidden = false;
-        });
+      container.innerHTML = items.map((item) => `
+        <article class="issue-card rounded-[1.7rem] p-5 md:p-6">
+          <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div class="space-y-3">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="status-token" data-status="${escapeHtml(item.status)}">${escapeHtml(statusLabels[item.status] || item.status)}</span>
+                <span class="priority-token" data-priority="${escapeHtml(item.priority)}">${escapeHtml(priorityLabels[item.priority] || item.priority)}</span>
+                <span class="category-token">${escapeHtml(categoryLabels[item.category] || item.category)}</span>
+              </div>
+              <div>
+                <div class="text-xs font-semibold uppercase tracking-[0.28em] text-[#72809a]">${escapeHtml(item.trackingCode)}</div>
+                <div class="mt-2 text-base leading-7 text-[#172033]">${escapeHtml(item.content)}</div>
+              </div>
+              <div class="grid gap-2 text-sm text-[#4c566b] sm:grid-cols-2 lg:grid-cols-3">
+                <div><strong class="text-[#172033]">姓名：</strong>${escapeHtml(item.name)}</div>
+                <div><strong class="text-[#172033]">学号：</strong>${escapeHtml(item.studentId)}</div>
+                <div><strong class="text-[#172033]">指派：</strong>${escapeHtml(item.assignedTo || '未指派')}</div>
+                <div><strong class="text-[#172033]">公开：</strong>${item.isPublic ? '是' : '否'}</div>
+                <div><strong class="text-[#172033]">上报：</strong>${item.isReported ? '是' : '否'}</div>
+                <div><strong class="text-[#172033]">更新：</strong>${escapeHtml(formatDate(item.updatedAt))}</div>
+              </div>
+            </div>
+            <div class="flex flex-col gap-3 lg:min-w-[220px]">
+              <div class="rounded-[1.3rem] border border-[rgba(23,32,51,0.08)] bg-white/75 px-4 py-3 text-sm text-[#4c566b]">
+                <div><strong class="text-[#172033]">提交：</strong>${escapeHtml(formatDate(item.createdAt))}</div>
+                <div class="mt-2"><strong class="text-[#172033]">摘要：</strong>${escapeHtml(item.publicSummary || '暂无')}</div>
+              </div>
+              <button class="open-detail rounded-full bg-[#172033] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#0c1424]" type="button" data-id="${item.id}">查看详情</button>
+            </div>
+          </div>
+        </article>
+      `).join('');
 
-        function renderIssues(issues, pagination, stats, page = 1) {
-            const issuesList = document.getElementById('issuesList');
-            const paginationContainer = document.getElementById('adminPaginationContainer');
-            
-            adminCurrentPage = page;
-            const totalPages = pagination?.totalPages || 1;
-            const resolvedStats = stats || {};
-            const totalCount = resolvedStats.total ?? pagination?.total ?? 0;
-            const publicCount = resolvedStats.publicCount ?? 0;
-            const reportCount = resolvedStats.reportCount ?? 0;
-            const todayCount = resolvedStats.todayCount ?? 0;
-            
-            document.getElementById('totalCount').textContent = totalCount;
-            document.getElementById('publicCount').textContent = publicCount;
-            document.getElementById('reportCount').textContent = reportCount;
-            document.getElementById('todayCount').textContent = todayCount;
+      container.querySelectorAll('.open-detail').forEach((button) => {
+        button.addEventListener('click', () => openDrawer(Number(button.dataset.id)));
+      });
 
-            if (!issues || issues.length === 0) {
-                issuesList.innerHTML = '<div class="text-center text-fb-gray py-12 text-sm">暂无问题反馈数据</div>';
-                paginationContainer.innerHTML = '';
-                return;
-            }
+      renderPagination(document.getElementById('paginationContainer'), pagination, (nextPage) => loadIssues(nextPage));
+    }
 
-            issuesList.innerHTML = `
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm">
-                        <thead>
-                            <tr class="border-b border-fb-gray-light">
-                                <th class="text-left py-3 px-2 font-semibold text-gray-700">ID</th>
-                                <th class="text-left py-3 px-2 font-semibold text-gray-700">问题内容</th>
-                                <th class="text-left py-3 px-2 font-semibold text-gray-700">姓名</th>
-                                <th class="text-left py-3 px-2 font-semibold text-gray-700">学号</th>
-                                <th class="text-center py-3 px-2 font-semibold text-gray-700">公开实名</th>
-                                <th class="text-center py-3 px-2 font-semibold text-gray-700">请求上报</th>
-                                <th class="text-left py-3 px-2 font-semibold text-gray-700">提交时间(UTC)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${issues.map(issue => `
-                                <tr class="border-b border-fb-gray-light hover:bg-fb-bg transition-colors">
-                                    <td class="py-3 px-2 text-fb-gray">${issue.id}</td>
-                                    <td class="py-3 px-2 text-gray-900 max-w-xs">
-                                        <div class="break-words">${escapeHtml(issue.issue)}</div>
-                                    </td>
-                                    <td class="py-3 px-2 text-gray-900">${escapeHtml(issue.name)}</td>
-                                    <td class="py-3 px-2 text-gray-900">${escapeHtml(issue.student_id)}</td>
-                                    <td class="py-3 px-2 text-center">
-                                        ${issue.isInformationPublic === 'yes' 
-                                            ? '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">是</span>'
-                                            : '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">否</span>'
-                                        }
-                                    </td>
-                                    <td class="py-3 px-2 text-center">
-                                        ${issue.isReport === 'yes'
-                                            ? '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">是</span>'
-                                            : '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">否</span>'
-                                        }
-                                    </td>
-                                    <td class="py-3 px-2 text-fb-gray whitespace-nowrap">${formatDate(issue.created_at)}</td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                </div>
-            `;
+    async function loadIssues(page = 1) {
+      state.page = page;
+      document.getElementById('issuesList').innerHTML = '<div class="rounded-[1.5rem] border border-dashed border-[rgba(23,32,51,0.16)] bg-white/55 px-5 py-8 text-center text-sm leading-7 text-[#5f6b80]">正在加载问题列表...</div>';
+      const data = await apiFetch(`/admin/issues?${serializeFilters(page)}`);
+      renderStats(data.stats);
+      renderIssueList(data.items, data.pagination);
+    }
 
-            renderPagination(paginationContainer, adminCurrentPage, totalPages, (newPage) => {
-                loadAdminIssues(newPage);
-            });
-        }
-    </script>
+    function openDrawerShell() {
+      document.getElementById('drawerBackdrop').hidden = false;
+      document.getElementById('issueDrawer').hidden = false;
+      document.body.classList.add('overflow-hidden');
+    }
+
+    function closeDrawer() {
+      document.getElementById('drawerBackdrop').hidden = true;
+      document.getElementById('issueDrawer').hidden = true;
+      document.body.classList.remove('overflow-hidden');
+      state.activeIssueId = null;
+      state.activeIssue = null;
+    }
+
+    function buildStatusOptions(current) {
+      const allowed = statusTransitions[current] || [current];
+      return allowed.map((status) => `<option value="${status}">${escapeHtml(statusLabels[status] || status)}</option>`).join('');
+    }
+
+    function renderUpdates(items) {
+      const container = document.getElementById('updatesTimeline');
+      if (!items || items.length === 0) {
+        container.innerHTML = '<div class="rounded-[1.2rem] border border-dashed border-[rgba(23,32,51,0.14)] bg-white/60 px-4 py-5 text-sm text-[#5f6b80]">还没有状态更新或公开回复。</div>';
+        return;
+      }
+
+      container.innerHTML = items.map((item) => `
+        <article class="timeline-item">
+          <div class="timeline-dot">${item.type === 'public_reply' ? '答' : '更'}</div>
+          <div class="rounded-[1.2rem] border border-[rgba(23,32,51,0.08)] bg-white/70 p-4">
+            <div class="flex flex-wrap items-center gap-2">
+              <strong class="text-[#172033]">${item.type === 'public_reply' ? '公开回复' : `${escapeHtml(statusLabels[item.oldValue] || item.oldValue || '初始状态')} → ${escapeHtml(statusLabels[item.newValue] || item.newValue || '已更新')}`}</strong>
+              <span class="text-xs uppercase tracking-[0.26em] text-[#72809a]">${escapeHtml(formatDate(item.createdAt))}</span>
+            </div>
+            <div class="mt-2 text-sm leading-7 text-[#4c566b]">${escapeHtml(item.content || '状态已更新。')}</div>
+          </div>
+        </article>
+      `).join('');
+    }
+
+    function renderNotes(items) {
+      const container = document.getElementById('notesList');
+      if (!items || items.length === 0) {
+        container.innerHTML = '<div class="rounded-[1.2rem] border border-dashed border-[rgba(23,32,51,0.14)] bg-white/60 px-4 py-5 text-sm text-[#5f6b80]">暂无内部备注。</div>';
+        return;
+      }
+      container.innerHTML = items.map((item) => `<article class="rounded-[1.2rem] border border-[rgba(23,32,51,0.08)] bg-white/70 p-4"><div class="text-sm leading-7 text-[#172033]">${escapeHtml(item.content)}</div><div class="mt-2 text-xs uppercase tracking-[0.26em] text-[#72809a]">${escapeHtml(item.createdBy)} · ${escapeHtml(formatDate(item.createdAt))}</div></article>`).join('');
+    }
+
+    function renderReplies(items) {
+      const container = document.getElementById('repliesList');
+      if (!items || items.length === 0) {
+        container.innerHTML = '<div class="rounded-[1.2rem] border border-dashed border-[rgba(23,32,51,0.14)] bg-white/60 px-4 py-5 text-sm text-[#5f6b80]">暂无回复记录。</div>';
+        return;
+      }
+      container.innerHTML = items.map((item) => `<article class="rounded-[1.2rem] border border-[rgba(23,32,51,0.08)] bg-white/70 p-4"><div class="flex flex-wrap items-center gap-2"><span class="rounded-full px-3 py-1 text-xs font-semibold ${item.isPublic ? 'bg-[rgba(19,121,91,0.12)] text-[#13795b]' : 'bg-[rgba(23,32,51,0.08)] text-[#4c566b]'}">${item.isPublic ? '公开' : '私有'}</span><span class="text-xs uppercase tracking-[0.26em] text-[#72809a]">${escapeHtml(formatDate(item.createdAt))}</span></div><div class="mt-2 text-sm leading-7 text-[#172033]">${escapeHtml(item.content || '')}</div></article>`).join('');
+    }
+
+    function renderHistory(items) {
+      const container = document.getElementById('historyList');
+      if (!items || items.length === 0) {
+        container.innerHTML = '<div class="rounded-[1.2rem] border border-dashed border-[rgba(23,32,51,0.14)] bg-white/60 px-4 py-5 text-sm text-[#5f6b80]">暂无操作历史。</div>';
+        return;
+      }
+      container.innerHTML = items.map((item) => `<article class="rounded-[1.2rem] border border-[rgba(23,32,51,0.08)] bg-white/70 p-4"><div class="flex flex-wrap items-center gap-2"><strong class="text-[#172033]">${escapeHtml(item.actionType)}</strong><span class="text-xs uppercase tracking-[0.26em] text-[#72809a]">${escapeHtml(item.performedBy)} · ${escapeHtml(formatDate(item.performedAt))}</span></div><div class="mt-2 text-sm leading-7 text-[#4c566b]">${escapeHtml(JSON.stringify(item.details || {}, null, 0))}</div></article>`).join('');
+    }
+
+    function renderDrawer(detail) {
+      state.activeIssue = detail;
+      document.getElementById('drawerTitle').textContent = detail.trackingCode;
+      document.getElementById('drawerMeta').textContent = `${statusLabels[detail.status] || detail.status} · ${formatDate(detail.updatedAt)}`;
+      document.getElementById('drawerContent').innerHTML = `
+        <section class="space-y-4 rounded-[1.6rem] border border-[rgba(23,32,51,0.08)] bg-white/82 p-5">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="status-token" data-status="${escapeHtml(detail.status)}">${escapeHtml(statusLabels[detail.status] || detail.status)}</span>
+            <span class="priority-token" data-priority="${escapeHtml(detail.priority)}">${escapeHtml(priorityLabels[detail.priority] || detail.priority)}</span>
+            <span class="category-token">${escapeHtml(categoryLabels[detail.category] || detail.category)}</span>
+          </div>
+          <div class="grid gap-3 text-sm text-[#4c566b] md:grid-cols-2">
+            <div><strong class="text-[#172033]">姓名：</strong>${escapeHtml(detail.name)}</div>
+            <div><strong class="text-[#172033]">学号：</strong>${escapeHtml(detail.studentId)}</div>
+            <div><strong class="text-[#172033]">提交时间：</strong>${escapeHtml(formatDate(detail.createdAt))}</div>
+            <div><strong class="text-[#172033]">首次响应：</strong>${escapeHtml(formatDate(detail.firstResponseAt))}</div>
+            <div><strong class="text-[#172033]">解决时间：</strong>${escapeHtml(formatDate(detail.resolvedAt))}</div>
+            <div><strong class="text-[#172033]">是否公开：</strong>${detail.isPublic ? '是' : '否'}</div>
+          </div>
+          <div class="rounded-[1.3rem] border border-[rgba(23,32,51,0.08)] bg-[rgba(36,87,214,0.05)] px-4 py-4 text-sm leading-7 text-[#172033]">${escapeHtml(detail.content)}</div>
+        </section>
+
+        <section class="space-y-4 rounded-[1.6rem] border border-[rgba(23,32,51,0.08)] bg-white/82 p-5">
+          <div class="flex items-center justify-between">
+            <div><div class="text-xs font-semibold uppercase tracking-[0.3em] text-[#72809a]">Editable Fields</div><h3 class="display-font mt-2 text-2xl">问题编辑</h3></div>
+            <button id="saveIssueButton" class="rounded-full bg-[#2457d6] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#1e47b0]" type="button">保存修改</button>
+          </div>
+          <div id="drawerNotification"></div>
+          <div class="grid gap-4 md:grid-cols-2">
+            <label class="space-y-2 text-sm font-medium text-[#25314a]"><span>状态</span><select id="detailStatus" class="field-shell h-11 w-full rounded-2xl px-4 text-sm">${buildStatusOptions(detail.status)}</select></label>
+            <label class="space-y-2 text-sm font-medium text-[#25314a]"><span>分类</span><select id="detailCategory" class="field-shell h-11 w-full rounded-2xl px-4 text-sm">${Object.entries(categoryLabels).map(([value, label]) => `<option value="${value}" ${detail.category === value ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
+            <label class="space-y-2 text-sm font-medium text-[#25314a]"><span>优先级</span><select id="detailPriority" class="field-shell h-11 w-full rounded-2xl px-4 text-sm">${Object.entries(priorityLabels).map(([value, label]) => `<option value="${value}" ${detail.priority === value ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
+            <label class="space-y-2 text-sm font-medium text-[#25314a]"><span>指派人</span><input id="detailAssignedTo" class="field-shell h-11 w-full rounded-2xl px-4 text-sm" value="${escapeHtml(detail.assignedTo || '')}" placeholder="可留空清除"></label>
+          </div>
+          <label class="space-y-2 text-sm font-medium text-[#25314a]"><span>公开摘要</span><textarea id="detailPublicSummary" class="field-shell min-h-[120px] w-full rounded-[1.4rem] px-4 py-3 text-sm leading-7" maxlength="500" placeholder="可留空清除">${escapeHtml(detail.publicSummary || '')}</textarea></label>
+          <label class="flex items-start gap-3 rounded-[1.4rem] border border-[rgba(23,32,51,0.08)] bg-white/70 px-4 py-3 text-sm leading-6 text-[#445069]"><input id="detailIsPublic" type="checkbox" class="mt-1 h-4 w-4 rounded border-[#b9c3d6] text-[#2457d6] focus:ring-[#2457d6]" ${detail.isPublic ? 'checked' : ''}><span>允许该问题进入首页公开列表。</span></label>
+        </section>
+
+        <section class="space-y-4 rounded-[1.6rem] border border-[rgba(23,32,51,0.08)] bg-white/82 p-5"><div class="text-xs font-semibold uppercase tracking-[0.3em] text-[#72809a]">Updates</div><h3 class="display-font text-2xl">处理时间线</h3><div id="updatesTimeline" class="space-y-5"></div></section>
+        <section class="space-y-4 rounded-[1.6rem] border border-[rgba(23,32,51,0.08)] bg-white/82 p-5"><div class="text-xs font-semibold uppercase tracking-[0.3em] text-[#72809a]">Internal Notes</div><h3 class="display-font text-2xl">内部备注</h3><div id="notesList" class="space-y-3"></div><form id="noteForm" class="space-y-3"><textarea id="noteContent" class="field-shell min-h-[110px] w-full rounded-[1.4rem] px-4 py-3 text-sm leading-7" maxlength="1000" placeholder="记录内部跟进、外部沟通或处理建议"></textarea><button class="rounded-full bg-[#172033] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#0c1424]" type="submit">添加备注</button></form></section>
+        <section class="space-y-4 rounded-[1.6rem] border border-[rgba(23,32,51,0.08)] bg-white/82 p-5"><div class="text-xs font-semibold uppercase tracking-[0.3em] text-[#72809a]">Replies</div><h3 class="display-font text-2xl">公开回复</h3><div id="repliesList" class="space-y-3"></div><form id="replyForm" class="space-y-3"><textarea id="replyContent" class="field-shell min-h-[110px] w-full rounded-[1.4rem] px-4 py-3 text-sm leading-7" maxlength="1000" placeholder="面向提交者和公开页面展示的回复内容"></textarea><label class="flex items-start gap-3 rounded-[1.2rem] border border-[rgba(23,32,51,0.08)] bg-white/70 px-4 py-3 text-sm leading-6 text-[#445069]"><input id="replyIsPublic" type="checkbox" class="mt-1 h-4 w-4 rounded border-[#b9c3d6] text-[#2457d6] focus:ring-[#2457d6]" checked><span>勾选后，这条回复会在追踪页对外可见。</span></label><button class="rounded-full bg-[#2457d6] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#1e47b0]" type="submit">发送回复</button></form></section>
+        <section class="space-y-4 rounded-[1.6rem] border border-[rgba(23,32,51,0.08)] bg-white/82 p-5"><div class="text-xs font-semibold uppercase tracking-[0.3em] text-[#72809a]">Audit Trail</div><h3 class="display-font text-2xl">操作历史</h3><div id="historyList" class="space-y-3"></div></section>
+      `;
+
+      document.getElementById('detailStatus').value = detail.status;
+      document.getElementById('saveIssueButton').addEventListener('click', saveIssueChanges);
+      document.getElementById('noteForm').addEventListener('submit', submitNote);
+      document.getElementById('replyForm').addEventListener('submit', submitReply);
+      renderUpdates(detail.updates);
+      renderNotes(detail.internalNotes);
+      renderReplies(detail.updates.filter((item) => item.type === 'public_reply'));
+      renderHistory(detail.history);
+    }
+
+    async function openDrawer(issueId) {
+      state.activeIssueId = issueId;
+      openDrawerShell();
+      document.getElementById('drawerContent').innerHTML = '<div class="rounded-[1.5rem] border border-dashed border-[rgba(23,32,51,0.16)] bg-white/60 px-5 py-8 text-center text-sm leading-7 text-[#5f6b80]">正在加载问题详情...</div>';
+      try {
+        const detail = await apiFetch(`/admin/issues/${issueId}`);
+        renderDrawer(detail);
+      } catch (error) {
+        document.getElementById('drawerContent').innerHTML = `<div class="rounded-[1.5rem] border border-[rgba(178,58,50,0.2)] bg-[rgba(178,58,50,0.08)] px-5 py-8 text-center text-sm leading-7 text-[#8f2d27]">${escapeHtml(error.message)}</div>`;
+      }
+    }
+
+    async function refreshActiveIssue() {
+      if (!state.activeIssueId) return;
+      const detail = await apiFetch(`/admin/issues/${state.activeIssueId}`);
+      renderDrawer(detail);
+      await loadIssues(state.page);
+    }
+
+    async function saveIssueChanges() {
+      if (!state.activeIssue) return;
+      const patch = {};
+      const status = document.getElementById('detailStatus').value;
+      const category = document.getElementById('detailCategory').value;
+      const priority = document.getElementById('detailPriority').value;
+      const assignedTo = document.getElementById('detailAssignedTo').value.trim() || null;
+      const publicSummary = document.getElementById('detailPublicSummary').value.trim() || null;
+      const isPublic = document.getElementById('detailIsPublic').checked;
+      if (status !== state.activeIssue.status) patch.status = status;
+      if (category !== state.activeIssue.category) patch.category = category;
+      if (priority !== state.activeIssue.priority) patch.priority = priority;
+      if (assignedTo !== (state.activeIssue.assignedTo || null)) patch.assignedTo = assignedTo;
+      if (publicSummary !== (state.activeIssue.publicSummary || null)) patch.publicSummary = publicSummary;
+      if (isPublic !== state.activeIssue.isPublic) patch.isPublic = isPublic;
+      if (Object.keys(patch).length === 0) { setNotification('drawerNotification', '没有需要保存的字段变化。', 'info'); return; }
+      try {
+        await apiFetch(`/admin/issues/${state.activeIssueId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) });
+        setNotification('drawerNotification', '问题信息已更新。', 'success');
+        await refreshActiveIssue();
+      } catch (error) { setNotification('drawerNotification', error.message, 'error'); }
+    }
+
+    async function submitNote(event) {
+      event.preventDefault();
+      const content = document.getElementById('noteContent').value.trim();
+      if (!content) { setNotification('drawerNotification', '备注内容不能为空。', 'error'); return; }
+      try {
+        await apiFetch(`/admin/issues/${state.activeIssueId}/notes`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content }) });
+        document.getElementById('noteContent').value = '';
+        setNotification('drawerNotification', '内部备注已添加。', 'success');
+        await refreshActiveIssue();
+      } catch (error) { setNotification('drawerNotification', error.message, 'error'); }
+    }
+
+    async function submitReply(event) {
+      event.preventDefault();
+      const content = document.getElementById('replyContent').value.trim();
+      const isPublic = document.getElementById('replyIsPublic').checked;
+      if (!content) { setNotification('drawerNotification', '回复内容不能为空。', 'error'); return; }
+      try {
+        await apiFetch(`/admin/issues/${state.activeIssueId}/replies`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content, isPublic }) });
+        document.getElementById('replyContent').value = '';
+        document.getElementById('replyIsPublic').checked = true;
+        setNotification('drawerNotification', '回复已添加。', 'success');
+        await refreshActiveIssue();
+      } catch (error) { setNotification('drawerNotification', error.message, 'error'); }
+    }
+
+    async function login(secretKey) {
+      state.token = secretKey;
+      sessionStorage.setItem(STORAGE_KEY, secretKey);
+      document.getElementById('loginButton').disabled = true;
+      document.getElementById('loginButton').textContent = '验证中...';
+      setNotification('loginNotification', '正在验证并加载列表...', 'info');
+      try {
+        await loadIssues(1);
+        document.getElementById('loginSection').hidden = true;
+        document.getElementById('adminShell').hidden = false;
+        setNotification('adminNotification', '后台数据已加载。', 'success');
+        setNotification('loginNotification', '');
+      } catch (error) {
+        sessionStorage.removeItem(STORAGE_KEY);
+        state.token = null;
+        setNotification('loginNotification', error.message, 'error');
+      } finally {
+        document.getElementById('loginButton').disabled = false;
+        document.getElementById('loginButton').textContent = '登录并加载问题列表';
+      }
+    }
+
+    function logout() {
+      state.token = null;
+      state.activeIssueId = null;
+      state.activeIssue = null;
+      sessionStorage.removeItem(STORAGE_KEY);
+      document.getElementById('secretKey').value = '';
+      document.getElementById('loginSection').hidden = false;
+      document.getElementById('adminShell').hidden = true;
+      setNotification('adminNotification', '');
+      closeDrawer();
+    }
+
+    document.getElementById('loginForm').addEventListener('submit', (event) => {
+      event.preventDefault();
+      const secretKey = document.getElementById('secretKey').value.trim();
+      if (!secretKey) { setNotification('loginNotification', '请输入管理密钥。', 'error'); return; }
+      login(secretKey);
+    });
+    document.getElementById('filterForm').addEventListener('submit', (event) => { event.preventDefault(); loadIssues(1).catch((error) => setNotification('adminNotification', error.message, 'error')); });
+    document.getElementById('resetFilters').addEventListener('click', () => { document.getElementById('filterForm').reset(); loadIssues(1).catch((error) => setNotification('adminNotification', error.message, 'error')); });
+    document.getElementById('refreshButton').addEventListener('click', () => loadIssues(state.page).catch((error) => setNotification('adminNotification', error.message, 'error')));
+    document.getElementById('logoutButton').addEventListener('click', logout);
+    document.getElementById('closeDrawer').addEventListener('click', closeDrawer);
+    document.getElementById('drawerBackdrop').addEventListener('click', closeDrawer);
+    document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !document.getElementById('issueDrawer').hidden) closeDrawer(); });
+
+    const storedSecret = sessionStorage.getItem(STORAGE_KEY);
+    if (storedSecret) {
+      document.getElementById('secretKey').value = storedSecret;
+      login(storedSecret);
+    }
+  </script>
 </body>
 </html>
-

@@ -1,7 +1,10 @@
 # Admin Secret Key Configuration
 # Copy this file to .dev.vars and set your actual secret key
 # DO NOT commit .dev.vars to version control!
+#
+# Quote the value if it contains #, &, $, or spaces so dotenv-style parsing keeps the full string.
+# Example: ADMIN_SECRET_KEY="your-secret-key-here-change-me"
 
 # Admin secret key for backend authentication
 # Must be at least 32 characters for security
-ADMIN_SECRET_KEY=your-secret-key-here-change-me
+ADMIN_SECRET_KEY="your-secret-key-here-change-me"

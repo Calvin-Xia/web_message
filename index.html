@@ -1,351 +1,602 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>问题反馈系统</title>
-    <link rel="stylesheet" href="/styles.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>留言处理台</title>
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #f5efe4;
+      --paper-strong: rgba(255, 252, 246, 0.9);
+      --ink: #172033;
+      --ink-soft: #4c566b;
+      --line: rgba(23, 32, 51, 0.12);
+      --accent: #2457d6;
+      --accent-soft: rgba(36, 87, 214, 0.1);
+      --warn: #d98a17;
+      --mint: #13795b;
+      --danger: #b23a32;
+      --shadow: 0 24px 70px rgba(18, 26, 44, 0.12);
+    }
+
+    body {
+      font-family: "Aptos", "Segoe UI", "PingFang SC", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(36, 87, 214, 0.12), transparent 35%),
+        radial-gradient(circle at top right, rgba(217, 138, 23, 0.12), transparent 28%),
+        linear-gradient(180deg, #f8f3ea 0%, #efe8dc 100%);
+      color: var(--ink);
+    }
+
+    .display-font {
+      font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+    }
+
+    .surface-panel {
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(255, 252, 246, 0.86) 100%);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(20px);
+    }
+
+    .grid-overlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.24;
+      background-image:
+        linear-gradient(rgba(23, 32, 51, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(23, 32, 51, 0.05) 1px, transparent 1px);
+      background-size: 24px 24px;
+      mask-image: radial-gradient(circle at center, black 30%, transparent 92%);
+    }
+
+    .hero-rail {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-rail::after {
+      content: "";
+      position: absolute;
+      right: -4rem;
+      bottom: -4rem;
+      width: 16rem;
+      height: 16rem;
+      border-radius: 999px;
+      background: radial-gradient(circle, rgba(36, 87, 214, 0.18), transparent 70%);
+      filter: blur(6px);
+    }
+
+    .status-token,
+    .category-token,
+    .priority-token {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 0.35rem 0.75rem;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .status-token[data-status="submitted"] { background: rgba(36, 87, 214, 0.1); color: #2046a2; }
+    .status-token[data-status="in_review"] { background: rgba(217, 138, 23, 0.14); color: #8b5a12; }
+    .status-token[data-status="in_progress"] { background: rgba(96, 92, 189, 0.12); color: #4f43a8; }
+    .status-token[data-status="resolved"] { background: rgba(19, 121, 91, 0.14); color: #0b6a4e; }
+    .status-token[data-status="closed"] { background: rgba(23, 32, 51, 0.1); color: #374151; }
+
+    .category-token { background: rgba(23, 32, 51, 0.08); color: var(--ink-soft); }
+    .priority-token[data-priority="urgent"] { background: rgba(178, 58, 50, 0.15); color: var(--danger); }
+    .priority-token[data-priority="high"] { background: rgba(217, 138, 23, 0.16); color: #9b5f12; }
+    .priority-token[data-priority="normal"] { background: rgba(36, 87, 214, 0.1); color: #2147ac; }
+    .priority-token[data-priority="low"] { background: rgba(19, 121, 91, 0.12); color: var(--mint); }
+
+    .field-shell {
+      border: 1px solid rgba(23, 32, 51, 0.12);
+      background: rgba(255, 255, 255, 0.84);
+      transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+    }
+
+    .field-shell:focus {
+      border-color: rgba(36, 87, 214, 0.5);
+      box-shadow: 0 0 0 4px rgba(36, 87, 214, 0.12);
+      outline: none;
+      transform: translateY(-1px);
+    }
+
+    .ghost-button {
+      border: 1px solid rgba(23, 32, 51, 0.12);
+      background: rgba(255, 255, 255, 0.78);
+    }
+
+    .ghost-button:hover {
+      background: rgba(255, 255, 255, 0.96);
+      border-color: rgba(23, 32, 51, 0.2);
+    }
+
+    .public-card {
+      border: 1px solid rgba(23, 32, 51, 0.08);
+      background: rgba(255, 255, 255, 0.72);
+      transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .public-card:hover {
+      transform: translateY(-3px);
+      border-color: rgba(36, 87, 214, 0.22);
+      box-shadow: 0 20px 45px rgba(18, 26, 44, 0.08);
+    }
+
+    .notice-box {
+      border: 1px dashed rgba(23, 32, 51, 0.18);
+      background: rgba(255, 255, 255, 0.55);
+    }
+
+    .loading-dots::after {
+      content: "";
+      animation: ellipsis 1.1s infinite;
+    }
+
+    @keyframes ellipsis {
+      0% { content: ""; }
+      33% { content: "."; }
+      66% { content: ".."; }
+      100% { content: "..."; }
+    }
+  </style>
 </head>
-<body class="min-h-screen bg-fb-bg p-4 md:p-8">
-    <div class="max-w-4xl mx-auto">
-        <!-- 标题 -->
-        <div class="text-center mb-6">
-            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
-                问题反馈系统
-            </h1>
-            <p class="text-fb-gray text-sm md:text-base">提交您的问题和反馈</p>
-        </div>
-
-        <!-- 问题表单 -->
-        <div class="bg-white rounded-lg shadow-md p-6 md:p-8 mb-4">
-            <div id="notification"></div>
-            <form id="messageForm" class="space-y-4">
-                <div>
-                    <label for="issue" class="block text-sm font-medium text-gray-700 mb-2">
-                        问题
-                    </label>
-                    <textarea
-                        id="issue"
-                        name="issue"
-                        required
-                        rows="4"
-                        placeholder="描述您的问题..."
-                        class="w-full px-3 py-2 border border-fb-gray-light rounded-lg bg-fb-bg focus:bg-white focus:outline-none focus:ring-2 focus:ring-fb-blue focus:border-transparent transition-all resize-none"
-                    ></textarea>
-                </div>
-                <div>
-                    <label for="name" class="block text-sm font-medium text-gray-700 mb-2">
-                        姓名
-                    </label>
-                    <input
-                        type="text"
-                        id="name"
-                        name="name"
-                        required
-                        placeholder="请输入姓名"
-                        class="w-full px-3 py-2 border border-fb-gray-light rounded-lg bg-fb-bg focus:bg-white focus:outline-none focus:ring-2 focus:ring-fb-blue focus:border-transparent transition-all"
-                    >
-                </div>
-                <div>
-                    <label for="student_id" class="block text-sm font-medium text-gray-700 mb-2">
-                        学号
-                    </label>
-                    <input
-                        type="text"
-                        id="student_id"
-                        name="student_id"
-                        required
-                        placeholder="请输入学号"
-                        class="w-full px-3 py-2 border border-fb-gray-light rounded-lg bg-fb-bg focus:bg-white focus:outline-none focus:ring-2 focus:ring-fb-blue focus:border-transparent transition-all"
-                    >
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                        是否实名
-                    </label>
-                    <div class="flex items-center">
-                        <input
-                            type="checkbox"
-                            id="isInformationPublic"
-                            name="isInformationPublic"
-                            class="w-4 h-4 text-fb-blue border-fb-gray-light rounded focus:ring-fb-blue"
-                        >
-                        <label for="isInformationPublic" class="ml-2 text-sm text-gray-700">
-                            是的，我愿意公开实名信息
-                        </label>
-                    </div>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                        是否上报
-                    </label>
-                    <div class="flex items-center">
-                        <input
-                            type="checkbox"
-                            id="isReport"
-                            name="isReport"
-                            class="w-4 h-4 text-fb-blue border-fb-gray-light rounded focus:ring-fb-blue"
-                        >
-                        <label for="isReport" class="ml-2 text-sm text-gray-700">
-                            是的，请将此问题上报
-                        </label>
-                    </div>
-                </div>
-                <button
-                    type="submit"
-                    class="w-full bg-fb-blue hover:bg-fb-blue-dark text-white font-semibold py-2.5 px-4 rounded-lg transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                    提交问题
-                </button>
-            </form>
-        </div>
-
-        <!-- 历史问题列表 -->
-        <div class="bg-white rounded-lg shadow-md p-6 md:p-8">
-            <h2 class="text-xl md:text-2xl font-bold text-gray-900 mb-4">
-                所有问题（时间戳为UTC标准时间）
-            </h2>
-            <div id="messagesList">
-                <div class="text-center text-fb-gray py-8">加载中...</div>
-            </div>
-            <div id="paginationContainer" class="mt-4"></div>
-        </div>
-
-        <div class="text-right py-6 mt-8 border-t border-gray-200">
-            <p class="text-fb-gray text-sm">
-                <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener" class="text-fb-gray hover:text-fb-blue transition-colors">渝ICP备2026000319号</a>
-                <br>
-                <a href="https://beian.mps.gov.cn/#/query/webSearch?code=50010102001439" rel="noreferrer" target="_blank" class="inline-flex items-center text-fb-gray hover:text-fb-blue transition-colors">
-                    <img src="/storage/Beian.png" alt="公安备案" class="w-5 h-5 ml-1">
-                    渝公网安备50010102001439号
-                </a>
-            </p>
-        </div>
+<body class="min-h-screen px-4 py-5 md:px-8 md:py-8">
+  <div class="grid-overlay"></div>
+  <header class="mx-auto flex max-w-6xl flex-col gap-4 md:flex-row md:items-center md:justify-between">
+    <div>
+      <div class="text-xs font-semibold uppercase tracking-[0.35em] text-[#5f6b80]">Phase 1 Public Desk</div>
+      <h1 class="display-font mt-2 text-3xl text-[#172033] md:text-4xl">留言处理台</h1>
     </div>
+    <nav class="flex flex-wrap gap-2 text-sm text-[#445069]">
+      <a class="ghost-button rounded-full px-4 py-2 transition-colors" href="/tracking.html">追踪进度</a>
+      <a class="ghost-button rounded-full px-4 py-2 transition-colors" href="/admin.html">管理后台</a>
+      <a class="ghost-button rounded-full px-4 py-2 transition-colors" href="/health.html">系统状态</a>
+    </nav>
+  </header>
 
-    <script>
-        const API_URL = '/api';
-        const REQUEST_TIMEOUT = 10000;
-        let currentPage = 1;
-        const pageSize = 20;
+  <main class="mx-auto mt-6 max-w-6xl space-y-8 pb-8 md:mt-8">
+    <section class="grid gap-6 lg:grid-cols-[1.08fr_0.92fr]">
+      <div class="hero-rail surface-panel rounded-[2rem] p-7 md:p-9">
+        <div class="max-w-xl">
+          <div class="inline-flex items-center rounded-full bg-[rgba(36,87,214,0.1)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-[#2147ac]">公开同步 + 私密追踪</div>
+          <h2 class="display-font mt-5 text-4xl leading-tight md:text-5xl">让每一条留言都有编号、有状态、有回音。</h2>
+          <p class="mt-4 text-base leading-7 text-[#4c566b] md:text-lg">
+            提交后系统会立即生成追踪编号。选择公开的问题会进入下方公开列表；未公开的问题不会出现在列表中，但依然可以通过追踪页查看处理状态与公开回复。
+          </p>
+          <div class="mt-6 grid gap-3 sm:grid-cols-3">
+            <div class="rounded-3xl border border-[rgba(23,32,51,0.08)] bg-white/60 p-4">
+              <div class="text-xs uppercase tracking-[0.25em] text-[#72809a]">Step 01</div>
+              <div class="mt-2 text-lg font-semibold">提交留言</div>
+              <div class="mt-1 text-sm text-[#5f6b80]">填写分类与内容</div>
+            </div>
+            <div class="rounded-3xl border border-[rgba(23,32,51,0.08)] bg-white/60 p-4">
+              <div class="text-xs uppercase tracking-[0.25em] text-[#72809a]">Step 02</div>
+              <div class="mt-2 text-lg font-semibold">保存编号</div>
+              <div class="mt-1 text-sm text-[#5f6b80]">追踪页随时查询</div>
+            </div>
+            <div class="rounded-3xl border border-[rgba(23,32,51,0.08)] bg-white/60 p-4">
+              <div class="text-xs uppercase tracking-[0.25em] text-[#72809a]">Step 03</div>
+              <div class="mt-2 text-lg font-semibold">查看回执</div>
+              <div class="mt-1 text-sm text-[#5f6b80]">状态变化会被记录</div>
+            </div>
+          </div>
+          <div class="notice-box mt-6 rounded-[1.5rem] p-4 text-sm leading-6 text-[#445069]">
+            姓名和学号仅用于后台处理，不会进入公开接口。若你不勾选“加入公开列表”，他人不会在首页看到你的问题内容。
+          </div>
+        </div>
+      </div>
 
-        async function fetchWithTimeout(url, options = {}, timeout = REQUEST_TIMEOUT) {
-            const controller = new AbortController();
-            const id = setTimeout(() => controller.abort(), timeout);
-            try {
-                const response = await fetch(url, {
-                    ...options,
-                    signal: controller.signal
-                });
-                return response;
-            } finally {
-                clearTimeout(id);
-            }
-        }
+      <section class="surface-panel rounded-[2rem] p-6 md:p-7">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <div class="text-xs font-semibold uppercase tracking-[0.28em] text-[#72809a]">New Submission</div>
+            <h3 class="display-font mt-2 text-2xl">提交新留言</h3>
+          </div>
+          <a class="text-sm font-medium text-[#2147ac] underline-offset-4 hover:underline" href="/tracking.html">已有编号？去追踪</a>
+        </div>
 
-        function renderPagination(container, currentPage, totalPages, onPageChange) {
-            if (totalPages <= 1) {
-                container.innerHTML = '';
-                return;
-            }
+        <div id="submitNotification" class="mt-4"></div>
 
-            const maxVisiblePages = 5;
-            let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-            let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
-            
-            if (endPage - startPage + 1 < maxVisiblePages) {
-                startPage = Math.max(1, endPage - maxVisiblePages + 1);
-            }
+        <form id="issueForm" class="mt-4 space-y-4">
+          <div class="grid gap-4 sm:grid-cols-2">
+            <label class="space-y-2 text-sm font-medium text-[#25314a]">
+              <span>姓名</span>
+              <input id="name" name="name" class="field-shell h-12 w-full rounded-2xl px-4 text-[15px]" maxlength="50" placeholder="请输入姓名" required>
+            </label>
+            <label class="space-y-2 text-sm font-medium text-[#25314a]">
+              <span>学号</span>
+              <input id="studentId" name="studentId" class="field-shell h-12 w-full rounded-2xl px-4 text-[15px]" placeholder="4位 / 5位 / 13位数字" required>
+            </label>
+          </div>
 
-            let paginationHtml = `
-                <div class="flex items-center justify-center gap-1 flex-wrap">
-                    <button 
-                        class="px-3 py-2 text-sm rounded-lg border border-fb-gray-light bg-white hover:bg-fb-bg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                        ${currentPage === 1 ? 'disabled' : ''}
-                        data-page="${currentPage - 1}"
-                    >
-                        上一页
-                    </button>
-            `;
+          <label class="space-y-2 text-sm font-medium text-[#25314a]">
+            <span>分类</span>
+            <select id="category" name="category" class="field-shell h-12 w-full rounded-2xl px-4 text-[15px]" required>
+              <option value="academic">学业相关</option>
+              <option value="facility">设施问题</option>
+              <option value="service">服务咨询</option>
+              <option value="complaint">投诉建议</option>
+              <option value="counseling">心理咨询</option>
+              <option value="other">其他</option>
+            </select>
+          </label>
 
-            if (startPage > 1) {
-                paginationHtml += `
-                    <button class="px-3 py-2 text-sm rounded-lg border border-fb-gray-light bg-white hover:bg-fb-bg transition-colors" data-page="1">1</button>
-                `;
-                if (startPage > 2) {
-                    paginationHtml += `<span class="px-2 text-fb-gray">...</span>`;
-                }
-            }
+          <label class="space-y-2 text-sm font-medium text-[#25314a]">
+            <span>问题内容</span>
+            <textarea id="content" name="content" class="field-shell min-h-[180px] w-full rounded-[1.5rem] px-4 py-4 text-[15px] leading-7" maxlength="2000" placeholder="请尽量写清楚发生了什么、发生时间、希望如何处理。" required></textarea>
+          </label>
 
-            for (let i = startPage; i <= endPage; i++) {
-                const isActive = i === currentPage;
-                paginationHtml += `
-                    <button 
-                        class="px-3 py-2 text-sm rounded-lg border transition-colors ${
-                            isActive 
-                                ? 'bg-fb-blue text-white border-fb-blue' 
-                                : 'border-fb-gray-light bg-white hover:bg-fb-bg'
-                        }"
-                        data-page="${i}"
-                        ${isActive ? 'disabled' : ''}
-                    >
-                        ${i}
-                    </button>
-                `;
-            }
+          <div class="grid gap-3">
+            <label class="flex items-start gap-3 rounded-[1.4rem] border border-[rgba(23,32,51,0.08)] bg-white/70 px-4 py-3 text-sm leading-6 text-[#445069]">
+              <input id="isPublic" name="isPublic" type="checkbox" class="mt-1 h-4 w-4 rounded border-[#b9c3d6] text-[#2457d6] focus:ring-[#2457d6]">
+              <span>
+                <strong class="block text-[#172033]">加入公开列表</strong>
+                允许问题内容和处理摘要出现在首页公开列表中，便于同步进展。
+              </span>
+            </label>
+            <label class="flex items-start gap-3 rounded-[1.4rem] border border-[rgba(23,32,51,0.08)] bg-white/70 px-4 py-3 text-sm leading-6 text-[#445069]">
+              <input id="isReported" name="isReported" type="checkbox" class="mt-1 h-4 w-4 rounded border-[#b9c3d6] text-[#2457d6] focus:ring-[#2457d6]">
+              <span>
+                <strong class="block text-[#172033]">需要上报</strong>
+                如果你希望该问题进入上报流程，请勾选此项，后台会据此优先处理。
+              </span>
+            </label>
+          </div>
 
-            if (endPage < totalPages) {
-                if (endPage < totalPages - 1) {
-                    paginationHtml += `<span class="px-2 text-fb-gray">...</span>`;
-                }
-                paginationHtml += `
-                    <button class="px-3 py-2 text-sm rounded-lg border border-fb-gray-light bg-white hover:bg-fb-bg transition-colors" data-page="${totalPages}">${totalPages}</button>
-                `;
-            }
+          <button id="submitButton" type="submit" class="inline-flex w-full items-center justify-center rounded-full bg-[#2457d6] px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-[#1e47b0] disabled:cursor-not-allowed disabled:opacity-60">
+            提交并生成追踪编号
+          </button>
+        </form>
+      </section>
+    </section>
 
-            paginationHtml += `
-                    <button 
-                        class="px-3 py-2 text-sm rounded-lg border border-fb-gray-light bg-white hover:bg-fb-bg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                        ${currentPage === totalPages ? 'disabled' : ''}
-                        data-page="${currentPage + 1}"
-                    >
-                        下一页
-                    </button>
-                </div>
-            `;
+    <section id="trackingReceipt" hidden class="surface-panel rounded-[2rem] p-6 md:p-7">
+      <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <div class="text-xs font-semibold uppercase tracking-[0.3em] text-[#72809a]">Receipt</div>
+          <h3 class="display-font mt-2 text-2xl">追踪编号已生成</h3>
+          <p class="mt-2 text-sm leading-6 text-[#4c566b]">请保存这个编号。未公开的问题只有通过追踪页和该编号才能查看处理状态。</p>
+        </div>
+        <div class="rounded-[1.5rem] border border-[rgba(23,32,51,0.08)] bg-white/80 px-5 py-4 text-right">
+          <div class="text-xs uppercase tracking-[0.3em] text-[#72809a]">Tracking Code</div>
+          <div id="trackingCodeValue" class="mt-2 text-2xl font-black tracking-[0.22em] text-[#172033]"></div>
+        </div>
+      </div>
+      <div class="mt-5 flex flex-col gap-3 sm:flex-row">
+        <a id="trackingLink" class="inline-flex items-center justify-center rounded-full bg-[#172033] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#0c1424]" href="/tracking.html">前往追踪页</a>
+        <button id="copyTrackingCode" type="button" class="ghost-button inline-flex items-center justify-center rounded-full px-5 py-3 text-sm font-semibold text-[#172033] transition">复制编号</button>
+      </div>
+    </section>
 
-            container.innerHTML = paginationHtml;
+    <section class="surface-panel rounded-[2rem] p-6 md:p-7">
+      <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div>
+          <div class="text-xs font-semibold uppercase tracking-[0.3em] text-[#72809a]">Public Board</div>
+          <h3 class="display-font mt-2 text-3xl">公开同步问题</h3>
+          <p class="mt-2 max-w-2xl text-sm leading-6 text-[#4c566b]">这里只展示主动选择公开的问题。你可以按状态、分类或关键词筛选，也能按最近更新排序查看处理进展。</p>
+        </div>
+      </div>
 
-            container.querySelectorAll('button[data-page]').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const page = parseInt(btn.dataset.page);
-                    if (page !== currentPage && page >= 1 && page <= totalPages) {
-                        onPageChange(page);
-                    }
-                });
-            });
-        }
+      <form id="filterForm" class="mt-6 grid gap-3 md:grid-cols-[1fr_0.9fr_0.9fr_0.8fr_auto]">
+        <input id="searchInput" name="q" class="field-shell h-12 rounded-2xl px-4 text-sm" placeholder="搜索内容或公开摘要">
+        <select id="statusFilter" name="status" class="field-shell h-12 rounded-2xl px-4 text-sm">
+          <option value="">全部状态</option>
+          <option value="submitted">已提交</option>
+          <option value="in_review">审核中</option>
+          <option value="in_progress">处理中</option>
+          <option value="resolved">已解决</option>
+          <option value="closed">已关闭</option>
+        </select>
+        <select id="categoryFilter" name="category" class="field-shell h-12 rounded-2xl px-4 text-sm">
+          <option value="">全部分类</option>
+          <option value="academic">学业相关</option>
+          <option value="facility">设施问题</option>
+          <option value="service">服务咨询</option>
+          <option value="complaint">投诉建议</option>
+          <option value="counseling">心理咨询</option>
+          <option value="other">其他</option>
+        </select>
+        <select id="sortFilter" name="sort" class="field-shell h-12 rounded-2xl px-4 text-sm">
+          <option value="newest">按最新提交</option>
+          <option value="updated">按最近更新</option>
+          <option value="oldest">按最早提交</option>
+        </select>
+        <div class="flex gap-2">
+          <button class="inline-flex h-12 flex-1 items-center justify-center rounded-full bg-[#2457d6] px-4 text-sm font-semibold text-white transition hover:bg-[#1e47b0]" type="submit">筛选</button>
+          <button id="resetFilters" class="ghost-button inline-flex h-12 items-center justify-center rounded-full px-4 text-sm font-semibold text-[#172033] transition" type="button">重置</button>
+        </div>
+      </form>
 
-        // 加载问题列表
-        async function loadMessages(page = 1) {
-            try {
-                const response = await fetchWithTimeout(`${API_URL}/issues?page=${page}&pageSize=${pageSize}`);
-                const data = await response.json();
+      <div id="publicList" class="mt-6 grid gap-4"></div>
+      <div id="publicPagination" class="mt-6"></div>
+    </section>
+  </main>
 
-                const messagesList = document.getElementById('messagesList');
-                const paginationContainer = document.getElementById('paginationContainer');
+  <footer class="mx-auto mt-10 max-w-6xl border-t border-[rgba(23,32,51,0.08)] pt-6 text-right text-sm text-[#6b7488]">
+    <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener" class="transition hover:text-[#172033]">渝ICP备2026000319号</a>
+    <br>
+    <a href="https://beian.mps.gov.cn/#/query/webSearch?code=50010102001439" rel="noreferrer" target="_blank" class="mt-2 inline-flex items-center gap-2 transition hover:text-[#172033]">
+      <img src="/storage/Beian.png" alt="公安备案" class="h-5 w-5">
+      渝公网安备50010102001439号
+    </a>
+  </footer>
 
-                currentPage = page;
-                const totalPages = data.pagination?.totalPages || 1;
+  <script>
+    const API_BASE = '/api';
+    const REQUEST_TIMEOUT = 12000;
+    const statusLabels = {
+      submitted: '已提交',
+      in_review: '审核中',
+      in_progress: '处理中',
+      resolved: '已解决',
+      closed: '已关闭',
+    };
+    const categoryLabels = {
+      academic: '学业相关',
+      facility: '设施问题',
+      service: '服务咨询',
+      complaint: '投诉建议',
+      counseling: '心理咨询',
+      other: '其他',
+    };
+    const priorityLabels = {
+      low: '低',
+      normal: '普通',
+      high: '高',
+      urgent: '紧急',
+    };
 
-                if (!data.messages || data.messages.length === 0) {
-                    messagesList.innerHTML = '<div class="text-center text-fb-gray py-12 text-sm">暂无问题，成为第一个提交问题的人吧！</div>';
-                    paginationContainer.innerHTML = '';
-                    return;
-                }
+    const listState = {
+      page: 1,
+      pageSize: 20,
+    };
 
-                messagesList.innerHTML = data.messages.map(msg => `
-                    <div class="bg-fb-bg rounded-lg p-4 mb-3 hover:bg-gray-100 transition-colors">
-                        <div class="text-gray-900 text-base mb-2 leading-relaxed">${escapeHtml(msg.issue)}</div>
-                        <div class="flex flex-wrap items-center gap-2 text-xs text-fb-gray">
-                            <span>${formatDate(msg.created_at)}</span>
-                        </div>
-                    </div>
-                `).join('');
+    function escapeHtml(value) {
+      const div = document.createElement('div');
+      div.textContent = value ?? '';
+      return div.innerHTML;
+    }
 
-                renderPagination(paginationContainer, currentPage, totalPages, (newPage) => {
-                    loadMessages(newPage);
-                });
+    function formatDate(value) {
+      if (!value) {
+        return '-';
+      }
 
-            } catch (error) {
-                console.error('加载问题失败:', error);
-                const errorMsg = error.name === 'AbortError' ? '加载超时，请刷新页面重试' : '加载问题失败，请刷新页面重试';
-                document.getElementById('messagesList').innerHTML =
-                    `<div class="bg-red-50 text-red-600 p-3 rounded-lg text-sm">${errorMsg}</div>`;
-            }
-        }
+      return new Date(value).toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+      });
+    }
 
-        // 提交问题
-        document.getElementById('messageForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
+    async function fetchWithTimeout(url, options = {}, timeout = REQUEST_TIMEOUT) {
+      const controller = new AbortController();
+      const timer = window.setTimeout(() => controller.abort(), timeout);
 
-            const submitBtn = e.target.querySelector('button[type="submit"]');
-            const notification = document.getElementById('notification');
-            const issue = document.getElementById('issue').value;
-            const name = document.getElementById('name').value;
-            const student_id = document.getElementById('student_id').value;
-            const isInformationPublic = document.getElementById('isInformationPublic').checked ? 'yes' : 'no';
-            const isReport = document.getElementById('isReport').checked ? 'yes' : 'no';
-
-            if (name.length > 20) {
-                notification.innerHTML = '<div class="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm font-medium">姓名不能超过20个字符</div>';
-                return;
-            }
-
-            const studentIdPattern = /^\d{4}$|^\d{5}$|^\d{13}$/;
-            if (!studentIdPattern.test(student_id)) {
-                notification.innerHTML = '<div class="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm font-medium">学号必须为4位、5位或13位数字</div>';
-                return;
-            }
-
-            submitBtn.disabled = true;
-            submitBtn.textContent = '提交中...';
-            notification.innerHTML = '';
-
-            try {
-                const response = await fetchWithTimeout(`${API_URL}/issues`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ issue, name, student_id, isInformationPublic, isReport })
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    notification.innerHTML = '<div class="bg-green-50 text-green-700 p-3 rounded-lg mb-4 text-sm font-medium">问题提交成功！</div>';
-                    document.getElementById('messageForm').reset();
-                    await loadMessages(1);
-                    setTimeout(() => {
-                        notification.innerHTML = '';
-                    }, 3000);
-                } else {
-                    notification.innerHTML = `<div class="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm font-medium">${data.error || '提交失败，请重试'}</div>`;
-                }
-            } catch (error) {
-                console.error('提交问题失败:', error);
-                const errorMsg = error.name === 'AbortError' ? '请求超时，请重试' : '提交失败，请检查网络连接';
-                notification.innerHTML = `<div class="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm font-medium">${errorMsg}</div>`;
-            } finally {
-                submitBtn.disabled = false;
-                submitBtn.textContent = '提交问题';
-            }
+      try {
+        return await fetch(url, {
+          ...options,
+          signal: controller.signal,
         });
+      } finally {
+        clearTimeout(timer);
+      }
+    }
 
-        // HTML转义，防止XSS
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
+    function showNotification(message, type = 'error') {
+      const target = document.getElementById('submitNotification');
+      const palette = {
+        success: 'bg-[rgba(19,121,91,0.12)] text-[#0f6b50] border-[rgba(19,121,91,0.2)]',
+        error: 'bg-[rgba(178,58,50,0.12)] text-[#8f2d27] border-[rgba(178,58,50,0.2)]',
+      };
+
+      target.innerHTML = `<div class="rounded-[1.2rem] border px-4 py-3 text-sm ${palette[type] || palette.error}">${escapeHtml(message)}</div>`;
+    }
+
+    function clearNotification() {
+      document.getElementById('submitNotification').innerHTML = '';
+    }
+
+    function buildQuery(page = 1) {
+      const params = new URLSearchParams();
+      const form = new FormData(document.getElementById('filterForm'));
+
+      params.set('page', String(page));
+      params.set('pageSize', String(listState.pageSize));
+
+      for (const [key, rawValue] of form.entries()) {
+        const value = String(rawValue).trim();
+        if (value) {
+          params.set(key, value);
+        }
+      }
+
+      return params.toString();
+    }
+
+    function renderPagination(container, pagination, onChange) {
+      if (!pagination || pagination.totalPages <= 1) {
+        container.innerHTML = '';
+        return;
+      }
+
+      const { page, totalPages } = pagination;
+      const buttons = [];
+      const start = Math.max(1, page - 2);
+      const end = Math.min(totalPages, start + 4);
+
+      buttons.push(`<button class="ghost-button rounded-full px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-40" data-page="${page - 1}" ${page === 1 ? 'disabled' : ''}>上一页</button>`);
+
+      for (let current = start; current <= end; current += 1) {
+        const active = current === page;
+        buttons.push(`<button class="rounded-full px-4 py-2 text-sm font-semibold ${active ? 'bg-[#172033] text-white' : 'ghost-button text-[#172033]'}" data-page="${current}" ${active ? 'disabled' : ''}>${current}</button>`);
+      }
+
+      buttons.push(`<button class="ghost-button rounded-full px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-40" data-page="${page + 1}" ${page === totalPages ? 'disabled' : ''}>下一页</button>`);
+      container.innerHTML = `<div class="flex flex-wrap items-center justify-center gap-2">${buttons.join('')}</div>`;
+
+      container.querySelectorAll('button[data-page]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const nextPage = Number(button.dataset.page);
+          if (Number.isFinite(nextPage) && nextPage >= 1 && nextPage <= totalPages && nextPage !== page) {
+            onChange(nextPage);
+          }
+        });
+      });
+    }
+
+    function renderPublicList(items, pagination) {
+      const list = document.getElementById('publicList');
+      const paginationContainer = document.getElementById('publicPagination');
+
+      if (!items || items.length === 0) {
+        list.innerHTML = `
+          <div class="notice-box rounded-[1.5rem] px-5 py-6 text-center text-sm text-[#4c566b]">
+            当前筛选条件下没有公开问题。
+          </div>
+        `;
+        paginationContainer.innerHTML = '';
+        return;
+      }
+
+      list.innerHTML = items.map((item) => {
+        const summary = item.publicSummary || item.content;
+        return `
+          <article class="public-card rounded-[1.6rem] p-5 md:p-6">
+            <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div class="space-y-3">
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="status-token" data-status="${escapeHtml(item.status)}">${escapeHtml(statusLabels[item.status] || item.status)}</span>
+                  <span class="category-token">${escapeHtml(categoryLabels[item.category] || item.category)}</span>
+                  <span class="priority-token" data-priority="${escapeHtml(item.priority)}">${escapeHtml(priorityLabels[item.priority] || item.priority)}</span>
+                </div>
+                <div>
+                  <div class="text-xs font-semibold uppercase tracking-[0.28em] text-[#72809a]">${escapeHtml(item.trackingCode)}</div>
+                  <p class="mt-2 text-base leading-7 text-[#172033]">${escapeHtml(summary)}</p>
+                </div>
+              </div>
+              <div class="min-w-[180px] rounded-[1.4rem] border border-[rgba(23,32,51,0.08)] bg-white/75 px-4 py-3 text-sm text-[#4c566b]">
+                <div><strong class="text-[#172033]">提交：</strong>${escapeHtml(formatDate(item.createdAt))}</div>
+                <div class="mt-2"><strong class="text-[#172033]">更新：</strong>${escapeHtml(formatDate(item.updatedAt))}</div>
+              </div>
+            </div>
+          </article>
+        `;
+      }).join('');
+
+      renderPagination(paginationContainer, pagination, (nextPage) => {
+        loadPublicList(nextPage);
+      });
+    }
+
+    async function loadPublicList(page = 1) {
+      const list = document.getElementById('publicList');
+      listState.page = page;
+      list.innerHTML = '<div class="notice-box rounded-[1.5rem] px-5 py-6 text-center text-sm text-[#4c566b]"><span class="loading-dots">正在加载公开列表</span></div>';
+
+      try {
+        const response = await fetchWithTimeout(`${API_BASE}/issues?${buildQuery(page)}`);
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+          throw new Error(result.error || '公开列表加载失败');
         }
 
-        // 格式化日期为 yyyy-mm-dd hh:mm:ss 格式
-        function formatDate(dateString) {
-            const date = new Date(dateString);
-            const year = date.getUTCFullYear();
-            const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-            const day = String(date.getUTCDate()).padStart(2, '0');
-            const hours = String(date.getUTCHours()).padStart(2, '0');
-            const minutes = String(date.getUTCMinutes()).padStart(2, '0');
-            const seconds = String(date.getUTCSeconds()).padStart(2, '0');
+        renderPublicList(result.data.items, result.data.pagination);
+      } catch (error) {
+        const message = error.name === 'AbortError' ? '公开列表加载超时' : error.message;
+        list.innerHTML = `<div class="rounded-[1.5rem] border border-[rgba(178,58,50,0.2)] bg-[rgba(178,58,50,0.08)] px-5 py-6 text-center text-sm text-[#8f2d27]">${escapeHtml(message)}</div>`;
+        document.getElementById('publicPagination').innerHTML = '';
+      }
+    }
 
-            return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+    async function handleSubmit(event) {
+      event.preventDefault();
+      clearNotification();
+
+      const button = document.getElementById('submitButton');
+      const payload = {
+        name: document.getElementById('name').value.trim(),
+        studentId: document.getElementById('studentId').value.trim(),
+        category: document.getElementById('category').value,
+        content: document.getElementById('content').value.trim(),
+        isPublic: document.getElementById('isPublic').checked,
+        isReported: document.getElementById('isReported').checked,
+      };
+
+      button.disabled = true;
+      button.textContent = '提交中...';
+
+      try {
+        const response = await fetchWithTimeout(`${API_BASE}/issues`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        });
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+          throw new Error(result.error || '提交失败');
         }
 
-        // 页面加载时获取问题列表
-        loadMessages();
-    </script>
+        const data = result.data;
+        const trackingLink = `/tracking.html?code=${encodeURIComponent(data.trackingCode)}`;
+        document.getElementById('trackingCodeValue').textContent = data.trackingCode;
+        document.getElementById('trackingLink').href = trackingLink;
+        document.getElementById('trackingReceipt').hidden = false;
+        document.getElementById('trackingReceipt').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        document.getElementById('issueForm').reset();
+        showNotification('提交成功，追踪编号已生成。', 'success');
+        await loadPublicList(1);
+      } catch (error) {
+        const message = error.name === 'AbortError' ? '请求超时，请重试' : error.message;
+        showNotification(message, 'error');
+      } finally {
+        button.disabled = false;
+        button.textContent = '提交并生成追踪编号';
+      }
+    }
+
+    async function copyTrackingCode() {
+      const value = document.getElementById('trackingCodeValue').textContent.trim();
+      if (!value) {
+        return;
+      }
+
+      try {
+        await navigator.clipboard.writeText(value);
+        showNotification('追踪编号已复制到剪贴板。', 'success');
+      } catch {
+        showNotification('复制失败，请手动记录追踪编号。');
+      }
+    }
+
+    document.getElementById('issueForm').addEventListener('submit', handleSubmit);
+    document.getElementById('filterForm').addEventListener('submit', (event) => {
+      event.preventDefault();
+      loadPublicList(1);
+    });
+    document.getElementById('resetFilters').addEventListener('click', () => {
+      document.getElementById('filterForm').reset();
+      loadPublicList(1);
+    });
+    document.getElementById('copyTrackingCode').addEventListener('click', copyTrackingCode);
+
+    loadPublicList(1);
+  </script>
 </body>
 </html>
-

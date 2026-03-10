@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>追踪进度</title>
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    :root {
+      --paper: #f5efe4;
+      --ink: #172033;
+      --ink-soft: #4c566b;
+      --line: rgba(23, 32, 51, 0.12);
+      --accent: #2457d6;
+      --shadow: 0 24px 70px rgba(18, 26, 44, 0.12);
+    }
+
+    body {
+      font-family: "Aptos", "Segoe UI", "PingFang SC", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(36, 87, 214, 0.12), transparent 35%),
+        radial-gradient(circle at top right, rgba(217, 138, 23, 0.1), transparent 28%),
+        linear-gradient(180deg, #f8f3ea 0%, #efe8dc 100%);
+    }
+
+    .display-font {
+      font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+    }
+
+    .surface-panel {
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(255, 252, 246, 0.86) 100%);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(20px);
+    }
+
+    .status-token,
+    .timeline-dot {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      font-weight: 700;
+    }
+
+    .status-token {
+      padding: 0.4rem 0.85rem;
+      font-size: 0.75rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .status-token[data-status="submitted"] { background: rgba(36, 87, 214, 0.1); color: #2046a2; }
+    .status-token[data-status="in_review"] { background: rgba(217, 138, 23, 0.14); color: #8b5a12; }
+    .status-token[data-status="in_progress"] { background: rgba(96, 92, 189, 0.12); color: #4f43a8; }
+    .status-token[data-status="resolved"] { background: rgba(19, 121, 91, 0.14); color: #0b6a4e; }
+    .status-token[data-status="closed"] { background: rgba(23, 32, 51, 0.1); color: #374151; }
+
+    .timeline-item {
+      position: relative;
+      padding-left: 3rem;
+    }
+
+    .timeline-item::before {
+      content: "";
+      position: absolute;
+      left: 0.9rem;
+      top: 1.6rem;
+      bottom: -1.6rem;
+      width: 1px;
+      background: rgba(23, 32, 51, 0.12);
+    }
+
+    .timeline-item:last-child::before {
+      display: none;
+    }
+
+    .timeline-dot {
+      position: absolute;
+      left: 0;
+      top: 0.1rem;
+      width: 1.8rem;
+      height: 1.8rem;
+      background: rgba(36, 87, 214, 0.12);
+      color: #2147ac;
+      font-size: 0.85rem;
+    }
+
+    .field-shell {
+      border: 1px solid rgba(23, 32, 51, 0.12);
+      background: rgba(255, 255, 255, 0.84);
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .field-shell:focus {
+      border-color: rgba(36, 87, 214, 0.5);
+      box-shadow: 0 0 0 4px rgba(36, 87, 214, 0.12);
+      outline: none;
+    }
+  </style>
+</head>
+<body class="min-h-screen px-4 py-5 md:px-8 md:py-8">
+  <header class="mx-auto flex max-w-5xl flex-col gap-4 md:flex-row md:items-center md:justify-between">
+    <div>
+      <div class="text-xs font-semibold uppercase tracking-[0.35em] text-[#5f6b80]">Tracking Desk</div>
+      <h1 class="display-font mt-2 text-3xl md:text-4xl">追踪进度</h1>
+    </div>
+    <nav class="flex flex-wrap gap-2 text-sm text-[#445069]">
+      <a class="rounded-full border border-[rgba(23,32,51,0.12)] bg-white/80 px-4 py-2 transition hover:bg-white" href="/">返回首页</a>
+      <a class="rounded-full border border-[rgba(23,32,51,0.12)] bg-white/80 px-4 py-2 transition hover:bg-white" href="/admin.html">管理后台</a>
+    </nav>
+  </header>
+
+  <main class="mx-auto mt-6 max-w-5xl space-y-6 md:mt-8">
+    <section class="surface-panel rounded-[2rem] p-6 md:p-8">
+      <div class="grid gap-6 md:grid-cols-[1.08fr_0.92fr] md:items-center">
+        <div>
+          <div class="text-xs font-semibold uppercase tracking-[0.32em] text-[#72809a]">Enter Code</div>
+          <h2 class="display-font mt-3 text-3xl leading-tight md:text-4xl">输入追踪编号，查看处理状态与公开回复。</h2>
+          <p class="mt-4 text-sm leading-7 text-[#4c566b] md:text-base">
+            即使你的问题没有进入公开列表，只要保存了编号，也能在这里看到当前状态、处理摘要和已公开的回复记录。
+          </p>
+        </div>
+        <form id="trackingForm" class="space-y-4 rounded-[1.8rem] border border-[rgba(23,32,51,0.08)] bg-white/72 p-5">
+          <label class="space-y-2 text-sm font-medium text-[#25314a]">
+            <span>追踪编号</span>
+            <input id="trackingCode" name="trackingCode" class="field-shell h-14 w-full rounded-2xl px-4 text-[15px] font-semibold tracking-[0.18em] uppercase" placeholder="例如 ABCD23EF" required>
+          </label>
+          <button id="queryButton" type="submit" class="inline-flex h-12 w-full items-center justify-center rounded-full bg-[#2457d6] px-5 text-sm font-semibold text-white transition hover:bg-[#1e47b0] disabled:cursor-not-allowed disabled:opacity-60">查询处理进度</button>
+          <div class="rounded-[1.2rem] border border-dashed border-[rgba(23,32,51,0.16)] bg-white/60 px-4 py-3 text-xs leading-6 text-[#5f6b80]">
+            编号通常由 8 位不易混淆的大写字符组成。你也可以从首页提交成功回执里直接跳转到本页。
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <section id="resultPanel" class="surface-panel rounded-[2rem] p-6 md:p-8">
+      <div id="resultState" class="rounded-[1.5rem] border border-dashed border-[rgba(23,32,51,0.14)] bg-white/55 px-5 py-10 text-center text-sm leading-7 text-[#5f6b80]">
+        输入追踪编号后，这里会展示当前状态、公开摘要和时间线。
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const API_BASE = '/api';
+    const REQUEST_TIMEOUT = 12000;
+    const statusLabels = {
+      submitted: '已提交',
+      in_review: '审核中',
+      in_progress: '处理中',
+      resolved: '已解决',
+      closed: '已关闭',
+    };
+    const categoryLabels = {
+      academic: '学业相关',
+      facility: '设施问题',
+      service: '服务咨询',
+      complaint: '投诉建议',
+      counseling: '心理咨询',
+      other: '其他',
+    };
+    const priorityLabels = {
+      low: '低',
+      normal: '普通',
+      high: '高',
+      urgent: '紧急',
+    };
+
+    function escapeHtml(value) {
+      const div = document.createElement('div');
+      div.textContent = value ?? '';
+      return div.innerHTML;
+    }
+
+    function formatDate(value) {
+      if (!value) {
+        return '-';
+      }
+
+      return new Date(value).toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+      });
+    }
+
+    async function fetchWithTimeout(url, options = {}, timeout = REQUEST_TIMEOUT) {
+      const controller = new AbortController();
+      const timer = window.setTimeout(() => controller.abort(), timeout);
+      try {
+        return await fetch(url, {
+          ...options,
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    function buildTimeline(data) {
+      const baseEvent = {
+        type: 'status_change',
+        newValue: 'submitted',
+        isPublic: false,
+        createdAt: data.createdAt,
+      };
+      return [baseEvent, ...(data.updates || [])];
+    }
+
+    function renderResult(data) {
+      const timeline = buildTimeline(data);
+      document.getElementById('resultState').innerHTML = `
+        <div class="grid gap-6 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
+          <section class="rounded-[1.6rem] border border-[rgba(23,32,51,0.08)] bg-white/76 p-5 text-left">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="status-token" data-status="${escapeHtml(data.status)}">${escapeHtml(statusLabels[data.status] || data.status)}</span>
+              <span class="rounded-full bg-[rgba(23,32,51,0.08)] px-3 py-1 text-xs font-semibold text-[#4c566b]">${escapeHtml(categoryLabels[data.category] || data.category)}</span>
+              <span class="rounded-full bg-[rgba(36,87,214,0.1)] px-3 py-1 text-xs font-semibold text-[#2147ac]">优先级 ${escapeHtml(priorityLabels[data.priority] || data.priority)}</span>
+            </div>
+            <div class="mt-4 text-xs font-semibold uppercase tracking-[0.3em] text-[#72809a]">${escapeHtml(data.trackingCode)}</div>
+            <div class="mt-3 text-lg leading-8 text-[#172033]">${escapeHtml(data.content)}</div>
+            <div class="mt-5 rounded-[1.4rem] border border-[rgba(23,32,51,0.08)] bg-[rgba(36,87,214,0.05)] p-4 text-sm leading-7 text-[#445069]">
+              <div class="text-xs font-semibold uppercase tracking-[0.28em] text-[#72809a]">公开摘要</div>
+              <div class="mt-2">${escapeHtml(data.publicSummary || '后台尚未填写公开摘要。')}</div>
+            </div>
+            <div class="mt-5 grid gap-3 text-sm text-[#4c566b] sm:grid-cols-2">
+              <div class="rounded-[1.2rem] border border-[rgba(23,32,51,0.08)] bg-white/70 px-4 py-3">
+                <div class="text-xs uppercase tracking-[0.28em] text-[#72809a]">提交时间</div>
+                <div class="mt-2 text-[#172033]">${escapeHtml(formatDate(data.createdAt))}</div>
+              </div>
+              <div class="rounded-[1.2rem] border border-[rgba(23,32,51,0.08)] bg-white/70 px-4 py-3">
+                <div class="text-xs uppercase tracking-[0.28em] text-[#72809a]">最近更新</div>
+                <div class="mt-2 text-[#172033]">${escapeHtml(formatDate(data.updatedAt))}</div>
+              </div>
+            </div>
+          </section>
+          <section class="rounded-[1.6rem] border border-[rgba(23,32,51,0.08)] bg-white/76 p-5 text-left">
+            <div class="text-xs font-semibold uppercase tracking-[0.3em] text-[#72809a]">Timeline</div>
+            <h3 class="display-font mt-2 text-2xl">处理时间线</h3>
+            <div class="mt-5 space-y-6">
+              ${timeline.map((item) => `
+                <article class="timeline-item">
+                  <div class="timeline-dot">${item.type === 'public_reply' ? '答' : '更'}</div>
+                  <div class="rounded-[1.3rem] border border-[rgba(23,32,51,0.08)] bg-white/70 p-4">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span class="text-sm font-semibold text-[#172033]">${item.type === 'public_reply' ? '公开回复' : `状态更新为 ${escapeHtml(statusLabels[item.newValue] || item.newValue || '已更新')}`}</span>
+                      <span class="text-xs uppercase tracking-[0.24em] text-[#72809a]">${escapeHtml(formatDate(item.createdAt))}</span>
+                    </div>
+                    <div class="mt-2 text-sm leading-7 text-[#4c566b]">${item.type === 'public_reply' ? escapeHtml(item.content || '暂无内容') : '处理状态已更新，可持续关注后续动作。'}</div>
+                  </div>
+                </article>
+              `).join('')}
+            </div>
+          </section>
+        </div>
+      `;
+    }
+
+    function renderError(message) {
+      document.getElementById('resultState').innerHTML = `<div class="rounded-[1.5rem] border border-[rgba(178,58,50,0.18)] bg-[rgba(178,58,50,0.08)] px-5 py-8 text-center text-sm leading-7 text-[#8f2d27]">${escapeHtml(message)}</div>`;
+    }
+
+    async function loadTracking(code) {
+      const resultState = document.getElementById('resultState');
+      resultState.innerHTML = '<div class="rounded-[1.5rem] border border-dashed border-[rgba(23,32,51,0.14)] bg-white/55 px-5 py-10 text-center text-sm leading-7 text-[#5f6b80]">正在查询追踪记录...</div>';
+
+      try {
+        const response = await fetchWithTimeout(`${API_BASE}/issues/${encodeURIComponent(code.trim().toUpperCase())}`);
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+          throw new Error(result.error || '查询失败');
+        }
+
+        renderResult(result.data);
+      } catch (error) {
+        const message = error.name === 'AbortError' ? '请求超时，请稍后重试' : error.message;
+        renderError(message);
+      }
+    }
+
+    document.getElementById('trackingForm').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const code = document.getElementById('trackingCode').value.trim().toUpperCase();
+      if (!code) {
+        renderError('请输入追踪编号。');
+        return;
+      }
+
+      document.getElementById('queryButton').disabled = true;
+      document.getElementById('queryButton').textContent = '查询中...';
+      try {
+        await loadTracking(code);
+      } finally {
+        document.getElementById('queryButton').disabled = false;
+        document.getElementById('queryButton').textContent = '查询处理进度';
+      }
+    });
+
+    const presetCode = new URLSearchParams(window.location.search).get('code');
+    if (presetCode) {
+      document.getElementById('trackingCode').value = presetCode.toUpperCase();
+      loadTracking(presetCode);
+    }
+  </script>
+</body>
+</html>
