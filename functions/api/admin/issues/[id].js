@@ -1,16 +1,16 @@
 import { canTransitionStatus } from '../../../../src/shared/constants.js';
 import { getAdminCorsPolicy, createForbiddenOriginResponse, authorizeAdminRequest } from '../../../../src/shared/auth.js';
 import {
+  createAdminActionStatement,
   getIssueById,
   mapAdminAction,
   mapAdminIssue,
   mapInternalNote,
   mapIssueUpdate,
-  recordAdminAction,
 } from '../../../../src/shared/issueData.js';
 import { successResponse, errorResponse, createOptionsResponse, methodNotAllowedResponse, notFoundResponse } from '../../../../src/shared/response.js';
 import { adminIssuePatchSchema, formatZodError, issueIdSchema } from '../../../../src/shared/validation.js';
-import { getClientIP } from '../../../../src/shared/rateLimit.js';
+import { checkAdminRateLimit, getClientIP } from '../../../../src/shared/rateLimit.js';
 import { parseJsonBody } from '../../../../src/shared/request.js';
 
 const ALLOWED_METHODS = 'GET, PATCH, OPTIONS';
@@ -57,6 +57,11 @@ export async function onRequest(context) {
     return methodNotAllowedResponse(corsPolicy.headers, ALLOWED_METHODS);
   }
 
+  const rateLimitResponse = await checkAdminRateLimit(env, request, corsPolicy.headers);
+  if (rateLimitResponse) {
+    return rateLimitResponse;
+  }
+
   const authResult = authorizeAdminRequest(request, env, ALLOWED_METHODS);
   if (!authResult.ok) {
     return authResult.response;
@@ -100,64 +105,52 @@ export async function onRequest(context) {
     }
 
     const now = new Date().toISOString();
+    const ipAddress = getClientIP(request);
     const updatedFields = [];
     const fieldChanges = {};
-    let statusChange = null;
     const assignments = [];
     const bindings = [];
 
-    const addFieldChange = (apiField, columnName, currentValue, nextValue, dbValue = nextValue) => {
-      if (currentValue === nextValue) {
+    const assignColumn = (columnName, value) => {
+      assignments.push(`${columnName} = ?`);
+      bindings.push(value);
+    };
+
+    const trackFieldChange = (apiField, columnName, currentValue, nextValue, {
+      dbValue = nextValue,
+      onChange,
+    } = {}) => {
+      if (nextValue === undefined || currentValue === nextValue) {
         return;
       }
 
-      assignments.push(`${columnName} = ?`);
-      bindings.push(dbValue);
+      assignColumn(columnName, dbValue);
       updatedFields.push(apiField);
       fieldChanges[apiField] = {
         oldValue: currentValue,
         newValue: nextValue,
       };
+      onChange?.({ currentValue, nextValue });
     };
 
-    if (payload.category !== undefined) {
-      addFieldChange('category', 'category', existingIssue.category, payload.category);
-    }
+    trackFieldChange('category', 'category', existingIssue.category, payload.category);
+    trackFieldChange('priority', 'priority', existingIssue.priority, payload.priority);
+    trackFieldChange('assignedTo', 'assigned_to', existingIssue.assigned_to ?? null, payload.assignedTo);
+    trackFieldChange('publicSummary', 'public_summary', existingIssue.public_summary ?? null, payload.publicSummary);
+    trackFieldChange('isPublic', 'is_public', Boolean(existingIssue.is_public), payload.isPublic, {
+      dbValue: payload.isPublic === undefined ? undefined : (payload.isPublic ? 1 : 0),
+    });
+    trackFieldChange('status', 'status', existingIssue.status, payload.status, {
+      onChange: ({ currentValue, nextValue }) => {
+        if (nextValue === 'resolved') {
+          assignColumn('resolved_at', now);
+        } else if (currentValue === 'resolved' && nextValue === 'in_progress') {
+          assignColumn('resolved_at', null);
+        }
+      },
+    });
 
-    if (payload.priority !== undefined) {
-      addFieldChange('priority', 'priority', existingIssue.priority, payload.priority);
-    }
-
-    if (payload.assignedTo !== undefined) {
-      addFieldChange('assignedTo', 'assigned_to', existingIssue.assigned_to ?? null, payload.assignedTo, payload.assignedTo);
-    }
-
-    if (payload.publicSummary !== undefined) {
-      addFieldChange('publicSummary', 'public_summary', existingIssue.public_summary ?? null, payload.publicSummary, payload.publicSummary);
-    }
-
-    if (payload.isPublic !== undefined) {
-      const currentIsPublic = Boolean(existingIssue.is_public);
-      addFieldChange('isPublic', 'is_public', currentIsPublic, payload.isPublic, payload.isPublic ? 1 : 0);
-    }
-
-    if (payload.status !== undefined && payload.status !== existingIssue.status) {
-      assignments.push('status = ?');
-      bindings.push(payload.status);
-      updatedFields.push('status');
-      statusChange = {
-        oldValue: existingIssue.status,
-        newValue: payload.status,
-      };
-
-      if (payload.status === 'resolved') {
-        assignments.push('resolved_at = ?');
-        bindings.push(now);
-      } else if (existingIssue.status === 'resolved' && payload.status === 'in_progress') {
-        assignments.push('resolved_at = ?');
-        bindings.push(null);
-      }
-    }
+    const statusChange = fieldChanges.status ?? null;
 
     if (updatedFields.length === 0) {
       return successResponse({
@@ -169,44 +162,43 @@ export async function onRequest(context) {
     }
 
     if (!existingIssue.first_response_at) {
-      assignments.push('first_response_at = ?');
-      bindings.push(now);
+      assignColumn('first_response_at', now);
     }
 
-    assignments.push('updated_at = ?');
-    bindings.push(now);
-
-    await env.DB.prepare(`UPDATE issues SET ${assignments.join(', ')} WHERE id = ?`)
-      .bind(...bindings, issueId)
-      .run();
-
-    if (statusChange) {
-      await env.DB.prepare(`
-        INSERT INTO issue_updates (issue_id, update_type, old_value, new_value, content, is_public, created_by, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `)
-        .bind(issueId, 'status_change', statusChange.oldValue, statusChange.newValue, null, 1, authResult.actor, now)
-        .run();
-
-      await recordAdminAction(env.DB, {
-        actionType: 'status_update',
-        targetId: issueId,
-        details: {
-          trackingCode: existingIssue.tracking_code,
-          ...statusChange,
-        },
-        performedBy: authResult.actor,
-        ipAddress: getClientIP(request),
-        performedAt: now,
-      });
-    }
+    assignColumn('updated_at', now);
 
     const nonStatusChanges = Object.fromEntries(
       Object.entries(fieldChanges).filter(([key]) => key !== 'status')
     );
 
+    const statements = [
+      env.DB.prepare(`UPDATE issues SET ${assignments.join(', ')} WHERE id = ?`)
+        .bind(...bindings, issueId),
+    ];
+
+    if (statusChange) {
+      statements.push(
+        env.DB.prepare(`
+          INSERT INTO issue_updates (issue_id, update_type, old_value, new_value, content, is_public, created_by, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `)
+          .bind(issueId, 'status_change', statusChange.oldValue, statusChange.newValue, null, 1, authResult.actor, now),
+        createAdminActionStatement(env.DB, {
+          actionType: 'status_update',
+          targetId: issueId,
+          details: {
+            trackingCode: existingIssue.tracking_code,
+            ...statusChange,
+          },
+          performedBy: authResult.actor,
+          ipAddress,
+          performedAt: now,
+        }),
+      );
+    }
+
     if (Object.keys(nonStatusChanges).length > 0) {
-      await recordAdminAction(env.DB, {
+      statements.push(createAdminActionStatement(env.DB, {
         actionType: 'field_edit',
         targetId: issueId,
         details: {
@@ -214,10 +206,12 @@ export async function onRequest(context) {
           changes: nonStatusChanges,
         },
         performedBy: authResult.actor,
-        ipAddress: getClientIP(request),
+        ipAddress,
         performedAt: now,
-      });
+      }));
     }
+
+    await env.DB.batch(statements);
 
     return successResponse({
       id: issueId,

@@ -21,14 +21,3 @@ export function canTransitionStatus(currentStatus, nextStatus) {
   return STATUS_TRANSITIONS[currentStatus]?.includes(nextStatus) ?? false;
 }
 
-export function parseJsonValue(value, fallback = null) {
-  if (!value) {
-    return fallback;
-  }
-
-  try {
-    return JSON.parse(value);
-  } catch {
-    return fallback;
-  }
-}

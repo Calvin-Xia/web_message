@@ -8,6 +8,27 @@ export function generateTrackingCode() {
   return createTrackingCode();
 }
 
+export function isTrackingCodeConflictError(error) {
+  const messages = [];
+
+  if (typeof error === 'string') {
+    messages.push(error);
+  }
+
+  if (error?.message) {
+    messages.push(error.message);
+  }
+
+  if (error?.cause?.message) {
+    messages.push(error.cause.message);
+  }
+
+  return messages.some((value) => {
+    const message = String(value).toLowerCase();
+    return message.includes('tracking_code') && (message.includes('unique') || message.includes('constraint'));
+  });
+}
+
 export async function generateUniqueTrackingCode(exists, { maxAttempts = 8, codeFactory = generateTrackingCode } = {}) {
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     const code = codeFactory();
@@ -15,6 +36,23 @@ export async function generateUniqueTrackingCode(exists, { maxAttempts = 8, code
 
     if (!isTaken) {
       return code;
+    }
+  }
+
+  throw new Error('追踪编号生成失败，请稍后重试');
+}
+
+export async function insertWithUniqueTrackingCode(insert, { maxAttempts = 8, codeFactory = generateTrackingCode } = {}) {
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const trackingCode = codeFactory();
+
+    try {
+      const result = await insert(trackingCode);
+      return { trackingCode, result };
+    } catch (error) {
+      if (!isTrackingCodeConflictError(error)) {
+        throw error;
+      }
     }
   }
 

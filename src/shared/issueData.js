@@ -1,4 +1,4 @@
-import { parseJsonValue } from './constants.js';
+import { parseJsonValue } from './utils.js';
 
 export function toBoolean(value) {
   return Boolean(value);
@@ -76,7 +76,7 @@ export function createPagination(page, pageSize, total) {
   };
 }
 
-export async function recordAdminAction(db, {
+export function createAdminActionStatement(db, {
   actionType,
   targetType = 'issue',
   targetId = null,
@@ -87,12 +87,15 @@ export async function recordAdminAction(db, {
 }) {
   const serializedDetails = details == null ? null : JSON.stringify(details);
 
-  await db.prepare(`
+  return db.prepare(`
     INSERT INTO admin_actions (action_type, target_type, target_id, details, performed_by, performed_at, ip_address)
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `)
-    .bind(actionType, targetType, targetId, serializedDetails, performedBy, performedAt, ipAddress)
-    .run();
+    .bind(actionType, targetType, targetId, serializedDetails, performedBy, performedAt, ipAddress);
+}
+
+export async function recordAdminAction(db, options) {
+  await createAdminActionStatement(db, options).run();
 }
 
 export async function getIssueById(db, issueId) {

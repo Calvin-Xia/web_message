@@ -1,7 +1,9 @@
 import { getAdminCorsPolicy, createForbiddenOriginResponse, authorizeAdminRequest } from '../../../src/shared/auth.js';
 import { createPagination, mapAdminIssue } from '../../../src/shared/issueData.js';
 import { successResponse, errorResponse, createOptionsResponse, methodNotAllowedResponse } from '../../../src/shared/response.js';
+import { checkAdminRateLimit } from '../../../src/shared/rateLimit.js';
 import { adminIssueListQuerySchema, formatZodError } from '../../../src/shared/validation.js';
+import { createContainsLikePattern } from '../../../src/shared/sql.js';
 
 const ALLOWED_METHODS = 'GET, OPTIONS';
 const ADMIN_SORT_SQL = {
@@ -35,8 +37,8 @@ function buildAdminListWhere(filters) {
   }
 
   if (filters.q) {
-    clauses.push("(tracking_code LIKE ? OR name LIKE ? OR student_id LIKE ? OR content LIKE ? OR COALESCE(public_summary, '') LIKE ?)");
-    const keyword = `%${filters.q}%`;
+    clauses.push("(tracking_code LIKE ? ESCAPE '\\' OR name LIKE ? ESCAPE '\\' OR student_id LIKE ? ESCAPE '\\' OR content LIKE ? ESCAPE '\\' OR COALESCE(public_summary, '') LIKE ? ESCAPE '\\')");
+    const keyword = createContainsLikePattern(filters.q);
     bindings.push(keyword, keyword, keyword, keyword, keyword);
   }
 
@@ -71,6 +73,11 @@ export async function onRequest(context) {
 
   if (request.method !== 'GET') {
     return methodNotAllowedResponse(corsPolicy.headers, ALLOWED_METHODS);
+  }
+
+  const rateLimitResponse = await checkAdminRateLimit(env, request, corsPolicy.headers);
+  if (rateLimitResponse) {
+    return rateLimitResponse;
   }
 
   const authResult = authorizeAdminRequest(request, env, ALLOWED_METHODS);

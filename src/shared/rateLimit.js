@@ -1,3 +1,5 @@
+import { parseJsonValue } from './utils.js';
+
 const RATE_LIMIT_CONFIG = {
   postIssue: {
     maxRequests: 10,
@@ -8,6 +10,16 @@ const RATE_LIMIT_CONFIG = {
     maxRequests: 60,
     periodSeconds: 60,
     blockDuration: 60,
+  },
+  adminRead: {
+    maxRequests: 180,
+    periodSeconds: 60,
+    blockDuration: 60,
+  },
+  adminWrite: {
+    maxRequests: 60,
+    periodSeconds: 60,
+    blockDuration: 120,
   },
 };
 
@@ -37,17 +49,15 @@ function parseBlockedUntil(blockValue) {
     return null;
   }
 
-  try {
-    const parsedValue = JSON.parse(blockValue);
-    const blockedUntil = Number(parsedValue?.blockedUntil);
-    if (Number.isFinite(blockedUntil)) {
-      return blockedUntil;
-    }
-  } catch {
-    const numericValue = Number.parseInt(blockValue, 10);
-    if (Number.isFinite(numericValue)) {
-      return numericValue;
-    }
+  const parsedValue = parseJsonValue(blockValue, null);
+  const blockedUntil = Number(parsedValue?.blockedUntil);
+  if (Number.isFinite(blockedUntil)) {
+    return blockedUntil;
+  }
+
+  const numericValue = Number.parseInt(blockValue, 10);
+  if (Number.isFinite(numericValue)) {
+    return numericValue;
   }
 
   return null;
@@ -114,6 +124,14 @@ export async function checkRateLimit(env, request, endpoint, corsHeaders = {}) {
     console.error('Rate limit check failed:', error);
     return null;
   }
+}
+
+export function getAdminRateLimitEndpoint(method) {
+  return method === 'GET' ? 'adminRead' : 'adminWrite';
+}
+
+export async function checkAdminRateLimit(env, request, corsHeaders = {}) {
+  return checkRateLimit(env, request, getAdminRateLimitEndpoint(request.method), corsHeaders);
 }
 
 export function getClientIP(request) {

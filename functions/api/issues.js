@@ -2,8 +2,9 @@ import { checkRateLimit, getClientIP } from '../../src/shared/rateLimit.js';
 import { parseJsonBody } from '../../src/shared/request.js';
 import { createPagination, mapPublicIssue, recordAdminAction } from '../../src/shared/issueData.js';
 import { successResponse, errorResponse, createOptionsResponse, createPublicCorsHeaders, methodNotAllowedResponse } from '../../src/shared/response.js';
-import { generateUniqueTrackingCodeForDb } from '../../src/shared/tracking.js';
+import { insertWithUniqueTrackingCode } from '../../src/shared/tracking.js';
 import { publicIssueListQuerySchema, issueSchema, formatZodError } from '../../src/shared/validation.js';
+import { createContainsLikePattern } from '../../src/shared/sql.js';
 
 const ALLOWED_METHODS = 'GET, POST, OPTIONS';
 const PUBLIC_SORT_SQL = {
@@ -27,8 +28,8 @@ function buildPublicListWhere(filters) {
   }
 
   if (filters.q) {
-    clauses.push("(content LIKE ? OR COALESCE(public_summary, '') LIKE ?)");
-    const keyword = `%${filters.q}%`;
+    clauses.push("(content LIKE ? ESCAPE '\\' OR COALESCE(public_summary, '') LIKE ? ESCAPE '\\')");
+    const keyword = createContainsLikePattern(filters.q);
     bindings.push(keyword, keyword);
   }
 
@@ -111,27 +112,28 @@ export async function onRequest(context) {
 
     const payload = validationResult.data;
     const now = new Date().toISOString();
-    const trackingCode = await generateUniqueTrackingCodeForDb(env.DB);
-    const insertResult = await env.DB.prepare(`
-      INSERT INTO issues (
-        tracking_code, name, student_id, content, is_public, is_reported,
-        category, priority, status, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `)
-      .bind(
-        trackingCode,
-        payload.name,
-        payload.studentId,
-        payload.content,
-        payload.isPublic ? 1 : 0,
-        payload.isReported ? 1 : 0,
-        payload.category,
-        'normal',
-        'submitted',
-        now,
-        now,
-      )
-      .run();
+    const { trackingCode, result: insertResult } = await insertWithUniqueTrackingCode((nextTrackingCode) => (
+      env.DB.prepare(`
+        INSERT INTO issues (
+          tracking_code, name, student_id, content, is_public, is_reported,
+          category, priority, status, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `)
+        .bind(
+          nextTrackingCode,
+          payload.name,
+          payload.studentId,
+          payload.content,
+          payload.isPublic ? 1 : 0,
+          payload.isReported ? 1 : 0,
+          payload.category,
+          'normal',
+          'submitted',
+          now,
+          now,
+        )
+        .run()
+    ));
 
     const issueId = Number(insertResult.meta?.last_row_id);
 

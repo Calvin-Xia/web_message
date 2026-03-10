@@ -1,6 +1,7 @@
 import { getAdminCorsPolicy, createForbiddenOriginResponse, authorizeAdminRequest } from '../../../src/shared/auth.js';
 import { createPagination, mapAdminAction } from '../../../src/shared/issueData.js';
 import { successResponse, errorResponse, createOptionsResponse, methodNotAllowedResponse } from '../../../src/shared/response.js';
+import { checkAdminRateLimit } from '../../../src/shared/rateLimit.js';
 import { adminActionListQuerySchema, formatZodError } from '../../../src/shared/validation.js';
 
 const ALLOWED_METHODS = 'GET, OPTIONS';
@@ -40,6 +41,11 @@ export async function onRequest(context) {
 
   if (request.method !== 'GET') {
     return methodNotAllowedResponse(corsPolicy.headers, ALLOWED_METHODS);
+  }
+
+  const rateLimitResponse = await checkAdminRateLimit(env, request, corsPolicy.headers);
+  if (rateLimitResponse) {
+    return rateLimitResponse;
   }
 
   const authResult = authorizeAdminRequest(request, env, ALLOWED_METHODS);
