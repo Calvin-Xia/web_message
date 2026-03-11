@@ -9,5 +9,7 @@ dist
 Thumbs.db
 .trae/
 spec/
-
+output/
 REPO_PRD.md
+
+diff.txt

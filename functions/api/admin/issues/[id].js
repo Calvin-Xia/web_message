@@ -7,6 +7,7 @@ import {
   mapAdminIssue,
   mapInternalNote,
   mapIssueUpdate,
+  toBoolean,
 } from '../../../../src/shared/issueData.js';
 import { successResponse, errorResponse, createOptionsResponse, methodNotAllowedResponse, notFoundResponse } from '../../../../src/shared/response.js';
 import { adminIssuePatchSchema, formatZodError, issueIdSchema } from '../../../../src/shared/validation.js';
@@ -34,10 +35,17 @@ async function loadIssueDetail(db, issueId) {
 
   return {
     ...mapAdminIssue(issue),
-    updates: updates.results.map(mapIssueUpdate),
-    internalNotes: notes.results.map(mapInternalNote),
-    history: history.results.map(mapAdminAction),
+    updates: (updates.results || []).map(mapIssueUpdate),
+    internalNotes: (notes.results || []).map(mapInternalNote),
+    history: (history.results || []).map(mapAdminAction),
   };
+}
+
+function logIllegalTransitionAuditFailure(context, error) {
+  console.error('Failed to record illegal transition attempt', {
+    ...context,
+    errorMessage: error instanceof Error ? error.message : String(error),
+  });
 }
 
 export async function onRequest(context) {
@@ -100,12 +108,37 @@ export async function onRequest(context) {
     }
 
     const payload = validationResult.data;
+    const now = new Date().toISOString();
+    const ipAddress = getClientIP(request);
+
     if (payload.status && !canTransitionStatus(existingIssue.status, payload.status)) {
+      try {
+        await createAdminActionStatement(env.DB, {
+          actionType: 'illegal_transition_attempt',
+          targetId: issueId,
+          details: {
+            trackingCode: existingIssue.tracking_code,
+            currentStatus: existingIssue.status,
+            requestedStatus: payload.status,
+          },
+          performedBy: authResult.actor,
+          ipAddress,
+          performedAt: now,
+        }).run();
+      } catch (auditError) {
+        logIllegalTransitionAuditFailure({
+          issueId,
+          trackingCode: existingIssue.tracking_code,
+          currentStatus: existingIssue.status,
+          requestedStatus: payload.status,
+          actor: authResult.actor,
+          ipAddress,
+        }, auditError);
+      }
+
       return errorResponse('状态流转不合法', { status: 400, headers: authResult.corsHeaders });
     }
 
-    const now = new Date().toISOString();
-    const ipAddress = getClientIP(request);
     const updatedFields = [];
     const fieldChanges = {};
     const assignments = [];
@@ -137,7 +170,7 @@ export async function onRequest(context) {
     trackFieldChange('priority', 'priority', existingIssue.priority, payload.priority);
     trackFieldChange('assignedTo', 'assigned_to', existingIssue.assigned_to ?? null, payload.assignedTo);
     trackFieldChange('publicSummary', 'public_summary', existingIssue.public_summary ?? null, payload.publicSummary);
-    trackFieldChange('isPublic', 'is_public', Boolean(existingIssue.is_public), payload.isPublic, {
+    trackFieldChange('isPublic', 'is_public', toBoolean(existingIssue.is_public), payload.isPublic, {
       dbValue: payload.isPublic === undefined ? undefined : (payload.isPublic ? 1 : 0),
     });
     trackFieldChange('status', 'status', existingIssue.status, payload.status, {
@@ -225,3 +258,5 @@ export async function onRequest(context) {
     return errorResponse(message, { status: 500, headers: authResult.corsHeaders });
   }
 }
+
+

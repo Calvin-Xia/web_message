@@ -10,6 +10,13 @@
       --ink: #172033;
       --ink-soft: #4c566b;
       --line: rgba(23, 32, 51, 0.12);
+      --line-strong: rgba(23, 32, 51, 0.2);
+      --accent: #2457d6;
+      --accent-strong: #1d47b5;
+      --mint: #13795b;
+      --amber: #d98a17;
+      --danger: #b23a32;
+      --paper: #f6f1e7;
       --shadow: 0 24px 70px rgba(18, 26, 44, 0.14);
     }
 
@@ -17,9 +24,9 @@
       font-family: "Aptos", "Segoe UI", "PingFang SC", sans-serif;
       color: var(--ink);
       background:
-        radial-gradient(circle at top left, rgba(36, 87, 214, 0.1), transparent 35%),
-        radial-gradient(circle at bottom right, rgba(217, 138, 23, 0.08), transparent 30%),
-        linear-gradient(180deg, #f8f3ea 0%, #ede6d7 100%);
+        radial-gradient(circle at top left, rgba(36, 87, 214, 0.1), transparent 34%),
+        radial-gradient(circle at bottom right, rgba(217, 138, 23, 0.08), transparent 28%),
+        linear-gradient(180deg, #faf5ec 0%, #efe7d8 100%);
     }
 
     .display-font { font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif; }
@@ -27,34 +34,112 @@
       background: linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(255, 252, 246, 0.86) 100%);
       border: 1px solid var(--line);
       box-shadow: var(--shadow);
-      backdrop-filter: blur(20px);
+      backdrop-filter: blur(18px);
     }
     .field-shell {
       border: 1px solid rgba(23, 32, 51, 0.12);
       background: rgba(255, 255, 255, 0.84);
-      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
     }
     .field-shell:focus {
       border-color: rgba(36, 87, 214, 0.5);
       box-shadow: 0 0 0 4px rgba(36, 87, 214, 0.12);
       outline: none;
+      transform: translateY(-1px);
     }
     .ghost-button {
       border: 1px solid rgba(23, 32, 51, 0.12);
       background: rgba(255, 255, 255, 0.78);
     }
     .ghost-button:hover { background: rgba(255, 255, 255, 0.96); }
-    .issue-card {
-      border: 1px solid rgba(23, 32, 51, 0.08);
-      background: rgba(255, 255, 255, 0.76);
-      transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    .primary-button {
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
+      color: white;
+      box-shadow: 0 14px 30px rgba(36, 87, 214, 0.24);
     }
-    .issue-card:hover {
-      transform: translateY(-3px);
-      border-color: rgba(36, 87, 214, 0.22);
-      box-shadow: 0 18px 40px rgba(18, 26, 44, 0.1);
+    .primary-button:hover { filter: brightness(1.05); }
+    .dark-button {
+      border: 1px solid rgba(12, 20, 36, 0.22);
+      background: linear-gradient(135deg, #172033 0%, #0c1424 100%);
+      color: white;
+      box-shadow: 0 14px 30px rgba(12, 20, 36, 0.22);
     }
-    .status-token, .priority-token, .category-token {
+    .dark-button:hover { filter: brightness(1.06); }
+    .action-button {
+      position: relative;
+      overflow: hidden;
+      transform: translateY(0) scale(1);
+      transition: transform 0.18s ease, box-shadow 0.22s ease, border-color 0.22s ease, filter 0.22s ease, background-color 0.22s ease;
+      will-change: transform;
+    }
+    .action-button::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(120deg, transparent 0%, rgba(255, 255, 255, 0.04) 24%, rgba(255, 255, 255, 0.32) 50%, transparent 76%);
+      transform: translateX(-135%);
+      transition: transform 0.48s ease;
+      pointer-events: none;
+    }
+    .action-button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 16px 32px rgba(18, 26, 44, 0.14);
+    }
+    .action-button:hover::before {
+      transform: translateX(135%);
+    }
+    .action-button:active {
+      transform: translateY(1px) scale(0.985);
+      box-shadow: 0 8px 18px rgba(18, 26, 44, 0.12);
+    }
+    .action-button:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 4px rgba(36, 87, 214, 0.14), 0 16px 32px rgba(18, 26, 44, 0.14);
+    }
+    .action-button:disabled {
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+    .button-hint {
+      position: absolute;
+      left: 50%;
+      top: calc(100% + 0.7rem);
+      z-index: 10;
+      border-radius: 999px;
+      padding: 0.45rem 0.8rem;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      color: white;
+      background: #0f6b50;
+      box-shadow: 0 14px 28px rgba(15, 107, 80, 0.2);
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transform: translate(-50%, -8px) scale(0.96);
+      transition: opacity 0.18s ease, transform 0.18s ease;
+    }
+    .button-hint::before {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: -0.35rem;
+      width: 0.8rem;
+      height: 0.8rem;
+      background: inherit;
+      transform: translateX(-50%) rotate(45deg);
+      border-radius: 0.15rem;
+    }
+    .button-hint[data-visible="true"] {
+      opacity: 1;
+      transform: translate(-50%, 0) scale(1);
+    }
+    .button-hint[data-type="error"] {
+      background: #8f2d27;
+      box-shadow: 0 14px 28px rgba(143, 45, 39, 0.2);
+    }
+    .status-token, .priority-token, .category-token, .mini-token {
       display: inline-flex;
       align-items: center;
       border-radius: 999px;
@@ -74,14 +159,139 @@
     .priority-token[data-priority="normal"] { background: rgba(36, 87, 214, 0.1); color: #2147ac; }
     .priority-token[data-priority="low"] { background: rgba(19, 121, 91, 0.12); color: #13795b; }
     .category-token { background: rgba(23, 32, 51, 0.08); color: #4c566b; }
-    .drawer-scroll { scrollbar-width: thin; scrollbar-color: rgba(23, 32, 51, 0.22) transparent; }
+    .mini-token { background: rgba(23, 32, 51, 0.06); color: #445069; text-transform: none; letter-spacing: 0; }
+    .metric-card {
+      border: 1px solid rgba(23, 32, 51, 0.08);
+      background: rgba(255, 255, 255, 0.78);
+    }
+    .chart-shell {
+      border: 1px solid rgba(23, 32, 51, 0.08);
+      background: rgba(255, 255, 255, 0.72);
+    }
+    .issue-card {
+      border: 1px solid rgba(23, 32, 51, 0.08);
+      background: rgba(255, 255, 255, 0.78);
+      transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .issue-card:hover {
+      transform: translateY(-3px);
+      border-color: rgba(36, 87, 214, 0.22);
+      box-shadow: 0 18px 40px rgba(18, 26, 44, 0.1);
+    }
+    .filter-menu {
+      position: relative;
+      border: 1px solid rgba(23, 32, 51, 0.12);
+      border-radius: 1rem;
+      background: rgba(255, 255, 255, 0.84);
+    }
+    .filter-menu summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 0.85rem 1rem;
+      font-size: 0.9rem;
+      color: #25314a;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+    }
+    .filter-menu summary::-webkit-details-marker { display: none; }
+    .filter-menu__content {
+      position: absolute;
+      inset-inline: -1px;
+      top: calc(100% + 0.4rem);
+      z-index: 20;
+      border: 1px solid rgba(23, 32, 51, 0.12);
+      border-radius: 1rem;
+      background: rgba(255, 255, 255, 0.97);
+      box-shadow: 0 18px 45px rgba(18, 26, 44, 0.14);
+      padding: 0.85rem;
+    }
+    .filter-menu__option {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      border-radius: 0.9rem;
+      padding: 0.55rem 0.7rem;
+      font-size: 0.88rem;
+      color: #374151;
+    }
+    .filter-menu__option:hover { background: rgba(36, 87, 214, 0.06); }
+    .filter-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      border-radius: 999px;
+      background: rgba(36, 87, 214, 0.08);
+      color: #2147ac;
+      padding: 0.45rem 0.8rem;
+      font-size: 0.82rem;
+      font-weight: 600;
+    }
+    .history-chip {
+      border: 1px dashed rgba(23, 32, 51, 0.18);
+      background: rgba(255, 255, 255, 0.6);
+      color: #445069;
+    }
+    .segment-bar {
+      border: 1px solid rgba(23, 32, 51, 0.12);
+      background: rgba(255, 255, 255, 0.84);
+      border-radius: 999px;
+      padding: 0.22rem;
+      display: inline-flex;
+      gap: 0.2rem;
+    }
+    .segment-button {
+      border-radius: 999px;
+      padding: 0.5rem 0.95rem;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #5f6b80;
+    }
+    .segment-button[data-active="true"] {
+      background: #172033;
+      color: white;
+    }
+    .donut-ring {
+      width: 12rem;
+      height: 12rem;
+      border-radius: 999px;
+      position: relative;
+      margin: 0 auto;
+    }
+    .donut-ring::after {
+      content: "";
+      position: absolute;
+      inset: 1.7rem;
+      border-radius: 999px;
+      background: rgba(255, 252, 246, 0.94);
+      border: 1px solid rgba(23, 32, 51, 0.08);
+    }
+    .bar-track {
+      height: 0.8rem;
+      border-radius: 999px;
+      background: rgba(23, 32, 51, 0.08);
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, rgba(36, 87, 214, 0.9), rgba(26, 130, 153, 0.72));
+    }
+    .bar-fill[data-tone="warm"] { background: linear-gradient(90deg, rgba(217, 138, 23, 0.95), rgba(240, 171, 58, 0.72)); }
+    .bar-fill[data-tone="mint"] { background: linear-gradient(90deg, rgba(19, 121, 91, 0.95), rgba(65, 190, 155, 0.72)); }
+    .bar-fill[data-tone="ink"] { background: linear-gradient(90deg, rgba(23, 32, 51, 0.9), rgba(89, 103, 133, 0.72)); }
+    .empty-state {
+      border: 1px dashed rgba(23, 32, 51, 0.16);
+      background: rgba(255, 255, 255, 0.55);
+    }
     .timeline-item { position: relative; padding-left: 2.8rem; }
     .timeline-item::before {
       content: "";
       position: absolute;
       left: 0.85rem;
-      top: 1.4rem;
-      bottom: -1.4rem;
+      top: 1.45rem;
+      bottom: -1.45rem;
       width: 1px;
       background: rgba(23, 32, 51, 0.12);
     }
@@ -101,12 +311,19 @@
       font-size: 0.8rem;
       font-weight: 700;
     }
+    .drawer-scroll { scrollbar-width: thin; scrollbar-color: rgba(23, 32, 51, 0.22) transparent; }
+    .highlight-mark {
+      background: rgba(255, 219, 95, 0.5);
+      color: inherit;
+      border-radius: 0.25rem;
+      padding: 0 0.15rem;
+    }
   </style>
 </head>
 <body class="min-h-screen px-4 py-5 md:px-8 md:py-8">
   <header class="mx-auto flex max-w-7xl flex-col gap-4 md:flex-row md:items-center md:justify-between">
     <div>
-      <div class="text-xs font-semibold uppercase tracking-[0.35em] text-[#5f6b80]">Admin Console</div>
+      <div class="text-xs font-semibold uppercase tracking-[0.35em] text-[#5f6b80]">Admin Operations Desk</div>
       <h1 class="display-font mt-2 text-3xl md:text-4xl">留言后台</h1>
     </div>
     <nav class="flex flex-wrap gap-2 text-sm text-[#445069]">
@@ -119,45 +336,266 @@
     <section id="loginSection" class="surface-panel mx-auto max-w-lg rounded-[2rem] p-6 md:p-8">
       <div class="text-xs font-semibold uppercase tracking-[0.3em] text-[#72809a]">Secure Entry</div>
       <h2 class="display-font mt-3 text-3xl">管理员登录</h2>
-      <p class="mt-3 text-sm leading-7 text-[#4c566b]">输入共享密钥后即可查看列表、编辑状态、添加内部备注和公开回复。</p>
+      <p class="mt-3 text-sm leading-7 text-[#4c566b]">输入共享密钥后即可查看统计面板、问题队列、导出数据并处理状态流转。</p>
       <div id="loginNotification" class="mt-4"></div>
       <form id="loginForm" class="mt-5 space-y-4">
         <label class="space-y-2 text-sm font-medium text-[#25314a]">
           <span>Bearer 密钥</span>
           <input id="secretKey" name="secretKey" type="password" class="field-shell h-12 w-full rounded-2xl px-4" placeholder="请输入管理密钥" required>
         </label>
-        <button id="loginButton" type="submit" class="inline-flex h-12 w-full items-center justify-center rounded-full bg-[#2457d6] px-5 text-sm font-semibold text-white transition hover:bg-[#1e47b0] disabled:cursor-not-allowed disabled:opacity-60">登录并加载问题列表</button>
+        <button id="loginButton" type="submit" class="primary-button inline-flex h-12 w-full items-center justify-center rounded-full px-5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60">登录并加载后台</button>
       </form>
     </section>
 
     <section id="adminShell" hidden class="space-y-6">
-      <div class="grid gap-4 md:grid-cols-4">
-        <article class="surface-panel rounded-[1.8rem] p-5"><div class="text-xs font-semibold uppercase tracking-[0.28em] text-[#72809a]">Pending</div><div id="pendingCount" class="mt-3 text-4xl font-black text-[#172033]">0</div><div class="mt-1 text-sm text-[#5f6b80]">待处理总数</div></article>
-        <article class="surface-panel rounded-[1.8rem] p-5"><div class="text-xs font-semibold uppercase tracking-[0.28em] text-[#72809a]">Today</div><div id="todayNewCount" class="mt-3 text-4xl font-black text-[#2457d6]">0</div><div class="mt-1 text-sm text-[#5f6b80]">今日新增</div></article>
-        <article class="surface-panel rounded-[1.8rem] p-5"><div class="text-xs font-semibold uppercase tracking-[0.28em] text-[#72809a]">Resolved</div><div id="weekResolvedCount" class="mt-3 text-4xl font-black text-[#13795b]">0</div><div class="mt-1 text-sm text-[#5f6b80]">近 7 天解决</div></article>
-        <article class="surface-panel rounded-[1.8rem] p-5"><div class="text-xs font-semibold uppercase tracking-[0.28em] text-[#72809a]">Total</div><div id="totalCount" class="mt-3 text-4xl font-black text-[#8b5a12]">0</div><div class="mt-1 text-sm text-[#5f6b80]">全部问题</div></article>
-      </div>
+      <section class="surface-panel rounded-[2rem] p-6 md:p-7">
+        <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div class="max-w-2xl">
+            <div class="text-xs font-semibold uppercase tracking-[0.3em] text-[#72809a]">Metrics Cockpit</div>
+            <h2 class="display-font mt-2 text-3xl">运营面板</h2>
+            <p class="mt-3 text-sm leading-7 text-[#4c566b]">同一组时间条件会同时影响统计面板、问题列表和导出。你可以直接复制当前 URL，把筛选结果发给其他管理员。</p>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <div class="relative isolate">
+              <button id="copyFilterLinkButton" class="action-button ghost-button rounded-full px-4 py-2 text-sm font-semibold text-[#172033] transition" type="button">复制筛选链接</button>
+              <span id="copyLinkHint" class="button-hint" data-visible="false" data-type="success" role="status" aria-live="polite">链接已复制</span>
+            </div>
+            <button id="exportButton" class="action-button ghost-button rounded-full px-4 py-2 text-sm font-semibold text-[#172033] transition" type="button">导出 CSV</button>
+            <button id="refreshButton" class="action-button primary-button rounded-full px-4 py-2 text-sm font-semibold transition" type="button">刷新面板</button>
+            <button id="logoutButton" class="action-button dark-button rounded-full px-4 py-2 text-sm font-semibold transition" type="button">退出登录</button>
+          </div>
+        </div>
+
+        <div id="metricsNotification" class="mt-4"></div>
+
+        <div class="mt-6 grid gap-4 md:grid-cols-2 md:items-end xl:grid-cols-[1.1fr_1.1fr_auto]">
+          <div class="grid gap-3 sm:grid-cols-2">
+            <label class="space-y-2 text-sm font-medium text-[#25314a]">
+              <span>开始日期</span>
+              <input id="startDateFilter" type="date" class="field-shell h-11 w-full rounded-2xl px-4 text-sm">
+            </label>
+            <label class="space-y-2 text-sm font-medium text-[#25314a]">
+              <span>结束日期</span>
+              <input id="endDateFilter" type="date" class="field-shell h-11 w-full rounded-2xl px-4 text-sm">
+            </label>
+          </div>
+          <div>
+            <div class="mb-2 text-sm font-medium text-[#25314a]">趋势粒度</div>
+            <div class="segment-bar">
+              <button class="segment-button" data-period-button="day" type="button">按日</button>
+              <button class="segment-button" data-period-button="week" type="button">按周</button>
+              <button class="segment-button" data-period-button="month" type="button">按月</button>
+            </div>
+          </div>
+          <div class="rounded-[1.5rem] border border-[rgba(23,32,51,0.08)] bg-white/74 px-4 py-3 text-sm text-[#4c566b]">
+            <div class="text-xs font-semibold uppercase tracking-[0.24em] text-[#72809a]">当前统计范围</div>
+            <div id="metricsRangeLabel" class="mt-2 font-semibold text-[#172033]">全部数据 · 周趋势</div>
+          </div>
+        </div>
+
+        <div class="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <article class="metric-card rounded-[1.6rem] p-5">
+            <div class="text-xs font-semibold uppercase tracking-[0.28em] text-[#72809a]">Total Issues</div>
+            <div id="metricTotalIssues" class="mt-3 text-4xl font-black text-[#172033]">0</div>
+            <div class="mt-1 text-sm text-[#5f6b80]">统计范围内问题总量</div>
+          </article>
+          <article class="metric-card rounded-[1.6rem] p-5">
+            <div class="text-xs font-semibold uppercase tracking-[0.28em] text-[#72809a]">Pending</div>
+            <div id="metricPendingIssues" class="mt-3 text-4xl font-black text-[#2457d6]">0</div>
+            <div class="mt-1 text-sm text-[#5f6b80]">待处理问题数</div>
+          </article>
+          <article class="metric-card rounded-[1.6rem] p-5">
+            <div class="text-xs font-semibold uppercase tracking-[0.28em] text-[#72809a]">Created</div>
+            <div id="metricCreatedThisPeriod" class="mt-3 text-4xl font-black text-[#8b5a12]">0</div>
+            <div class="mt-1 text-sm text-[#5f6b80]">当前周期新增</div>
+          </article>
+          <article class="metric-card rounded-[1.6rem] p-5">
+            <div class="text-xs font-semibold uppercase tracking-[0.28em] text-[#72809a]">Resolved</div>
+            <div id="metricResolvedThisPeriod" class="mt-3 text-4xl font-black text-[#13795b]">0</div>
+            <div class="mt-1 text-sm text-[#5f6b80]">当前周期解决</div>
+          </article>
+          <article class="metric-card rounded-[1.6rem] p-5">
+            <div class="text-xs font-semibold uppercase tracking-[0.28em] text-[#72809a]">First Response</div>
+            <div id="metricAvgFirstResponse" class="mt-3 text-4xl font-black text-[#172033]">0m</div>
+            <div class="mt-1 text-sm text-[#5f6b80]">平均首次响应时间</div>
+          </article>
+          <article class="metric-card rounded-[1.6rem] p-5">
+            <div class="text-xs font-semibold uppercase tracking-[0.28em] text-[#72809a]">Resolution</div>
+            <div id="metricAvgResolution" class="mt-3 text-4xl font-black text-[#172033]">0m</div>
+            <div id="metricResolutionRate" class="mt-1 text-sm text-[#5f6b80]">解决率 0%</div>
+          </article>
+        </div>
+
+        <div class="mt-6 grid gap-4 md:grid-cols-2">
+          <section class="chart-shell rounded-[1.7rem] p-5">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <div class="text-xs font-semibold uppercase tracking-[0.28em] text-[#72809a]">Status Share</div>
+                <h3 class="display-font mt-2 text-2xl">状态分布</h3>
+              </div>
+              <div id="statusDonutCenter" class="text-right text-sm text-[#5f6b80]"></div>
+            </div>
+            <div class="mt-5 grid gap-4 md:grid-cols-[12rem_1fr] md:items-center">
+              <div id="statusDonut" class="donut-ring"></div>
+              <div id="statusLegend" class="grid gap-3"></div>
+            </div>
+          </section>
+
+          <section class="chart-shell rounded-[1.7rem] p-5">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <div class="text-xs font-semibold uppercase tracking-[0.28em] text-[#72809a]">Trend Line</div>
+                <h3 class="display-font mt-2 text-2xl">处理趋势</h3>
+              </div>
+              <div class="flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.22em] text-[#72809a]">
+                <span class="inline-flex items-center gap-2"><span class="h-3 w-3 rounded-full bg-[#2457d6]"></span>新增</span>
+                <span class="inline-flex items-center gap-2"><span class="h-3 w-3 rounded-full bg-[#13795b]"></span>解决</span>
+              </div>
+            </div>
+            <div id="trendChart" class="mt-5"></div>
+          </section>
+
+          <section class="chart-shell rounded-[1.7rem] p-5">
+            <div class="text-xs font-semibold uppercase tracking-[0.28em] text-[#72809a]">Category View</div>
+            <h3 class="display-font mt-2 text-2xl">分类分布</h3>
+            <div id="categoryBars" class="mt-5 space-y-4"></div>
+          </section>
+
+          <section class="chart-shell rounded-[1.7rem] p-5">
+            <div class="text-xs font-semibold uppercase tracking-[0.28em] text-[#72809a]">Priority & Performance</div>
+            <h3 class="display-font mt-2 text-2xl">优先级与时效分位</h3>
+            <div id="priorityBars" class="mt-5 space-y-4"></div>
+            <div id="performanceBlocks" class="mt-6 grid gap-3 sm:grid-cols-2"></div>
+          </section>
+        </div>
+      </section>
 
       <section class="surface-panel rounded-[2rem] p-6 md:p-7">
-        <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div><div class="text-xs font-semibold uppercase tracking-[0.3em] text-[#72809a]">Issue Queue</div><h2 class="display-font mt-2 text-3xl">后台问题列表</h2></div>
-          <div class="flex flex-wrap gap-2"><button id="refreshButton" class="ghost-button rounded-full px-4 py-2 text-sm font-semibold text-[#172033] transition">刷新数据</button><button id="logoutButton" class="rounded-full bg-[#172033] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#0c1424]">退出登录</button></div>
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <div class="text-xs font-semibold uppercase tracking-[0.3em] text-[#72809a]">Issue Queue</div>
+            <h2 class="display-font mt-2 text-3xl">后台问题列表</h2>
+            <p class="mt-2 text-sm leading-7 text-[#4c566b]">支持多条件组合筛选、URL 持久化、搜索高亮和导出同条件数据。</p>
+          </div>
+          <div id="queueSummary" class="rounded-[1.5rem] border border-[rgba(23,32,51,0.08)] bg-white/72 px-4 py-3 text-sm text-[#4c566b]">尚未加载问题列表。</div>
         </div>
 
         <div id="adminNotification" class="mt-4"></div>
 
-        <form id="filterForm" class="mt-6 grid gap-3 xl:grid-cols-[1.2fr_0.9fr_0.9fr_0.9fr_0.9fr_0.8fr_auto]">
-          <input id="searchInput" name="q" class="field-shell h-11 rounded-2xl px-4 text-sm" placeholder="搜索追踪码、姓名、学号、内容">
-          <select id="statusFilter" name="status" class="field-shell h-11 rounded-2xl px-4 text-sm"><option value="">全部状态</option><option value="submitted">已提交</option><option value="in_review">审核中</option><option value="in_progress">处理中</option><option value="resolved">已解决</option><option value="closed">已关闭</option></select>
-          <select id="categoryFilter" name="category" class="field-shell h-11 rounded-2xl px-4 text-sm"><option value="">全部分类</option><option value="academic">学业相关</option><option value="facility">设施问题</option><option value="service">服务咨询</option><option value="complaint">投诉建议</option><option value="counseling">心理咨询</option><option value="other">其他</option></select>
-          <select id="priorityFilter" name="priority" class="field-shell h-11 rounded-2xl px-4 text-sm"><option value="">全部优先级</option><option value="urgent">紧急</option><option value="high">高</option><option value="normal">普通</option><option value="low">低</option></select>
-          <input id="assignedToFilter" name="assignedTo" class="field-shell h-11 rounded-2xl px-4 text-sm" placeholder="按指派人筛选">
-          <select id="sortFilter" name="sort" class="field-shell h-11 rounded-2xl px-4 text-sm"><option value="newest">最新提交</option><option value="updated">最近更新</option><option value="oldest">最早提交</option></select>
-          <div class="flex gap-2"><button class="inline-flex h-11 flex-1 items-center justify-center rounded-full bg-[#2457d6] px-4 text-sm font-semibold text-white transition hover:bg-[#1e47b0]" type="submit">筛选</button><button id="resetFilters" class="ghost-button inline-flex h-11 items-center justify-center rounded-full px-4 text-sm font-semibold text-[#172033] transition" type="button">重置</button></div>
+        <form id="filterForm" class="mt-6 space-y-3">
+          <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <label class="space-y-2 text-sm font-medium text-[#25314a] md:col-span-2 xl:col-span-1">
+              <span>关键词搜索</span>
+              <input id="searchInput" list="adminSearchSuggestions" class="field-shell h-11 w-full rounded-2xl px-4 text-sm" placeholder="搜索追踪码、姓名、学号、内容或公开摘要">
+              <datalist id="adminSearchSuggestions"></datalist>
+            </label>
+            <details class="filter-menu" data-multi-filter="status">
+              <summary><span>状态</span><span data-filter-summary="status">全部</span></summary>
+              <div class="filter-menu__content space-y-2">
+                <label class="filter-menu__option"><input type="checkbox" value="submitted">已提交</label>
+                <label class="filter-menu__option"><input type="checkbox" value="in_review">审核中</label>
+                <label class="filter-menu__option"><input type="checkbox" value="in_progress">处理中</label>
+                <label class="filter-menu__option"><input type="checkbox" value="resolved">已解决</label>
+                <label class="filter-menu__option"><input type="checkbox" value="closed">已关闭</label>
+              </div>
+            </details>
+            <details class="filter-menu" data-multi-filter="category">
+              <summary><span>分类</span><span data-filter-summary="category">全部</span></summary>
+              <div class="filter-menu__content space-y-2">
+                <label class="filter-menu__option"><input type="checkbox" value="academic">学业相关</label>
+                <label class="filter-menu__option"><input type="checkbox" value="facility">设施问题</label>
+                <label class="filter-menu__option"><input type="checkbox" value="service">服务咨询</label>
+                <label class="filter-menu__option"><input type="checkbox" value="complaint">投诉建议</label>
+                <label class="filter-menu__option"><input type="checkbox" value="counseling">心理咨询</label>
+                <label class="filter-menu__option"><input type="checkbox" value="other">其他</label>
+              </div>
+            </details>
+            <details class="filter-menu" data-multi-filter="priority">
+              <summary><span>优先级</span><span data-filter-summary="priority">全部</span></summary>
+              <div class="filter-menu__content space-y-2">
+                <label class="filter-menu__option"><input type="checkbox" value="urgent">紧急</label>
+                <label class="filter-menu__option"><input type="checkbox" value="high">高</label>
+                <label class="filter-menu__option"><input type="checkbox" value="normal">普通</label>
+                <label class="filter-menu__option"><input type="checkbox" value="low">低</label>
+              </div>
+            </details>
+          </div>
+
+          <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            <label class="space-y-2 text-sm font-medium text-[#25314a]">
+              <span>指派人</span>
+              <input id="assignedToFilter" list="assigneeSuggestions" class="field-shell h-11 w-full rounded-2xl px-4 text-sm" placeholder="输入或选择管理员">
+              <datalist id="assigneeSuggestions"></datalist>
+            </label>
+            <label class="space-y-2 text-sm font-medium text-[#25314a]">
+              <span>更新晚于</span>
+              <input id="updatedAfterFilter" type="date" class="field-shell h-11 w-full rounded-2xl px-4 text-sm">
+            </label>
+            <label class="space-y-2 text-sm font-medium text-[#25314a]">
+              <span>备注</span>
+              <select id="hasNotesFilter" class="field-shell h-11 w-full rounded-2xl px-4 text-sm">
+                <option value="">全部</option>
+                <option value="true">有备注</option>
+                <option value="false">无备注</option>
+              </select>
+            </label>
+            <label class="space-y-2 text-sm font-medium text-[#25314a]">
+              <span>回复</span>
+              <select id="hasRepliesFilter" class="field-shell h-11 w-full rounded-2xl px-4 text-sm">
+                <option value="">全部</option>
+                <option value="true">有回复</option>
+                <option value="false">无回复</option>
+              </select>
+            </label>
+            <label class="space-y-2 text-sm font-medium text-[#25314a]">
+              <span>分配状态</span>
+              <select id="isAssignedFilter" class="field-shell h-11 w-full rounded-2xl px-4 text-sm">
+                <option value="">全部</option>
+                <option value="true">已分配</option>
+                <option value="false">未分配</option>
+              </select>
+            </label>
+            <div class="grid gap-3 sm:grid-cols-2">
+              <label class="space-y-2 text-sm font-medium text-[#25314a]">
+                <span>排序字段</span>
+                <select id="sortFieldFilter" class="field-shell h-11 w-full rounded-2xl px-4 text-sm">
+                  <option value="createdAt">提交时间</option>
+                  <option value="updatedAt">更新时间</option>
+                  <option value="priority">优先级</option>
+                </select>
+              </label>
+              <label class="space-y-2 text-sm font-medium text-[#25314a]">
+                <span>排序方向</span>
+                <select id="sortOrderFilter" class="field-shell h-11 w-full rounded-2xl px-4 text-sm">
+                  <option value="desc">降序</option>
+                  <option value="asc">升序</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div id="activeFilterChips" class="flex flex-wrap gap-2"></div>
+            <div class="flex flex-wrap gap-2">
+              <button class="primary-button inline-flex h-11 items-center justify-center rounded-full px-5 text-sm font-semibold transition" type="submit">应用筛选</button>
+              <button id="resetFilters" class="ghost-button inline-flex h-11 items-center justify-center rounded-full px-5 text-sm font-semibold text-[#172033] transition" type="button">清空筛选</button>
+            </div>
+          </div>
         </form>
 
-        <div id="issuesList" class="mt-6 grid gap-4"></div>
-        <div id="paginationContainer" class="mt-6"></div>
+        <div class="mt-4 flex flex-wrap gap-2" id="adminSearchHistory"></div>
+
+        <div class="mt-6 grid gap-6 xl:grid-cols-[1fr_320px]">
+          <div>
+            <div id="issuesList" class="grid gap-4"></div>
+            <div id="paginationContainer" class="mt-6"></div>
+          </div>
+          <aside class="chart-shell rounded-[1.6rem] p-5">
+            <div class="text-xs font-semibold uppercase tracking-[0.28em] text-[#72809a]">Export Log</div>
+            <h3 class="display-font mt-2 text-2xl">导出历史</h3>
+            <div id="exportHistoryList" class="mt-5 space-y-3"></div>
+          </aside>
+        </div>
       </section>
     </section>
   </main>
@@ -176,400 +614,14 @@
     </div>
 
     <div id="drawerContent" class="space-y-6 px-6 py-6">
-      <div class="rounded-[1.5rem] border border-dashed border-[rgba(23,32,51,0.16)] bg-white/60 px-5 py-8 text-center text-sm leading-7 text-[#5f6b80]">从左侧列表选择问题后，这里会加载完整详情。</div>
+      <div class="empty-state rounded-[1.5rem] px-5 py-8 text-center text-sm leading-7 text-[#5f6b80]">从左侧列表选择问题后，这里会加载完整详情。</div>
     </div>
   </aside>
 
-  <script>
-    const API_BASE = '/api';
-    const REQUEST_TIMEOUT = 15000;
-    const STORAGE_KEY = 'issue-admin-secret';
-    const statusLabels = { submitted: '已提交', in_review: '审核中', in_progress: '处理中', resolved: '已解决', closed: '已关闭' };
-    const categoryLabels = { academic: '学业相关', facility: '设施问题', service: '服务咨询', complaint: '投诉建议', counseling: '心理咨询', other: '其他' };
-    const priorityLabels = { low: '低', normal: '普通', high: '高', urgent: '紧急' };
-    const statusTransitions = {
-      submitted: ['submitted', 'in_review', 'closed'],
-      in_review: ['in_review', 'in_progress', 'closed'],
-      in_progress: ['in_progress', 'resolved', 'closed'],
-      resolved: ['resolved', 'closed', 'in_progress'],
-      closed: ['closed'],
-    };
-    const state = { token: null, page: 1, pageSize: 20, activeIssueId: null, activeIssue: null };
-
-    function escapeHtml(value) {
-      const div = document.createElement('div');
-      div.textContent = value ?? '';
-      return div.innerHTML;
-    }
-
-    function formatDate(value) {
-      if (!value) return '-';
-      return new Date(value).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-    }
-
-    async function fetchWithTimeout(url, options = {}, timeout = REQUEST_TIMEOUT) {
-      const controller = new AbortController();
-      const timer = window.setTimeout(() => controller.abort(), timeout);
-      try { return await fetch(url, { ...options, signal: controller.signal }); }
-      finally { clearTimeout(timer); }
-    }
-
-    async function apiFetch(path, options = {}) {
-      const response = await fetchWithTimeout(`${API_BASE}${path}`, { ...options, headers: { ...(options.headers || {}), Authorization: `Bearer ${state.token}` } });
-      let payload = null;
-      try { payload = await response.json(); } catch { payload = null; }
-      if (!response.ok || !payload?.success) throw new Error(payload?.error || '请求失败');
-      return payload.data;
-    }
-
-    function setNotification(targetId, message = '', type = 'info') {
-      const palette = {
-        success: 'border-[rgba(19,121,91,0.2)] bg-[rgba(19,121,91,0.12)] text-[#0f6b50]',
-        error: 'border-[rgba(178,58,50,0.2)] bg-[rgba(178,58,50,0.12)] text-[#8f2d27]',
-        info: 'border-[rgba(36,87,214,0.16)] bg-[rgba(36,87,214,0.1)] text-[#2147ac]',
-      };
-      const target = document.getElementById(targetId);
-      if (!message) { target.innerHTML = ''; return; }
-      target.innerHTML = `<div class="rounded-[1.2rem] border px-4 py-3 text-sm ${palette[type] || palette.info}">${escapeHtml(message)}</div>`;
-    }
-
-    function serializeFilters(page = 1) {
-      const params = new URLSearchParams();
-      const form = new FormData(document.getElementById('filterForm'));
-      params.set('page', String(page));
-      params.set('pageSize', String(state.pageSize));
-      for (const [key, rawValue] of form.entries()) {
-        const value = String(rawValue).trim();
-        if (value) params.set(key, value);
-      }
-      return params.toString();
-    }
-
-    function renderPagination(container, pagination, onChange) {
-      if (!pagination || pagination.totalPages <= 1) { container.innerHTML = ''; return; }
-      const { page, totalPages } = pagination;
-      const start = Math.max(1, page - 2);
-      const end = Math.min(totalPages, start + 4);
-      const buttons = [`<button class="ghost-button rounded-full px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-40" data-page="${page - 1}" ${page === 1 ? 'disabled' : ''}>上一页</button>`];
-      for (let current = start; current <= end; current += 1) {
-        const active = current === page;
-        buttons.push(`<button class="rounded-full px-4 py-2 text-sm font-semibold ${active ? 'bg-[#172033] text-white' : 'ghost-button text-[#172033]'}" data-page="${current}" ${active ? 'disabled' : ''}>${current}</button>`);
-      }
-      buttons.push(`<button class="ghost-button rounded-full px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-40" data-page="${page + 1}" ${page === totalPages ? 'disabled' : ''}>下一页</button>`);
-      container.innerHTML = `<div class="flex flex-wrap items-center justify-center gap-2">${buttons.join('')}</div>`;
-      container.querySelectorAll('button[data-page]').forEach((button) => {
-        button.addEventListener('click', () => {
-          const nextPage = Number(button.dataset.page);
-          if (Number.isFinite(nextPage) && nextPage >= 1 && nextPage <= totalPages && nextPage !== page) onChange(nextPage);
-        });
-      });
-    }
-
-    function renderStats(stats) {
-      document.getElementById('pendingCount').textContent = stats.pendingCount || 0;
-      document.getElementById('todayNewCount').textContent = stats.todayNewCount || 0;
-      document.getElementById('weekResolvedCount').textContent = stats.weekResolvedCount || 0;
-      document.getElementById('totalCount').textContent = stats.total || 0;
-    }
-
-    function renderIssueList(items, pagination) {
-      const container = document.getElementById('issuesList');
-      if (!items || items.length === 0) {
-        container.innerHTML = '<div class="rounded-[1.5rem] border border-dashed border-[rgba(23,32,51,0.16)] bg-white/55 px-5 py-8 text-center text-sm leading-7 text-[#5f6b80]">当前筛选条件下没有问题。</div>';
-        document.getElementById('paginationContainer').innerHTML = '';
-        return;
-      }
-
-      container.innerHTML = items.map((item) => `
-        <article class="issue-card rounded-[1.7rem] p-5 md:p-6">
-          <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div class="space-y-3">
-              <div class="flex flex-wrap items-center gap-2">
-                <span class="status-token" data-status="${escapeHtml(item.status)}">${escapeHtml(statusLabels[item.status] || item.status)}</span>
-                <span class="priority-token" data-priority="${escapeHtml(item.priority)}">${escapeHtml(priorityLabels[item.priority] || item.priority)}</span>
-                <span class="category-token">${escapeHtml(categoryLabels[item.category] || item.category)}</span>
-              </div>
-              <div>
-                <div class="text-xs font-semibold uppercase tracking-[0.28em] text-[#72809a]">${escapeHtml(item.trackingCode)}</div>
-                <div class="mt-2 text-base leading-7 text-[#172033]">${escapeHtml(item.content)}</div>
-              </div>
-              <div class="grid gap-2 text-sm text-[#4c566b] sm:grid-cols-2 lg:grid-cols-3">
-                <div><strong class="text-[#172033]">姓名：</strong>${escapeHtml(item.name)}</div>
-                <div><strong class="text-[#172033]">学号：</strong>${escapeHtml(item.studentId)}</div>
-                <div><strong class="text-[#172033]">指派：</strong>${escapeHtml(item.assignedTo || '未指派')}</div>
-                <div><strong class="text-[#172033]">公开：</strong>${item.isPublic ? '是' : '否'}</div>
-                <div><strong class="text-[#172033]">上报：</strong>${item.isReported ? '是' : '否'}</div>
-                <div><strong class="text-[#172033]">更新：</strong>${escapeHtml(formatDate(item.updatedAt))}</div>
-              </div>
-            </div>
-            <div class="flex flex-col gap-3 lg:min-w-[220px]">
-              <div class="rounded-[1.3rem] border border-[rgba(23,32,51,0.08)] bg-white/75 px-4 py-3 text-sm text-[#4c566b]">
-                <div><strong class="text-[#172033]">提交：</strong>${escapeHtml(formatDate(item.createdAt))}</div>
-                <div class="mt-2"><strong class="text-[#172033]">摘要：</strong>${escapeHtml(item.publicSummary || '暂无')}</div>
-              </div>
-              <button class="open-detail rounded-full bg-[#172033] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#0c1424]" type="button" data-id="${item.id}">查看详情</button>
-            </div>
-          </div>
-        </article>
-      `).join('');
-
-      container.querySelectorAll('.open-detail').forEach((button) => {
-        button.addEventListener('click', () => openDrawer(Number(button.dataset.id)));
-      });
-
-      renderPagination(document.getElementById('paginationContainer'), pagination, (nextPage) => loadIssues(nextPage));
-    }
-
-    async function loadIssues(page = 1) {
-      state.page = page;
-      document.getElementById('issuesList').innerHTML = '<div class="rounded-[1.5rem] border border-dashed border-[rgba(23,32,51,0.16)] bg-white/55 px-5 py-8 text-center text-sm leading-7 text-[#5f6b80]">正在加载问题列表...</div>';
-      const data = await apiFetch(`/admin/issues?${serializeFilters(page)}`);
-      renderStats(data.stats);
-      renderIssueList(data.items, data.pagination);
-    }
-
-    function openDrawerShell() {
-      document.getElementById('drawerBackdrop').hidden = false;
-      document.getElementById('issueDrawer').hidden = false;
-      document.body.classList.add('overflow-hidden');
-    }
-
-    function closeDrawer() {
-      document.getElementById('drawerBackdrop').hidden = true;
-      document.getElementById('issueDrawer').hidden = true;
-      document.body.classList.remove('overflow-hidden');
-      state.activeIssueId = null;
-      state.activeIssue = null;
-    }
-
-    function buildStatusOptions(current) {
-      const allowed = statusTransitions[current] || [current];
-      return allowed.map((status) => `<option value="${status}">${escapeHtml(statusLabels[status] || status)}</option>`).join('');
-    }
-
-    function renderUpdates(items) {
-      const container = document.getElementById('updatesTimeline');
-      if (!items || items.length === 0) {
-        container.innerHTML = '<div class="rounded-[1.2rem] border border-dashed border-[rgba(23,32,51,0.14)] bg-white/60 px-4 py-5 text-sm text-[#5f6b80]">还没有状态更新或公开回复。</div>';
-        return;
-      }
-
-      container.innerHTML = items.map((item) => `
-        <article class="timeline-item">
-          <div class="timeline-dot">${item.type === 'public_reply' ? '答' : '更'}</div>
-          <div class="rounded-[1.2rem] border border-[rgba(23,32,51,0.08)] bg-white/70 p-4">
-            <div class="flex flex-wrap items-center gap-2">
-              <strong class="text-[#172033]">${item.type === 'public_reply' ? '公开回复' : `${escapeHtml(statusLabels[item.oldValue] || item.oldValue || '初始状态')} → ${escapeHtml(statusLabels[item.newValue] || item.newValue || '已更新')}`}</strong>
-              <span class="text-xs uppercase tracking-[0.26em] text-[#72809a]">${escapeHtml(formatDate(item.createdAt))}</span>
-            </div>
-            <div class="mt-2 text-sm leading-7 text-[#4c566b]">${escapeHtml(item.content || '状态已更新。')}</div>
-          </div>
-        </article>
-      `).join('');
-    }
-
-    function renderNotes(items) {
-      const container = document.getElementById('notesList');
-      if (!items || items.length === 0) {
-        container.innerHTML = '<div class="rounded-[1.2rem] border border-dashed border-[rgba(23,32,51,0.14)] bg-white/60 px-4 py-5 text-sm text-[#5f6b80]">暂无内部备注。</div>';
-        return;
-      }
-      container.innerHTML = items.map((item) => `<article class="rounded-[1.2rem] border border-[rgba(23,32,51,0.08)] bg-white/70 p-4"><div class="text-sm leading-7 text-[#172033]">${escapeHtml(item.content)}</div><div class="mt-2 text-xs uppercase tracking-[0.26em] text-[#72809a]">${escapeHtml(item.createdBy)} · ${escapeHtml(formatDate(item.createdAt))}</div></article>`).join('');
-    }
-
-    function renderReplies(items) {
-      const container = document.getElementById('repliesList');
-      if (!items || items.length === 0) {
-        container.innerHTML = '<div class="rounded-[1.2rem] border border-dashed border-[rgba(23,32,51,0.14)] bg-white/60 px-4 py-5 text-sm text-[#5f6b80]">暂无回复记录。</div>';
-        return;
-      }
-      container.innerHTML = items.map((item) => `<article class="rounded-[1.2rem] border border-[rgba(23,32,51,0.08)] bg-white/70 p-4"><div class="flex flex-wrap items-center gap-2"><span class="rounded-full px-3 py-1 text-xs font-semibold ${item.isPublic ? 'bg-[rgba(19,121,91,0.12)] text-[#13795b]' : 'bg-[rgba(23,32,51,0.08)] text-[#4c566b]'}">${item.isPublic ? '公开' : '私有'}</span><span class="text-xs uppercase tracking-[0.26em] text-[#72809a]">${escapeHtml(formatDate(item.createdAt))}</span></div><div class="mt-2 text-sm leading-7 text-[#172033]">${escapeHtml(item.content || '')}</div></article>`).join('');
-    }
-
-    function renderHistory(items) {
-      const container = document.getElementById('historyList');
-      if (!items || items.length === 0) {
-        container.innerHTML = '<div class="rounded-[1.2rem] border border-dashed border-[rgba(23,32,51,0.14)] bg-white/60 px-4 py-5 text-sm text-[#5f6b80]">暂无操作历史。</div>';
-        return;
-      }
-      container.innerHTML = items.map((item) => `<article class="rounded-[1.2rem] border border-[rgba(23,32,51,0.08)] bg-white/70 p-4"><div class="flex flex-wrap items-center gap-2"><strong class="text-[#172033]">${escapeHtml(item.actionType)}</strong><span class="text-xs uppercase tracking-[0.26em] text-[#72809a]">${escapeHtml(item.performedBy)} · ${escapeHtml(formatDate(item.performedAt))}</span></div><div class="mt-2 text-sm leading-7 text-[#4c566b]">${escapeHtml(JSON.stringify(item.details || {}, null, 0))}</div></article>`).join('');
-    }
-
-    function renderDrawer(detail) {
-      state.activeIssue = detail;
-      document.getElementById('drawerTitle').textContent = detail.trackingCode;
-      document.getElementById('drawerMeta').textContent = `${statusLabels[detail.status] || detail.status} · ${formatDate(detail.updatedAt)}`;
-      document.getElementById('drawerContent').innerHTML = `
-        <section class="space-y-4 rounded-[1.6rem] border border-[rgba(23,32,51,0.08)] bg-white/82 p-5">
-          <div class="flex flex-wrap items-center gap-2">
-            <span class="status-token" data-status="${escapeHtml(detail.status)}">${escapeHtml(statusLabels[detail.status] || detail.status)}</span>
-            <span class="priority-token" data-priority="${escapeHtml(detail.priority)}">${escapeHtml(priorityLabels[detail.priority] || detail.priority)}</span>
-            <span class="category-token">${escapeHtml(categoryLabels[detail.category] || detail.category)}</span>
-          </div>
-          <div class="grid gap-3 text-sm text-[#4c566b] md:grid-cols-2">
-            <div><strong class="text-[#172033]">姓名：</strong>${escapeHtml(detail.name)}</div>
-            <div><strong class="text-[#172033]">学号：</strong>${escapeHtml(detail.studentId)}</div>
-            <div><strong class="text-[#172033]">提交时间：</strong>${escapeHtml(formatDate(detail.createdAt))}</div>
-            <div><strong class="text-[#172033]">首次响应：</strong>${escapeHtml(formatDate(detail.firstResponseAt))}</div>
-            <div><strong class="text-[#172033]">解决时间：</strong>${escapeHtml(formatDate(detail.resolvedAt))}</div>
-            <div><strong class="text-[#172033]">是否公开：</strong>${detail.isPublic ? '是' : '否'}</div>
-          </div>
-          <div class="rounded-[1.3rem] border border-[rgba(23,32,51,0.08)] bg-[rgba(36,87,214,0.05)] px-4 py-4 text-sm leading-7 text-[#172033]">${escapeHtml(detail.content)}</div>
-        </section>
-
-        <section class="space-y-4 rounded-[1.6rem] border border-[rgba(23,32,51,0.08)] bg-white/82 p-5">
-          <div class="flex items-center justify-between">
-            <div><div class="text-xs font-semibold uppercase tracking-[0.3em] text-[#72809a]">Editable Fields</div><h3 class="display-font mt-2 text-2xl">问题编辑</h3></div>
-            <button id="saveIssueButton" class="rounded-full bg-[#2457d6] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#1e47b0]" type="button">保存修改</button>
-          </div>
-          <div id="drawerNotification"></div>
-          <div class="grid gap-4 md:grid-cols-2">
-            <label class="space-y-2 text-sm font-medium text-[#25314a]"><span>状态</span><select id="detailStatus" class="field-shell h-11 w-full rounded-2xl px-4 text-sm">${buildStatusOptions(detail.status)}</select></label>
-            <label class="space-y-2 text-sm font-medium text-[#25314a]"><span>分类</span><select id="detailCategory" class="field-shell h-11 w-full rounded-2xl px-4 text-sm">${Object.entries(categoryLabels).map(([value, label]) => `<option value="${value}" ${detail.category === value ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
-            <label class="space-y-2 text-sm font-medium text-[#25314a]"><span>优先级</span><select id="detailPriority" class="field-shell h-11 w-full rounded-2xl px-4 text-sm">${Object.entries(priorityLabels).map(([value, label]) => `<option value="${value}" ${detail.priority === value ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
-            <label class="space-y-2 text-sm font-medium text-[#25314a]"><span>指派人</span><input id="detailAssignedTo" class="field-shell h-11 w-full rounded-2xl px-4 text-sm" value="${escapeHtml(detail.assignedTo || '')}" placeholder="可留空清除"></label>
-          </div>
-          <label class="space-y-2 text-sm font-medium text-[#25314a]"><span>公开摘要</span><textarea id="detailPublicSummary" class="field-shell min-h-[120px] w-full rounded-[1.4rem] px-4 py-3 text-sm leading-7" maxlength="500" placeholder="可留空清除">${escapeHtml(detail.publicSummary || '')}</textarea></label>
-          <label class="flex items-start gap-3 rounded-[1.4rem] border border-[rgba(23,32,51,0.08)] bg-white/70 px-4 py-3 text-sm leading-6 text-[#445069]"><input id="detailIsPublic" type="checkbox" class="mt-1 h-4 w-4 rounded border-[#b9c3d6] text-[#2457d6] focus:ring-[#2457d6]" ${detail.isPublic ? 'checked' : ''}><span>允许该问题进入首页公开列表。</span></label>
-        </section>
-
-        <section class="space-y-4 rounded-[1.6rem] border border-[rgba(23,32,51,0.08)] bg-white/82 p-5"><div class="text-xs font-semibold uppercase tracking-[0.3em] text-[#72809a]">Updates</div><h3 class="display-font text-2xl">处理时间线</h3><div id="updatesTimeline" class="space-y-5"></div></section>
-        <section class="space-y-4 rounded-[1.6rem] border border-[rgba(23,32,51,0.08)] bg-white/82 p-5"><div class="text-xs font-semibold uppercase tracking-[0.3em] text-[#72809a]">Internal Notes</div><h3 class="display-font text-2xl">内部备注</h3><div id="notesList" class="space-y-3"></div><form id="noteForm" class="space-y-3"><textarea id="noteContent" class="field-shell min-h-[110px] w-full rounded-[1.4rem] px-4 py-3 text-sm leading-7" maxlength="1000" placeholder="记录内部跟进、外部沟通或处理建议"></textarea><button class="rounded-full bg-[#172033] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#0c1424]" type="submit">添加备注</button></form></section>
-        <section class="space-y-4 rounded-[1.6rem] border border-[rgba(23,32,51,0.08)] bg-white/82 p-5"><div class="text-xs font-semibold uppercase tracking-[0.3em] text-[#72809a]">Replies</div><h3 class="display-font text-2xl">公开回复</h3><div id="repliesList" class="space-y-3"></div><form id="replyForm" class="space-y-3"><textarea id="replyContent" class="field-shell min-h-[110px] w-full rounded-[1.4rem] px-4 py-3 text-sm leading-7" maxlength="1000" placeholder="面向提交者和公开页面展示的回复内容"></textarea><label class="flex items-start gap-3 rounded-[1.2rem] border border-[rgba(23,32,51,0.08)] bg-white/70 px-4 py-3 text-sm leading-6 text-[#445069]"><input id="replyIsPublic" type="checkbox" class="mt-1 h-4 w-4 rounded border-[#b9c3d6] text-[#2457d6] focus:ring-[#2457d6]" checked><span>勾选后，这条回复会在追踪页对外可见。</span></label><button class="rounded-full bg-[#2457d6] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#1e47b0]" type="submit">发送回复</button></form></section>
-        <section class="space-y-4 rounded-[1.6rem] border border-[rgba(23,32,51,0.08)] bg-white/82 p-5"><div class="text-xs font-semibold uppercase tracking-[0.3em] text-[#72809a]">Audit Trail</div><h3 class="display-font text-2xl">操作历史</h3><div id="historyList" class="space-y-3"></div></section>
-      `;
-
-      document.getElementById('detailStatus').value = detail.status;
-      document.getElementById('saveIssueButton').addEventListener('click', saveIssueChanges);
-      document.getElementById('noteForm').addEventListener('submit', submitNote);
-      document.getElementById('replyForm').addEventListener('submit', submitReply);
-      renderUpdates(detail.updates);
-      renderNotes(detail.internalNotes);
-      renderReplies(detail.updates.filter((item) => item.type === 'public_reply'));
-      renderHistory(detail.history);
-    }
-
-    async function openDrawer(issueId) {
-      state.activeIssueId = issueId;
-      openDrawerShell();
-      document.getElementById('drawerContent').innerHTML = '<div class="rounded-[1.5rem] border border-dashed border-[rgba(23,32,51,0.16)] bg-white/60 px-5 py-8 text-center text-sm leading-7 text-[#5f6b80]">正在加载问题详情...</div>';
-      try {
-        const detail = await apiFetch(`/admin/issues/${issueId}`);
-        renderDrawer(detail);
-      } catch (error) {
-        document.getElementById('drawerContent').innerHTML = `<div class="rounded-[1.5rem] border border-[rgba(178,58,50,0.2)] bg-[rgba(178,58,50,0.08)] px-5 py-8 text-center text-sm leading-7 text-[#8f2d27]">${escapeHtml(error.message)}</div>`;
-      }
-    }
-
-    async function refreshActiveIssue() {
-      if (!state.activeIssueId) return;
-      const detail = await apiFetch(`/admin/issues/${state.activeIssueId}`);
-      renderDrawer(detail);
-      await loadIssues(state.page);
-    }
-
-    async function saveIssueChanges() {
-      if (!state.activeIssue) return;
-      const patch = {};
-      const status = document.getElementById('detailStatus').value;
-      const category = document.getElementById('detailCategory').value;
-      const priority = document.getElementById('detailPriority').value;
-      const assignedTo = document.getElementById('detailAssignedTo').value.trim() || null;
-      const publicSummary = document.getElementById('detailPublicSummary').value.trim() || null;
-      const isPublic = document.getElementById('detailIsPublic').checked;
-      if (status !== state.activeIssue.status) patch.status = status;
-      if (category !== state.activeIssue.category) patch.category = category;
-      if (priority !== state.activeIssue.priority) patch.priority = priority;
-      if (assignedTo !== (state.activeIssue.assignedTo || null)) patch.assignedTo = assignedTo;
-      if (publicSummary !== (state.activeIssue.publicSummary || null)) patch.publicSummary = publicSummary;
-      if (isPublic !== state.activeIssue.isPublic) patch.isPublic = isPublic;
-      if (Object.keys(patch).length === 0) { setNotification('drawerNotification', '没有需要保存的字段变化。', 'info'); return; }
-      try {
-        await apiFetch(`/admin/issues/${state.activeIssueId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) });
-        setNotification('drawerNotification', '问题信息已更新。', 'success');
-        await refreshActiveIssue();
-      } catch (error) { setNotification('drawerNotification', error.message, 'error'); }
-    }
-
-    async function submitNote(event) {
-      event.preventDefault();
-      const content = document.getElementById('noteContent').value.trim();
-      if (!content) { setNotification('drawerNotification', '备注内容不能为空。', 'error'); return; }
-      try {
-        await apiFetch(`/admin/issues/${state.activeIssueId}/notes`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content }) });
-        document.getElementById('noteContent').value = '';
-        setNotification('drawerNotification', '内部备注已添加。', 'success');
-        await refreshActiveIssue();
-      } catch (error) { setNotification('drawerNotification', error.message, 'error'); }
-    }
-
-    async function submitReply(event) {
-      event.preventDefault();
-      const content = document.getElementById('replyContent').value.trim();
-      const isPublic = document.getElementById('replyIsPublic').checked;
-      if (!content) { setNotification('drawerNotification', '回复内容不能为空。', 'error'); return; }
-      try {
-        await apiFetch(`/admin/issues/${state.activeIssueId}/replies`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content, isPublic }) });
-        document.getElementById('replyContent').value = '';
-        document.getElementById('replyIsPublic').checked = true;
-        setNotification('drawerNotification', '回复已添加。', 'success');
-        await refreshActiveIssue();
-      } catch (error) { setNotification('drawerNotification', error.message, 'error'); }
-    }
-
-    async function login(secretKey) {
-      state.token = secretKey;
-      sessionStorage.setItem(STORAGE_KEY, secretKey);
-      document.getElementById('loginButton').disabled = true;
-      document.getElementById('loginButton').textContent = '验证中...';
-      setNotification('loginNotification', '正在验证并加载列表...', 'info');
-      try {
-        await loadIssues(1);
-        document.getElementById('loginSection').hidden = true;
-        document.getElementById('adminShell').hidden = false;
-        setNotification('adminNotification', '后台数据已加载。', 'success');
-        setNotification('loginNotification', '');
-      } catch (error) {
-        sessionStorage.removeItem(STORAGE_KEY);
-        state.token = null;
-        setNotification('loginNotification', error.message, 'error');
-      } finally {
-        document.getElementById('loginButton').disabled = false;
-        document.getElementById('loginButton').textContent = '登录并加载问题列表';
-      }
-    }
-
-    function logout() {
-      state.token = null;
-      state.activeIssueId = null;
-      state.activeIssue = null;
-      sessionStorage.removeItem(STORAGE_KEY);
-      document.getElementById('secretKey').value = '';
-      document.getElementById('loginSection').hidden = false;
-      document.getElementById('adminShell').hidden = true;
-      setNotification('adminNotification', '');
-      closeDrawer();
-    }
-
-    document.getElementById('loginForm').addEventListener('submit', (event) => {
-      event.preventDefault();
-      const secretKey = document.getElementById('secretKey').value.trim();
-      if (!secretKey) { setNotification('loginNotification', '请输入管理密钥。', 'error'); return; }
-      login(secretKey);
-    });
-    document.getElementById('filterForm').addEventListener('submit', (event) => { event.preventDefault(); loadIssues(1).catch((error) => setNotification('adminNotification', error.message, 'error')); });
-    document.getElementById('resetFilters').addEventListener('click', () => { document.getElementById('filterForm').reset(); loadIssues(1).catch((error) => setNotification('adminNotification', error.message, 'error')); });
-    document.getElementById('refreshButton').addEventListener('click', () => loadIssues(state.page).catch((error) => setNotification('adminNotification', error.message, 'error')));
-    document.getElementById('logoutButton').addEventListener('click', logout);
-    document.getElementById('closeDrawer').addEventListener('click', closeDrawer);
-    document.getElementById('drawerBackdrop').addEventListener('click', closeDrawer);
-    document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && !document.getElementById('issueDrawer').hidden) closeDrawer(); });
-
-    const storedSecret = sessionStorage.getItem(STORAGE_KEY);
-    if (storedSecret) {
-      document.getElementById('secretKey').value = storedSecret;
-      login(storedSecret);
-    }
-  </script>
+  <script type="module" src="/admin-app.js"></script>
 </body>
 </html>
+
+
+
+

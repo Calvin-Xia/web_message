@@ -1,17 +1,35 @@
 import { describe, expect, it } from 'vitest';
-import { canTransitionStatus } from '../src/shared/constants.js';
+import { canTransitionStatus, STATUS_VALUES } from '../src/shared/constants.js';
+
+const allowedTransitions = [
+  ['submitted', 'submitted'],
+  ['submitted', 'in_review'],
+  ['submitted', 'closed'],
+  ['in_review', 'in_review'],
+  ['in_review', 'in_progress'],
+  ['in_review', 'closed'],
+  ['in_progress', 'in_progress'],
+  ['in_progress', 'resolved'],
+  ['in_progress', 'closed'],
+  ['resolved', 'resolved'],
+  ['resolved', 'closed'],
+  ['resolved', 'in_progress'],
+  ['closed', 'closed'],
+];
 
 describe('canTransitionStatus', () => {
-  it('allows documented transitions', () => {
-    expect(canTransitionStatus('submitted', 'in_review')).toBe(true);
-    expect(canTransitionStatus('in_progress', 'resolved')).toBe(true);
-    expect(canTransitionStatus('resolved', 'closed')).toBe(true);
-    expect(canTransitionStatus('resolved', 'in_progress')).toBe(true);
+  it('allows documented transitions and same-state idempotent updates', () => {
+    for (const [fromStatus, toStatus] of allowedTransitions) {
+      expect(canTransitionStatus(fromStatus, toStatus)).toBe(true);
+    }
   });
 
-  it('rejects illegal transitions', () => {
-    expect(canTransitionStatus('submitted', 'resolved')).toBe(false);
-    expect(canTransitionStatus('closed', 'submitted')).toBe(false);
-    expect(canTransitionStatus('in_review', 'resolved')).toBe(false);
+  it('rejects every undocumented transition', () => {
+    for (const fromStatus of STATUS_VALUES) {
+      for (const toStatus of STATUS_VALUES) {
+        const expected = allowedTransitions.some(([from, to]) => from === fromStatus && to === toStatus);
+        expect(canTransitionStatus(fromStatus, toStatus)).toBe(expected);
+      }
+    }
   });
 });

@@ -4,40 +4,9 @@ import { createPagination, mapPublicIssue, recordAdminAction } from '../../src/s
 import { successResponse, errorResponse, createOptionsResponse, createPublicCorsHeaders, methodNotAllowedResponse } from '../../src/shared/response.js';
 import { insertWithUniqueTrackingCode } from '../../src/shared/tracking.js';
 import { publicIssueListQuerySchema, issueSchema, formatZodError } from '../../src/shared/validation.js';
-import { createContainsLikePattern } from '../../src/shared/sql.js';
+import { buildPublicIssueWhere, resolvePublicOrderBy } from '../../src/shared/issueQueries.js';
 
 const ALLOWED_METHODS = 'GET, POST, OPTIONS';
-const PUBLIC_SORT_SQL = {
-  newest: 'created_at DESC, id DESC',
-  oldest: 'created_at ASC, id ASC',
-  updated: 'updated_at DESC, id DESC',
-};
-
-function buildPublicListWhere(filters) {
-  const clauses = ['is_public = 1'];
-  const bindings = [];
-
-  if (filters.status) {
-    clauses.push('status = ?');
-    bindings.push(filters.status);
-  }
-
-  if (filters.category) {
-    clauses.push('category = ?');
-    bindings.push(filters.category);
-  }
-
-  if (filters.q) {
-    clauses.push("(content LIKE ? ESCAPE '\\' OR COALESCE(public_summary, '') LIKE ? ESCAPE '\\')");
-    const keyword = createContainsLikePattern(filters.q);
-    bindings.push(keyword, keyword);
-  }
-
-  return {
-    whereSql: clauses.join(' AND '),
-    bindings,
-  };
-}
 
 export async function onRequest(context) {
   const { request, env } = context;
@@ -64,12 +33,12 @@ export async function onRequest(context) {
         return errorResponse(formatZodError(parsedQuery.error), { status: 400, headers: corsHeaders });
       }
 
-      const { page, pageSize, status, category, q, sort } = parsedQuery.data;
-      const offset = (page - 1) * pageSize;
-      const { whereSql, bindings } = buildPublicListWhere({ status, category, q });
-      const orderBy = PUBLIC_SORT_SQL[sort] || PUBLIC_SORT_SQL.newest;
+      const query = parsedQuery.data;
+      const offset = (query.page - 1) * query.pageSize;
+      const { whereSql, bindings } = buildPublicIssueWhere(query, { tableAlias: 'issues' });
+      const orderBy = resolvePublicOrderBy(query, { tableAlias: 'issues' });
 
-      const totalRow = await env.DB.prepare(`SELECT COUNT(*) AS total FROM issues WHERE ${whereSql}`)
+      const totalRow = await env.DB.prepare(`SELECT COUNT(*) AS total FROM issues ${whereSql}`)
         .bind(...bindings)
         .first();
       const total = Number(totalRow?.total) || 0;
@@ -77,16 +46,16 @@ export async function onRequest(context) {
       const rows = await env.DB.prepare(`
         SELECT tracking_code, content, category, status, priority, public_summary, created_at, updated_at
         FROM issues
-        WHERE ${whereSql}
+        ${whereSql}
         ORDER BY ${orderBy}
         LIMIT ? OFFSET ?
       `)
-        .bind(...bindings, pageSize, offset)
+        .bind(...bindings, query.pageSize, offset)
         .all();
 
       return successResponse({
-        items: rows.results.map(mapPublicIssue),
-        pagination: createPagination(page, pageSize, total),
+        items: (rows.results || []).map(mapPublicIssue),
+        pagination: createPagination(query.page, query.pageSize, total),
       }, {
         headers: {
           ...corsHeaders,

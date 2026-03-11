@@ -1,5 +1,5 @@
 import { checkRateLimit } from '../../../src/shared/rateLimit.js';
-import { getIssueByTrackingCode } from '../../../src/shared/issueData.js';
+import { getIssueByTrackingCode, toBoolean } from '../../../src/shared/issueData.js';
 import { successResponse, errorResponse, createOptionsResponse, createPublicCorsHeaders, methodNotAllowedResponse, notFoundResponse } from '../../../src/shared/response.js';
 import { trackingCodeSchema, formatZodError } from '../../../src/shared/validation.js';
 
@@ -8,7 +8,7 @@ const ALLOWED_METHODS = 'GET, OPTIONS';
 function mapPublicUpdate(row) {
   const update = {
     type: row.update_type,
-    isPublic: Boolean(row.is_public),
+    isPublic: toBoolean(row.is_public),
     createdAt: row.created_at,
   };
 
@@ -75,7 +75,7 @@ export async function onRequest(context) {
     }, {
       headers: {
         ...corsHeaders,
-        'Cache-Control': 'private, max-age=30',
+        'Cache-Control': 'private, no-store',
       },
     });
   } catch (error) {

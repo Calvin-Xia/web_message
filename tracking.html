@@ -194,6 +194,7 @@
       const timer = window.setTimeout(() => controller.abort(), timeout);
       try {
         return await fetch(url, {
+          cache: 'no-store',
           ...options,
           signal: controller.signal,
         });
@@ -309,3 +310,4 @@
   </script>
 </body>
 </html>
+

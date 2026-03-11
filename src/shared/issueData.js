@@ -1,7 +1,7 @@
 import { parseJsonValue } from './utils.js';
 
 export function toBoolean(value) {
-  return Boolean(value);
+  return value === true || value === 1 || value === '1';
 }
 
 export function mapPublicIssue(row) {
@@ -63,6 +63,10 @@ export function mapAdminIssue(row) {
     assignedTo: row.assigned_to,
     firstResponseAt: row.first_response_at,
     resolvedAt: row.resolved_at,
+    hasNotes: toBoolean(row.has_notes),
+    hasReplies: toBoolean(row.has_replies),
+    noteCount: Number(row.note_count) || 0,
+    replyCount: Number(row.reply_count) || 0,
   };
 }
 

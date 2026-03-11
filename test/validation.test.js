@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { issueSchema, adminIssuePatchSchema } from '../src/shared/validation.js';
+import {
+  adminIssueListQuerySchema,
+  adminIssuePatchSchema,
+  adminMetricsQuerySchema,
+  issueSchema,
+} from '../src/shared/validation.js';
 
 describe('issueSchema', () => {
   it('accepts 4, 5 and 13 digit student ids', () => {
@@ -59,5 +64,58 @@ describe('adminIssuePatchSchema', () => {
     expect(result.success).toBe(true);
     expect(result.data.assignedTo).toBeNull();
     expect(result.data.publicSummary).toBeNull();
+  });
+});
+
+describe('adminIssueListQuerySchema', () => {
+  it('parses csv lists, booleans and date filters', () => {
+    const result = adminIssueListQuerySchema.safeParse({
+      status: 'submitted,in_review',
+      category: 'facility,service',
+      priority: 'high,urgent',
+      hasNotes: 'true',
+      hasReplies: 'false',
+      isAssigned: '1',
+      startDate: '2026-03-01',
+      endDate: '2026-03-11',
+      updatedAfter: '2026-03-05',
+      sortField: 'priority',
+      sortOrder: 'asc',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.data.status).toEqual(['submitted', 'in_review']);
+    expect(result.data.category).toEqual(['facility', 'service']);
+    expect(result.data.priority).toEqual(['high', 'urgent']);
+    expect(result.data.hasNotes).toBe(true);
+    expect(result.data.hasReplies).toBe(false);
+    expect(result.data.isAssigned).toBe(true);
+  });
+
+  it('uses normalized validation messages for invalid enum lists', () => {
+    const categoryResult = adminIssueListQuerySchema.safeParse({ category: 'invalid' });
+    const priorityResult = adminIssueListQuerySchema.safeParse({ priority: 'invalid' });
+
+    expect(categoryResult.success).toBe(false);
+    expect(categoryResult.error.issues[0].message).toBe('分类无效');
+    expect(priorityResult.success).toBe(false);
+    expect(priorityResult.error.issues[0].message).toBe('优先级无效');
+  });
+
+  it('rejects inverted date ranges', () => {
+    const result = adminIssueListQuerySchema.safeParse({
+      startDate: '2026-03-11',
+      endDate: '2026-03-01',
+    });
+
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('adminMetricsQuerySchema', () => {
+  it('defaults period to week', () => {
+    const result = adminMetricsQuerySchema.safeParse({});
+    expect(result.success).toBe(true);
+    expect(result.data.period).toBe('week');
   });
 });
