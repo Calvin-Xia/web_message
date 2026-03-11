@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { onRequest } from '../functions/api/health.js';
-import { createRateLimitKv } from './helpers/fakeCloudflare.js';
+import { recordRequestObservation } from '../src/shared/observability.js';
+import { createD1Database, createRateLimitKv } from './helpers/fakeCloudflare.js';
 
 function createDb({ shouldFail = false } = {}) {
   return {
@@ -19,27 +20,32 @@ function createDb({ shouldFail = false } = {}) {
 
 describe('health route', () => {
   it('returns structured health data with metrics and trend history', async () => {
-    const kv = createRateLimitKv({
-      'ops:health:summary': JSON.stringify({
-        buckets: [
-          {
-            timestamp: Date.parse('2026-03-11T12:00:00.000Z'),
-            requestCount: 10,
-            errorCount: 1,
-            rateLimitHits: 2,
-            totalResponseTime: 800,
-          },
-        ],
-        recentErrors: [
-          {
-            timestamp: '2026-03-11T12:01:00.000Z',
-            path: '/api/issues',
-            method: 'POST',
-            status: 500,
-            message: '服务器内部错误',
-          },
-        ],
-      }),
+    const kv = createRateLimitKv();
+    const observationStore = createD1Database();
+    const observationEnv = { OBSERVABILITY_STORE: observationStore };
+
+    await recordRequestObservation(observationEnv, {
+      path: '/api/issues',
+      method: 'POST',
+      status: 500,
+      durationMs: 80,
+      timestamp: Date.now(),
+      message: '数据库错误',
+    });
+    await recordRequestObservation(observationEnv, {
+      path: '/api/issues',
+      method: 'GET',
+      status: 200,
+      durationMs: 720,
+      timestamp: Date.now(),
+    });
+    await recordRequestObservation(observationEnv, {
+      path: '/api/issues',
+      method: 'GET',
+      status: 429,
+      durationMs: 0,
+      timestamp: Date.now(),
+      message: '请求过于频繁，请稍后再试',
     });
 
     const response = await onRequest({
@@ -48,6 +54,7 @@ describe('health route', () => {
         ENVIRONMENT: 'development',
         DB: createDb(),
         RATE_LIMIT_KV: kv,
+        OBSERVABILITY_STORE: observationStore,
       },
       params: {},
     });
@@ -58,10 +65,10 @@ describe('health route', () => {
     expect(payload.data.status).toBe('healthy');
     expect(payload.data.services.d1.status).toBe('connected');
     expect(payload.data.services.kv.status).toBe('connected');
-    expect(payload.data.metrics.requestCount).toBe(10);
-    expect(payload.data.metrics.rateLimitHits).toBe(2);
+    expect(payload.data.metrics.requestCount).toBe(3);
+    expect(payload.data.metrics.rateLimitHits).toBe(1);
     expect(payload.data.trends).toHaveLength(1);
-    expect(payload.data.recentErrors).toHaveLength(1);
+    expect(payload.data.recentErrors).toHaveLength(2);
   });
 
   it('degrades when KV is unavailable and fails when D1 is unavailable', async () => {
@@ -70,6 +77,7 @@ describe('health route', () => {
       env: {
         ENVIRONMENT: 'development',
         DB: createDb(),
+        OBSERVABILITY_STORE: createD1Database(),
       },
       params: {},
     });
@@ -85,6 +93,7 @@ describe('health route', () => {
         ENVIRONMENT: 'development',
         DB: createDb({ shouldFail: true }),
         RATE_LIMIT_KV: createRateLimitKv(),
+        OBSERVABILITY_STORE: createD1Database(),
       },
       params: {},
     });

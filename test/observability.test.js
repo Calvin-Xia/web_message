@@ -1,19 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { loadObservabilitySnapshot, readErrorMessageFromResponse, recordRequestObservation } from '../src/shared/observability.js';
-import { createRateLimitKv } from './helpers/fakeCloudflare.js';
+import { createD1Database } from './helpers/fakeCloudflare.js';
 
 const BUCKET_MS = 5 * 60 * 1000;
-const BASE_TIMESTAMP = Date.parse('2026-03-11T00:00:00.000Z');
+const BASE_TIMESTAMP = Math.floor(Date.now() / BUCKET_MS) * BUCKET_MS - (36 * BUCKET_MS);
 
-function createBucket(offset, overrides = {}) {
-  return {
-    timestamp: BASE_TIMESTAMP + (offset * BUCKET_MS),
-    requestCount: 1,
-    errorCount: 0,
-    rateLimitHits: 0,
-    totalResponseTime: 10,
-    ...overrides,
-  };
+function createBucket(offset) {
+  return BASE_TIMESTAMP + (offset * BUCKET_MS);
 }
 
 describe('observability helpers', () => {
@@ -31,55 +24,56 @@ describe('observability helpers', () => {
   });
 
   it('keeps late-arriving buckets ordered when persisting observations', async () => {
-    const env = {
-      RATE_LIMIT_KV: createRateLimitKv({
-        'ops:health:summary': JSON.stringify({
-          buckets: [createBucket(2), createBucket(4)],
-          recentErrors: [],
-          updatedAt: new Date(BASE_TIMESTAMP).toISOString(),
-        }),
-      }),
-    };
+    const store = createD1Database();
+    const env = { OBSERVABILITY_STORE: store };
 
     await recordRequestObservation(env, {
       path: '/api/issues',
       method: 'GET',
       status: 200,
+      durationMs: 10,
+      timestamp: createBucket(2),
+    });
+    await recordRequestObservation(env, {
+      path: '/api/issues',
+      method: 'GET',
+      status: 200,
+      durationMs: 12,
+      timestamp: createBucket(4),
+    });
+    await recordRequestObservation(env, {
+      path: '/api/issues',
+      method: 'GET',
+      status: 200,
       durationMs: 25,
-      timestamp: BASE_TIMESTAMP + (3 * BUCKET_MS),
+      timestamp: createBucket(3),
     });
 
     const snapshot = await loadObservabilitySnapshot(env);
     expect(snapshot.buckets.map((bucket) => bucket.timestamp)).toEqual([
-      createBucket(2).timestamp,
-      createBucket(3).timestamp,
-      createBucket(4).timestamp,
+      createBucket(2),
+      createBucket(3),
+      createBucket(4),
     ]);
   });
 
   it('prunes the oldest buckets when the retention window is exceeded', async () => {
-    const buckets = Array.from({ length: 36 }, (_, index) => createBucket(index));
-    const env = {
-      RATE_LIMIT_KV: createRateLimitKv({
-        'ops:health:summary': JSON.stringify({
-          buckets,
-          recentErrors: [],
-          updatedAt: new Date(BASE_TIMESTAMP).toISOString(),
-        }),
-      }),
-    };
+    const store = createD1Database();
+    const env = { OBSERVABILITY_STORE: store };
 
-    await recordRequestObservation(env, {
-      path: '/api/issues',
-      method: 'POST',
-      status: 200,
-      durationMs: 30,
-      timestamp: BASE_TIMESTAMP + (36 * BUCKET_MS),
-    });
+    for (let index = 0; index < 37; index += 1) {
+      await recordRequestObservation(env, {
+        path: '/api/issues',
+        method: 'POST',
+        status: 200,
+        durationMs: 30,
+        timestamp: createBucket(index),
+      });
+    }
 
     const snapshot = await loadObservabilitySnapshot(env);
     expect(snapshot.buckets).toHaveLength(36);
-    expect(snapshot.buckets[0].timestamp).toBe(createBucket(1).timestamp);
-    expect(snapshot.buckets.at(-1).timestamp).toBe(createBucket(36).timestamp);
+    expect(snapshot.buckets[0].timestamp).toBe(createBucket(1));
+    expect(snapshot.buckets.at(-1).timestamp).toBe(createBucket(36));
   });
 });

@@ -72,17 +72,18 @@ describe('issueSchema', () => {
 
 describe('statusUpdateSchema', () => {
   it('requires at least one changed field', () => {
-    const result = statusUpdateSchema.safeParse({});
+    const result = statusUpdateSchema.safeParse({ updatedAt: '2026-03-11T00:00:00.000Z' });
     expect(result.success).toBe(false);
   });
 
   it('allows clearing nullable fields and preserves null inputs', () => {
     const blankResult = statusUpdateSchema.safeParse({
+      updatedAt: '2026-03-11T00:00:00.000Z',
       assignedTo: '',
       publicSummary: '',
       isPublic: true,
     });
-    const nullResult = statusUpdateSchema.safeParse({ assignedTo: null });
+    const nullResult = statusUpdateSchema.safeParse({ updatedAt: '2026-03-11T00:00:00.000Z', assignedTo: null });
 
     expect(blankResult.success).toBe(true);
     expect(blankResult.data.assignedTo).toBeNull();
@@ -235,4 +236,6 @@ describe('formatZodError', () => {
     expect(formatZodError({ issues: [] })).toBe('请求参数无效');
   });
 });
+
+
 

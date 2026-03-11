@@ -41,6 +41,64 @@ async function loadIssueDetail(db, issueId) {
   };
 }
 
+function createConditionalAdminActionStatement(db, {
+  issueId,
+  expectedUpdatedAt,
+  actionType,
+  details,
+  performedBy,
+  ipAddress,
+  performedAt,
+}) {
+  return db.prepare(`
+    INSERT INTO admin_actions (
+      action_type, target_type, target_id, details, performed_by, performed_at, ip_address
+    )
+    SELECT ?, ?, id, ?, ?, ?, ?
+    FROM issues
+    WHERE id = ? AND updated_at = ?
+  `)
+    .bind(
+      actionType,
+      'issue',
+      JSON.stringify(details),
+      performedBy,
+      performedAt,
+      ipAddress,
+      issueId,
+      expectedUpdatedAt,
+    );
+}
+
+function createConditionalStatusUpdateStatement(db, {
+  issueId,
+  expectedUpdatedAt,
+  oldValue,
+  newValue,
+  createdBy,
+  createdAt,
+}) {
+  return db.prepare(`
+    INSERT INTO issue_updates (
+      issue_id, update_type, old_value, new_value, content, is_public, created_by, created_at
+    )
+    SELECT id, ?, ?, ?, ?, ?, ?, ?
+    FROM issues
+    WHERE id = ? AND updated_at = ?
+  `)
+    .bind(
+      'status_change',
+      oldValue,
+      newValue,
+      null,
+      1,
+      createdBy,
+      createdAt,
+      issueId,
+      expectedUpdatedAt,
+    );
+}
+
 function logIllegalTransitionAuditFailure(context, error) {
   console.error('Failed to record illegal transition attempt', {
     ...context,
@@ -110,6 +168,7 @@ export async function onRequest(context) {
     const payload = validationResult.data;
     const now = new Date().toISOString();
     const ipAddress = getClientIP(request);
+    const expectedUpdatedAt = payload.updatedAt;
 
     if (payload.status && !canTransitionStatus(existingIssue.status, payload.status)) {
       try {
@@ -205,20 +264,24 @@ export async function onRequest(context) {
     );
 
     const statements = [
-      env.DB.prepare(`UPDATE issues SET ${assignments.join(', ')} WHERE id = ?`)
-        .bind(...bindings, issueId),
+      env.DB.prepare(`UPDATE issues SET ${assignments.join(', ')} WHERE id = ? AND updated_at = ?`)
+        .bind(...bindings, issueId, expectedUpdatedAt),
     ];
 
     if (statusChange) {
       statements.push(
-        env.DB.prepare(`
-          INSERT INTO issue_updates (issue_id, update_type, old_value, new_value, content, is_public, created_by, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        `)
-          .bind(issueId, 'status_change', statusChange.oldValue, statusChange.newValue, null, 1, authResult.actor, now),
-        createAdminActionStatement(env.DB, {
+        createConditionalStatusUpdateStatement(env.DB, {
+          issueId,
+          expectedUpdatedAt: now,
+          oldValue: statusChange.oldValue,
+          newValue: statusChange.newValue,
+          createdBy: authResult.actor,
+          createdAt: now,
+        }),
+        createConditionalAdminActionStatement(env.DB, {
+          issueId,
+          expectedUpdatedAt: now,
           actionType: 'status_update',
-          targetId: issueId,
           details: {
             trackingCode: existingIssue.tracking_code,
             ...statusChange,
@@ -231,9 +294,10 @@ export async function onRequest(context) {
     }
 
     if (Object.keys(nonStatusChanges).length > 0) {
-      statements.push(createAdminActionStatement(env.DB, {
+      statements.push(createConditionalAdminActionStatement(env.DB, {
+        issueId,
+        expectedUpdatedAt: now,
         actionType: 'field_edit',
-        targetId: issueId,
         details: {
           trackingCode: existingIssue.tracking_code,
           changes: nonStatusChanges,
@@ -244,7 +308,18 @@ export async function onRequest(context) {
       }));
     }
 
-    await env.DB.batch(statements);
+    const [updateResult] = await env.DB.batch(statements);
+    if (Number(updateResult?.meta?.changes) !== 1) {
+      const latestIssue = await getIssueById(env.DB, issueId);
+      if (!latestIssue) {
+        return notFoundResponse('问题不存在', authResult.corsHeaders);
+      }
+
+      return errorResponse('问题已被其他管理员更新，请刷新后重试', {
+        status: 409,
+        headers: authResult.corsHeaders,
+      });
+    }
 
     return successResponse({
       id: issueId,

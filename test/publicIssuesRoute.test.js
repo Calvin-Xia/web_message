@@ -1,15 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createAppEnv, createD1Database } from './helpers/fakeCloudflare.js';
 import { onRequest } from '../functions/api/issues.js';
-
-function createRateLimitKv() {
-  return {
-    async get() {
-      return null;
-    },
-    async put() {},
-    async delete() {},
-  };
-}
 
 function createDbMock() {
   let index = 0;
@@ -49,13 +40,28 @@ function createDbMock() {
   };
 }
 
+function createIssuePayload() {
+  return {
+    name: '测试用户',
+    studentId: '2024001001001',
+    category: 'facility',
+    content: '测试内容已经超过十个字符，用于验证公开提交流程。',
+    isPublic: true,
+    isReported: false,
+  };
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 describe('public issues route', () => {
   it('returns public fields only', async () => {
     const response = await onRequest({
       request: new Request('http://localhost/api/issues?page=1&pageSize=20'),
       env: {
         ENVIRONMENT: 'development',
-        RATE_LIMIT_KV: createRateLimitKv(),
+        RATE_LIMIT_STORE: createD1Database(),
         DB: createDbMock(),
       },
       params: {},
@@ -66,5 +72,46 @@ describe('public issues route', () => {
     expect(payload.success).toBe(true);
     expect(payload.data.items[0]).not.toHaveProperty('name');
     expect(payload.data.items[0]).not.toHaveProperty('studentId');
+  });
+
+  it('rolls back the issue insert when a later submit write fails', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const env = createAppEnv();
+    const originalPrepare = env.DB.prepare.bind(env.DB);
+    env.DB.prepare = (sql) => {
+      if (sql.includes('INSERT INTO issue_updates') && sql.includes('SELECT id')) {
+        return {
+          bind() {
+            return {
+              run: async () => {
+                throw new Error('issue update insert failed');
+              },
+            };
+          },
+        };
+      }
+
+      return originalPrepare(sql);
+    };
+
+    const response = await onRequest({
+      request: new Request('http://localhost/api/issues', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(createIssuePayload()),
+      }),
+      env,
+      params: {},
+    });
+    const payload = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(payload.success).toBe(false);
+    expect(env.DB.issues).toHaveLength(0);
+    expect(env.DB.issueUpdates).toHaveLength(0);
+    expect(env.DB.adminActions).toHaveLength(0);
   });
 });

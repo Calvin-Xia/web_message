@@ -13,7 +13,6 @@ export const ALERT_RULES = {
   },
 };
 
-const OBSERVABILITY_KEY = 'ops:health:summary';
 const METRIC_BUCKET_MS = 5 * 60 * 1000;
 const MAX_BUCKETS = 36;
 const MAX_ERROR_LOGS = 12;
@@ -25,6 +24,10 @@ function createEmptySnapshot() {
     recentErrors: [],
     updatedAt: null,
   };
+}
+
+function getObservationStore(env) {
+  return env.OBSERVABILITY_STORE ?? env.DB ?? null;
 }
 
 function toBucketTimestamp(timestamp = Date.now()) {
@@ -126,43 +129,76 @@ function normalizeErrorLog(log) {
   };
 }
 
-function parseSnapshot(value) {
-  if (!value) {
-    return createEmptySnapshot();
-  }
+async function loadSnapshotFromD1(store) {
+  const bucketCutoff = toBucketTimestamp(Date.now() - ((MAX_BUCKETS - 1) * METRIC_BUCKET_MS));
 
-  try {
-    const parsed = JSON.parse(value);
-    return {
-      buckets: normalizeBuckets(parsed?.buckets),
-      recentErrors: Array.isArray(parsed?.recentErrors)
-        ? parsed.recentErrors.map(normalizeErrorLog).filter(Boolean).slice(0, MAX_ERROR_LOGS)
-        : [],
-      updatedAt: typeof parsed?.updatedAt === 'string' ? parsed.updatedAt : null,
-    };
-  } catch {
-    return createEmptySnapshot();
-  }
-}
+  const [bucketRows, recentErrorRows] = await Promise.all([
+    store.prepare(`
+      SELECT
+        bucket_timestamp AS timestamp,
+        COUNT(*) AS requestCount,
+        SUM(CASE WHEN status >= 500 THEN 1 ELSE 0 END) AS errorCount,
+        SUM(CASE WHEN status = 429 THEN 1 ELSE 0 END) AS rateLimitHits,
+        SUM(duration_ms) AS totalResponseTime
+      FROM request_observations
+      WHERE bucket_timestamp >= ?
+      GROUP BY bucket_timestamp
+      ORDER BY bucket_timestamp ASC
+    `)
+      .bind(bucketCutoff)
+      .all(),
+    store.prepare(`
+      SELECT observed_at, path, method, status, sanitized_message
+      FROM request_observations
+      WHERE status >= 400
+      ORDER BY observed_at DESC, id DESC
+      LIMIT ?
+    `)
+      .bind(MAX_ERROR_LOGS)
+      .all(),
+  ]);
 
-async function persistSnapshot(env, snapshot) {
-  if (!env.RATE_LIMIT_KV) {
-    return;
-  }
+  const buckets = normalizeBuckets((bucketRows.results || []).map((row) => ({
+    timestamp: row.timestamp,
+    requestCount: row.requestCount,
+    errorCount: row.errorCount,
+    rateLimitHits: row.rateLimitHits,
+    totalResponseTime: row.totalResponseTime,
+  })));
 
-  await env.RATE_LIMIT_KV.put(OBSERVABILITY_KEY, JSON.stringify(snapshot), {
-    expirationTtl: SNAPSHOT_TTL_SECONDS,
-  });
+  const recentErrors = (recentErrorRows.results || [])
+    .map((row) => normalizeErrorLog({
+      timestamp: toIsoString(Number(row.observed_at) || Date.now()),
+      path: row.path,
+      method: row.method,
+      status: row.status,
+      message: row.sanitized_message,
+    }))
+    .filter(Boolean)
+    .slice(0, MAX_ERROR_LOGS);
+
+  const latestBucketTimestamp = buckets.length > 0 ? buckets[buckets.length - 1].timestamp : null;
+  const latestErrorTimestamp = recentErrors.length > 0 ? Date.parse(recentErrors[0].timestamp) : null;
+  const latestTimestamp = Math.max(
+    Number.isFinite(latestBucketTimestamp) ? latestBucketTimestamp : 0,
+    Number.isFinite(latestErrorTimestamp) ? latestErrorTimestamp : 0,
+  );
+
+  return {
+    buckets,
+    recentErrors,
+    updatedAt: latestTimestamp > 0 ? toIsoString(latestTimestamp) : null,
+  };
 }
 
 export async function loadObservabilitySnapshot(env) {
-  if (!env.RATE_LIMIT_KV) {
+  const store = getObservationStore(env);
+  if (!store?.prepare) {
     return createEmptySnapshot();
   }
 
   try {
-    const raw = await env.RATE_LIMIT_KV.get(OBSERVABILITY_KEY);
-    return parseSnapshot(raw);
+    return await loadSnapshotFromD1(store);
   } catch (error) {
     console.error('Failed to load observability snapshot:', error);
     return createEmptySnapshot();
@@ -213,52 +249,37 @@ export async function recordRequestObservation(env, {
   timestamp = Date.now(),
   message = null,
 }) {
-  if (!env.RATE_LIMIT_KV) {
+  const store = getObservationStore(env);
+  if (!store?.prepare) {
     return;
   }
 
+  const observedAt = Math.max(0, Math.trunc(Number(timestamp) || Date.now()));
+  const normalizedStatus = Math.max(0, Math.trunc(Number(status) || 0));
+  const normalizedDuration = Math.max(0, Math.round(Number(durationMs) || 0));
+  const createdAt = toIsoString(observedAt);
+  const retentionCutoff = observedAt - (SNAPSHOT_TTL_SECONDS * 1000);
+
   try {
-    const snapshot = await loadObservabilitySnapshot(env);
-    const bucketTimestamp = toBucketTimestamp(timestamp);
-    let bucket = snapshot.buckets.find((entry) => entry.timestamp === bucketTimestamp);
-
-    if (!bucket) {
-      bucket = {
-        timestamp: bucketTimestamp,
-        requestCount: 0,
-        errorCount: 0,
-        rateLimitHits: 0,
-        totalResponseTime: 0,
-      };
-      upsertBucket(snapshot.buckets, bucket);
-    }
-
-    bucket.requestCount += 1;
-    bucket.totalResponseTime += Math.max(0, Math.round(Number(durationMs) || 0));
-
-    if (status >= 500) {
-      bucket.errorCount += 1;
-    }
-
-    if (status === 429) {
-      bucket.rateLimitHits += 1;
-    }
-
-    trimBuckets(snapshot.buckets);
-    snapshot.updatedAt = toIsoString(timestamp);
-
-    if (status >= 400) {
-      snapshot.recentErrors.unshift({
-        timestamp: snapshot.updatedAt,
-        path,
-        method,
-        status,
-        message: sanitizeErrorMessage(message, status),
-      });
-      snapshot.recentErrors = snapshot.recentErrors.slice(0, MAX_ERROR_LOGS);
-    }
-
-    await persistSnapshot(env, snapshot);
+    await store.batch([
+      store.prepare(`
+        INSERT INTO request_observations (
+          bucket_timestamp, observed_at, path, method, status, duration_ms, sanitized_message, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `)
+        .bind(
+          toBucketTimestamp(observedAt),
+          observedAt,
+          typeof path === 'string' ? path : '/api/unknown',
+          typeof method === 'string' ? method : 'GET',
+          normalizedStatus,
+          normalizedDuration,
+          normalizedStatus >= 400 ? sanitizeErrorMessage(message, normalizedStatus) : null,
+          createdAt,
+        ),
+      store.prepare('DELETE FROM request_observations WHERE observed_at < ?')
+        .bind(retentionCutoff),
+    ]);
   } catch (error) {
     console.error('Failed to record observability event:', error);
   }

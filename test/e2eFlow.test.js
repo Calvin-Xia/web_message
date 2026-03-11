@@ -80,6 +80,7 @@ describe('end-to-end flows', () => {
         assignedTo: 'admin1',
         publicSummary: '已开始人工核实。',
         isPublic: true,
+        updatedAt: env.DB.issues[0].updated_at,
       }, authHeaders),
       env,
       params: { id: String(issueId) },
@@ -151,3 +152,4 @@ describe('end-to-end flows', () => {
     expect(env.DB.adminActions.some((item) => item.action_type === 'issues_exported')).toBe(true);
   });
 });
+

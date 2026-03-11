@@ -1,25 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { checkRateLimit } from '../src/shared/rateLimit.js';
-
-function createKvStore(initial = {}) {
-  const store = new Map(Object.entries(initial));
-  return {
-    store,
-    async get(key) {
-      return store.has(key) ? store.get(key) : null;
-    },
-    async put(key, value) {
-      store.set(key, value);
-    },
-    async delete(key) {
-      store.delete(key);
-    },
-  };
-}
+import { createD1Database } from './helpers/fakeCloudflare.js';
 
 describe('checkRateLimit', () => {
   it('returns a 429 response once the threshold is exceeded', async () => {
-    const kv = createKvStore({ 'ratelimit:postIssue:127.0.0.1:count': '10' });
+    const db = createD1Database();
     const request = new Request('http://localhost/api/issues', {
       method: 'POST',
       headers: {
@@ -27,7 +12,11 @@ describe('checkRateLimit', () => {
       },
     });
 
-    const response = await checkRateLimit({ RATE_LIMIT_KV: kv }, request, 'postIssue', {});
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      await expect(checkRateLimit({ RATE_LIMIT_STORE: db }, request, 'postIssue', {})).resolves.toBeNull();
+    }
+
+    const response = await checkRateLimit({ RATE_LIMIT_STORE: db }, request, 'postIssue', {});
     const payload = await response.json();
 
     expect(response.status).toBe(429);
@@ -36,7 +25,7 @@ describe('checkRateLimit', () => {
   });
 
   it('increments the current window counter when under the threshold', async () => {
-    const kv = createKvStore();
+    const db = createD1Database();
     const request = new Request('http://localhost/api/issues', {
       method: 'GET',
       headers: {
@@ -44,9 +33,10 @@ describe('checkRateLimit', () => {
       },
     });
 
-    const response = await checkRateLimit({ RATE_LIMIT_KV: kv }, request, 'getIssues', {});
+    const response = await checkRateLimit({ RATE_LIMIT_STORE: db }, request, 'getIssues', {});
 
     expect(response).toBeNull();
-    expect(kv.store.get('ratelimit:getIssues:127.0.0.1:count')).toBe('1');
+    expect(db.rateLimitState[0].request_count).toBe(1);
+    expect(db.rateLimitState[0].endpoint).toBe('getIssues');
   });
 });

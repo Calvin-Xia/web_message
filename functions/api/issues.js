@@ -1,12 +1,37 @@
 import { checkRateLimit, getClientIP } from '../../src/shared/rateLimit.js';
 import { parseJsonBody } from '../../src/shared/request.js';
-import { createPagination, mapPublicIssue, recordAdminAction } from '../../src/shared/issueData.js';
+import { createPagination, mapPublicIssue } from '../../src/shared/issueData.js';
 import { successResponse, errorResponse, createOptionsResponse, createPublicCorsHeaders, methodNotAllowedResponse } from '../../src/shared/response.js';
 import { insertWithUniqueTrackingCode } from '../../src/shared/tracking.js';
 import { publicIssueListQuerySchema, issueSchema, formatZodError } from '../../src/shared/validation.js';
 import { buildPublicIssueWhere, resolvePublicOrderBy } from '../../src/shared/issueQueries.js';
 
 const ALLOWED_METHODS = 'GET, POST, OPTIONS';
+
+function createIssueCreatedAuditStatement(db, trackingCode, payload, request, createdAt) {
+  return db.prepare(`
+    INSERT INTO admin_actions (
+      action_type, target_type, target_id, details, performed_by, performed_at, ip_address
+    )
+    SELECT ?, ?, id, ?, ?, ?, ?
+    FROM issues
+    WHERE tracking_code = ?
+  `)
+    .bind(
+      'issue_created',
+      'issue',
+      JSON.stringify({
+        trackingCode,
+        category: payload.category,
+        isPublic: payload.isPublic,
+        isReported: payload.isReported,
+      }),
+      'system',
+      createdAt,
+      getClientIP(request),
+      trackingCode,
+    );
+}
 
 export async function onRequest(context) {
   const { request, env } = context;
@@ -81,52 +106,40 @@ export async function onRequest(context) {
 
     const payload = validationResult.data;
     const now = new Date().toISOString();
-    const { trackingCode, result: insertResult } = await insertWithUniqueTrackingCode((nextTrackingCode) => (
-      env.DB.prepare(`
-        INSERT INTO issues (
-          tracking_code, name, student_id, content, is_public, is_reported,
-          category, priority, status, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `)
-        .bind(
-          nextTrackingCode,
-          payload.name,
-          payload.studentId,
-          payload.content,
-          payload.isPublic ? 1 : 0,
-          payload.isReported ? 1 : 0,
-          payload.category,
-          'normal',
-          'submitted',
-          now,
-          now,
-        )
-        .run()
+
+    const { trackingCode } = await insertWithUniqueTrackingCode((nextTrackingCode) => (
+      env.DB.batch([
+        env.DB.prepare(`
+          INSERT INTO issues (
+            tracking_code, name, student_id, content, is_public, is_reported,
+            category, priority, status, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `)
+          .bind(
+            nextTrackingCode,
+            payload.name,
+            payload.studentId,
+            payload.content,
+            payload.isPublic ? 1 : 0,
+            payload.isReported ? 1 : 0,
+            payload.category,
+            'normal',
+            'submitted',
+            now,
+            now,
+          ),
+        env.DB.prepare(`
+          INSERT INTO issue_updates (
+            issue_id, update_type, old_value, new_value, content, is_public, created_by, created_at
+          )
+          SELECT id, ?, ?, ?, ?, ?, ?, ?
+          FROM issues
+          WHERE tracking_code = ?
+        `)
+          .bind('status_change', null, 'submitted', null, 0, 'system', now, nextTrackingCode),
+        createIssueCreatedAuditStatement(env.DB, nextTrackingCode, payload, request, now),
+      ])
     ));
-
-    const issueId = Number(insertResult.meta?.last_row_id);
-
-    await env.DB.prepare(`
-      INSERT INTO issue_updates (
-        issue_id, update_type, old_value, new_value, content, is_public, created_by, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `)
-      .bind(issueId, 'status_change', null, 'submitted', null, 0, 'system', now)
-      .run();
-
-    await recordAdminAction(env.DB, {
-      actionType: 'issue_created',
-      targetId: issueId,
-      details: {
-        trackingCode,
-        category: payload.category,
-        isPublic: payload.isPublic,
-        isReported: payload.isReported,
-      },
-      performedBy: 'system',
-      ipAddress: getClientIP(request),
-      performedAt: now,
-    });
 
     return successResponse({
       trackingCode,

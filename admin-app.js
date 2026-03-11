@@ -859,6 +859,8 @@ async function saveIssueChanges() {
     return;
   }
 
+  patch.updatedAt = state.activeIssue.updatedAt;
+
   try {
     await apiFetch(`/admin/issues/${state.activeIssueId}`, {
       method: 'PATCH',
@@ -1083,5 +1085,6 @@ if (storedSecret) {
   document.getElementById('secretKey').value = storedSecret;
   login(storedSecret);
 }
+
 
 

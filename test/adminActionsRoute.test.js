@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { createD1Database } from './helpers/fakeCloudflare.js';
 import { onRequest } from '../functions/api/admin/actions.js';
 
 function createRateLimitKv() {
@@ -58,7 +59,7 @@ describe('admin actions route', () => {
       env: {
         ADMIN_SECRET_KEY: 'test-secret',
         ENVIRONMENT: 'development',
-        RATE_LIMIT_KV: createRateLimitKv(),
+        RATE_LIMIT_STORE: createD1Database(),
         DB: db,
       },
       params: {},
@@ -71,3 +72,4 @@ describe('admin actions route', () => {
     expect(payload.data.items[0].actionType).toBe('reply_added');
   });
 });
+

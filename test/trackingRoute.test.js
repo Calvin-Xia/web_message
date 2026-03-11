@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { createD1Database } from './helpers/fakeCloudflare.js';
 import { onRequest } from '../functions/api/issues/[trackingCode].js';
 
 function createRateLimitKv() {
@@ -62,7 +63,7 @@ describe('tracking route', () => {
       request,
       env: {
         ENVIRONMENT: 'development',
-        RATE_LIMIT_KV: createRateLimitKv(),
+        RATE_LIMIT_STORE: createD1Database(),
         DB: db,
       },
       params: {
@@ -77,3 +78,4 @@ describe('tracking route', () => {
     expect(payload.data.updates[0].isPublic).toBe(false);
   });
 });
+

@@ -98,6 +98,10 @@ function validateDateRange(value, ctx) {
   }
 }
 
+function isValidTimestamp(value) {
+  return typeof value === 'string' && value.trim() !== '' && !Number.isNaN(Date.parse(value));
+}
+
 const paginationSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
@@ -151,6 +155,7 @@ export const adminIssueListQuerySchema = paginationSchema.extend({
 export const issueIdSchema = z.coerce.number().int().positive('问题 ID 无效');
 
 export const adminIssuePatchSchema = z.object({
+  updatedAt: z.string().trim().refine(isValidTimestamp, '更新时间格式无效'),
   category: z.preprocess(emptyToUndefined, z.enum(CATEGORY_VALUES).optional()),
   priority: z.preprocess(emptyToUndefined, z.enum(PRIORITY_VALUES).optional()),
   status: z.preprocess(emptyToUndefined, z.enum(STATUS_VALUES).optional()),
@@ -163,7 +168,7 @@ export const adminIssuePatchSchema = z.object({
     z.null(),
   ]).optional()),
   isPublic: z.boolean().optional(),
-}).strict().refine((value) => Object.keys(value).length > 0, {
+}).strict().refine((value) => Object.keys(value).some((key) => key !== 'updatedAt'), {
   message: '至少提供一个更新字段',
 });
 

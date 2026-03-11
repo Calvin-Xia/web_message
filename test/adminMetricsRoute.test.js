@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { createD1Database } from './helpers/fakeCloudflare.js';
 import { onRequest } from '../functions/api/admin/metrics.js';
 
 function createRateLimitKv() {
@@ -135,7 +136,7 @@ describe('admin metrics route', () => {
       env: {
         ADMIN_SECRET_KEY: 'test-secret',
         ENVIRONMENT: 'development',
-        RATE_LIMIT_KV: createRateLimitKv(),
+        RATE_LIMIT_STORE: createD1Database(),
         DB: db,
       },
       params: {},
@@ -151,5 +152,6 @@ describe('admin metrics route', () => {
     expect(payload.data.performance.firstResponseTime.p50).toBe(60);
   });
 });
+
 
 

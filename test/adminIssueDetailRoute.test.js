@@ -1,16 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { onRequest } from '../functions/api/admin/issues/[id].js';
+import { createD1Database } from './helpers/fakeCloudflare.js';
 
-function createRateLimitKv() {
-  return {
-    get: async () => null,
-    put: async () => undefined,
-    delete: async () => undefined,
-  };
-}
-
-function createDbMock(results) {
+function createDbMock(results, { batchResults = [] } = {}) {
   let index = 0;
+  let batchIndex = 0;
   return {
     prepare() {
       const result = results[index] || {};
@@ -29,6 +23,9 @@ function createDbMock(results) {
           };
         },
       };
+    },
+    async batch() {
+      return batchResults[batchIndex++] ?? [{ meta: { changes: 1 } }];
     },
   };
 }
@@ -51,6 +48,7 @@ describe('admin issue detail route', () => {
           assigned_to: null,
           public_summary: null,
           is_public: '0',
+          updated_at: '2026-03-11T00:00:00.000Z',
         },
       },
       {
@@ -63,7 +61,7 @@ describe('admin issue detail route', () => {
         Authorization: 'Bearer test-secret',
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ status: 'resolved' }),
+      body: JSON.stringify({ status: 'resolved', updatedAt: '2026-03-11T00:00:00.000Z' }),
     });
 
     const response = await onRequest({
@@ -71,7 +69,7 @@ describe('admin issue detail route', () => {
       env: {
         ADMIN_SECRET_KEY: 'test-secret',
         ENVIRONMENT: 'development',
-        RATE_LIMIT_KV: createRateLimitKv(),
+        RATE_LIMIT_STORE: createD1Database(),
         DB: db,
       },
       params: {
@@ -92,4 +90,68 @@ describe('admin issue detail route', () => {
       errorMessage: 'audit write failed',
     }));
   });
+
+  it('returns 409 when the issue has been modified since the client loaded it', async () => {
+    const db = createDbMock([
+      {
+        first: {
+          id: 1,
+          tracking_code: 'ABCD23EF',
+          status: 'submitted',
+          category: 'facility',
+          priority: 'normal',
+          assigned_to: null,
+          public_summary: null,
+          is_public: '0',
+          first_response_at: null,
+          updated_at: '2026-03-11T00:00:00.000Z',
+        },
+      },
+      {},
+      {},
+      {},
+      {
+        first: {
+          id: 1,
+          tracking_code: 'ABCD23EF',
+          status: 'in_review',
+          category: 'facility',
+          priority: 'high',
+          assigned_to: 'admin2',
+          public_summary: '已被他人修改',
+          is_public: '1',
+          first_response_at: '2026-03-11T00:05:00.000Z',
+          updated_at: '2026-03-11T00:06:00.000Z',
+        },
+      },
+    ], {
+      batchResults: [[{ meta: { changes: 0 } }]],
+    });
+
+    const response = await onRequest({
+      request: new Request('http://localhost/api/admin/issues/1', {
+        method: 'PATCH',
+        headers: {
+          Authorization: 'Bearer test-secret',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          status: 'in_review',
+          updatedAt: '2026-03-11T00:00:00.000Z',
+        }),
+      }),
+      env: {
+        ADMIN_SECRET_KEY: 'test-secret',
+        ENVIRONMENT: 'development',
+        RATE_LIMIT_STORE: createD1Database(),
+        DB: db,
+      },
+      params: { id: '1' },
+    });
+    const payload = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(payload.error).toBe('问题已被其他管理员更新，请刷新后重试');
+  });
 });
+
