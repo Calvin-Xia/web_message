@@ -13,3 +13,6 @@ output/
 REPO_PRD.md
 
 diff.txt
+diff_output.txt
+coverage/
+temp-validation-coverage/

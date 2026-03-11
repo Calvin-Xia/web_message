@@ -1,3 +1,4 @@
+export const APP_VERSION = '3.0.0';
 export const STATUS_VALUES = ['submitted', 'in_review', 'in_progress', 'resolved', 'closed'];
 export const PRIORITY_VALUES = ['low', 'normal', 'high', 'urgent'];
 export const CATEGORY_VALUES = ['academic', 'facility', 'service', 'complaint', 'counseling', 'other'];

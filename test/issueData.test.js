@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mapAdminIssue, toBoolean } from '../src/shared/issueData.js';
+import { mapAdminIssue, mapPublicIssue, toBoolean } from '../src/shared/issueData.js';
 
 describe('toBoolean', () => {
   it('treats 1 and true as true, and 0 string as false', () => {
@@ -8,6 +8,36 @@ describe('toBoolean', () => {
     expect(toBoolean('1')).toBe(true);
     expect(toBoolean(0)).toBe(false);
     expect(toBoolean('0')).toBe(false);
+  });
+});
+
+describe('mapPublicIssue', () => {
+  it('returns only whitelisted public fields', () => {
+    const result = mapPublicIssue({
+      tracking_code: 'ABCD23EF',
+      content: '测试内容',
+      category: 'facility',
+      status: 'submitted',
+      priority: 'high',
+      public_summary: '公开摘要',
+      created_at: '2026-03-11T00:00:00.000Z',
+      updated_at: '2026-03-11T01:00:00.000Z',
+      name: '张三',
+      student_id: '12345',
+    });
+
+    expect(result).toEqual({
+      trackingCode: 'ABCD23EF',
+      content: '测试内容',
+      category: 'facility',
+      status: 'submitted',
+      priority: 'high',
+      publicSummary: '公开摘要',
+      createdAt: '2026-03-11T00:00:00.000Z',
+      updatedAt: '2026-03-11T01:00:00.000Z',
+    });
+    expect(result).not.toHaveProperty('name');
+    expect(result).not.toHaveProperty('studentId');
   });
 });
 

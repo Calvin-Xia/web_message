@@ -167,6 +167,8 @@ export const adminIssuePatchSchema = z.object({
   message: '至少提供一个更新字段',
 });
 
+export const statusUpdateSchema = adminIssuePatchSchema;
+
 export const noteSchema = z.object({
   content: z.string().trim().min(1, '备注内容不能为空').max(1000, '备注内容不能超过1000个字符'),
 }).strict();

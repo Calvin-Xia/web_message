@@ -1,10 +1,11 @@
-# Admin Secret Key Configuration
-# Copy this file to .dev.vars and set your actual secret key
-# DO NOT commit .dev.vars to version control!
-#
-# Quote the value if it contains #, &, $, or spaces so dotenv-style parsing keeps the full string.
-# Example: ADMIN_SECRET_KEY="your-secret-key-here-change-me"
+# Local development variables for Cloudflare Pages / Wrangler
+# Copy this file to .dev.vars and fill in the real values.
+# Do not commit .dev.vars.
 
-# Admin secret key for backend authentication
-# Must be at least 32 characters for security
+# Shared admin bearer secret.
+# Quote the value if it contains #, &, $, or spaces.
 ADMIN_SECRET_KEY="your-secret-key-here-change-me"
+
+# Optional explicit environment label for local development.
+# The repository defaults to local in wrangler.toml, but keeping it here helps when debugging.
+ENVIRONMENT="local"

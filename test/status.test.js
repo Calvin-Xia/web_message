@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canTransitionStatus, STATUS_VALUES } from '../src/shared/constants.js';
+import { canTransitionStatus, getAllowedTransitionStatuses, STATUS_VALUES } from '../src/shared/constants.js';
 
 const allowedTransitions = [
   ['submitted', 'submitted'],
@@ -31,5 +31,13 @@ describe('canTransitionStatus', () => {
         expect(canTransitionStatus(fromStatus, toStatus)).toBe(expected);
       }
     }
+  });
+});
+
+describe('getAllowedTransitionStatuses', () => {
+  it('returns the configured follow-up states and can include the current one', () => {
+    expect(getAllowedTransitionStatuses('submitted')).toEqual(['in_review', 'closed']);
+    expect(getAllowedTransitionStatuses('resolved', { includeCurrent: true })).toEqual(['resolved', 'closed', 'in_progress']);
+    expect(getAllowedTransitionStatuses('unknown')).toEqual([]);
   });
 });
