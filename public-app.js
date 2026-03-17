@@ -305,6 +305,7 @@ function renderPublicList(items, pagination) {
 
   list.innerHTML = items.map((item) => {
     const summary = item.publicSummary || item.content;
+    const trackingHref = `/tracking.html?code=${encodeURIComponent(item.trackingCode)}`;
     return `
       <article class="public-card interactive-card rounded-[1.6rem] p-5 md:p-6">
         <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
@@ -322,6 +323,8 @@ function renderPublicList(items, pagination) {
           <div class="min-w-[180px] rounded-[1.4rem] border border-[rgba(23,32,51,0.08)] bg-white/75 px-4 py-3 text-sm text-[#4c566b]">
             <div><strong class="text-[#172033]">提交：</strong>${escapeHtml(formatDate(item.createdAt))}</div>
             <div class="mt-2"><strong class="text-[#172033]">更新：</strong>${escapeHtml(formatDate(item.updatedAt))}</div>
+            <a class="ghost-button mt-4 w-full rounded-full px-4 py-2 text-sm font-semibold text-[#172033] transition" href="${trackingHref}" aria-label="查看问题 ${escapeHtml(item.trackingCode)} 的处理进度">查看处理进度</a>
+            <div class="mt-2 text-xs leading-5 text-[#72809a]">将自动带入追踪编号并查询公开处理记录。</div>
           </div>
         </div>
       </article>

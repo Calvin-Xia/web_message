@@ -226,6 +226,10 @@
 
     function renderResult(data) {
       const timeline = buildTimeline(data);
+      const publicReplies = (data.updates || [])
+        .filter((item) => item.type === 'public_reply')
+        .slice()
+        .sort((left, right) => Date.parse(right.createdAt || 0) - Date.parse(left.createdAt || 0));
       document.getElementById('resultState').setAttribute('aria-busy', 'false');
       document.getElementById('resultState').innerHTML = `
         <div class="grid gap-6 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
@@ -240,6 +244,22 @@
             <div class="mt-5 rounded-[1.4rem] border border-[rgba(23,32,51,0.08)] bg-[rgba(36,87,214,0.05)] p-4 text-sm leading-7 text-[#445069]">
               <div class="text-xs font-semibold uppercase tracking-[0.28em] text-[#72809a]">公开摘要</div>
               <div class="mt-2">${escapeHtml(data.publicSummary || '后台尚未填写公开摘要。')}</div>
+            </div>
+            <div class="mt-5 rounded-[1.4rem] border border-[rgba(23,32,51,0.08)] bg-white/72 p-4 text-sm leading-7 text-[#445069]">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <div class="text-xs font-semibold uppercase tracking-[0.28em] text-[#72809a]">公开回复汇总</div>
+                <div class="text-xs text-[#72809a]">${publicReplies.length > 0 ? `共 ${publicReplies.length} 条` : '暂无公开回复'}</div>
+              </div>
+              <div class="mt-3 space-y-3">
+                ${publicReplies.length > 0
+                  ? publicReplies.map((item) => `
+                    <article class="rounded-[1.2rem] border border-[rgba(23,32,51,0.08)] bg-[rgba(248,243,234,0.78)] px-4 py-3">
+                      <div class="text-xs font-semibold uppercase tracking-[0.24em] text-[#72809a]">${escapeHtml(formatDate(item.createdAt))}</div>
+                      <div class="mt-2 text-sm leading-7 text-[#172033]">${escapeHtml(item.content || '暂无内容')}</div>
+                    </article>
+                  `).join('')
+                  : '<div class="rounded-[1.2rem] border border-dashed border-[rgba(23,32,51,0.14)] bg-white/60 px-4 py-3 text-sm leading-6 text-[#5f6b80]">暂时还没有公开回复，可先查看右侧时间线了解状态变化。</div>'}
+              </div>
             </div>
             <div class="mt-5 grid gap-3 text-sm text-[#4c566b] sm:grid-cols-2">
               <div class="rounded-[1.2rem] border border-[rgba(23,32,51,0.08)] bg-white/70 px-4 py-3">

@@ -836,9 +836,9 @@ function renderDrawer(detail) {
     </section>
 
     <section class="space-y-4 rounded-[1.6rem] border border-[rgba(23,32,51,0.08)] bg-white/82 p-5">
-      <div class="flex items-center justify-between">
-        <div><div class="text-xs font-semibold uppercase tracking-[0.3em] text-[#72809a]">Editable Fields</div><h3 class="display-font mt-2 text-2xl">问题编辑</h3></div>
-        <button id="saveIssueButton" class="primary-button rounded-full px-4 py-2 text-sm font-semibold transition" type="button">保存修改</button>
+      <div>
+        <div class="text-xs font-semibold uppercase tracking-[0.3em] text-[#72809a]">Editable Fields</div>
+        <h3 class="display-font mt-2 text-2xl">问题编辑</h3>
       </div>
       <div id="drawerNotification" aria-live="polite" aria-atomic="true"></div>
       <div class="grid gap-4 md:grid-cols-2">
@@ -848,7 +848,13 @@ function renderDrawer(detail) {
         <label class="space-y-2 text-sm font-medium text-[#25314a]"><span>指派人</span><input id="detailAssignedTo" list="assigneeSuggestions" class="field-shell h-11 w-full rounded-2xl px-4 text-sm" value="${escapeHtml(detail.assignedTo || '')}" placeholder="可留空清除"></label>
       </div>
       <label class="space-y-2 text-sm font-medium text-[#25314a]"><span>公开摘要</span><textarea id="detailPublicSummary" class="field-shell min-h-[120px] w-full rounded-[1.4rem] px-4 py-3 text-sm leading-7" maxlength="500" placeholder="可留空清除">${escapeHtml(detail.publicSummary || '')}</textarea></label>
-      <label class="flex items-start gap-3 rounded-[1.4rem] border border-[rgba(23,32,51,0.08)] bg-white/70 px-4 py-3 text-sm leading-6 text-[#445069]"><input id="detailIsPublic" type="checkbox" class="mt-1 h-4 w-4 rounded border-[#b9c3d6] text-[#2457d6] focus:ring-[#2457d6]" ${detail.isPublic ? 'checked' : ''}><span>允许该问题进入首页公开列表。</span></label>
+      <div class="rounded-[1.4rem] border border-[rgba(23,32,51,0.08)] bg-white/70 px-4 py-3">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+          <label class="flex items-start gap-3 text-sm leading-6 text-[#445069] sm:flex-1"><input id="detailIsPublic" type="checkbox" class="mt-1 h-4 w-4 rounded border-[#b9c3d6] text-[#2457d6] focus:ring-[#2457d6]" ${detail.isPublic ? 'checked' : ''}><span>允许该问题进入首页公开列表。</span></label>
+          <button id="saveIssueButton" class="primary-button w-full rounded-full px-4 py-2 text-sm font-semibold transition sm:w-auto sm:min-w-[8rem]" type="button">保存修改</button>
+        </div>
+        <p class="mt-3 text-xs leading-6 text-[#72809a]">修改完状态、分类、优先级、指派、摘要或公开设置后，请在这里保存。</p>
+      </div>
     </section>
 
     <section class="space-y-4 rounded-[1.6rem] border border-[rgba(23,32,51,0.08)] bg-white/82 p-5"><div class="text-xs font-semibold uppercase tracking-[0.3em] text-[#72809a]">Updates</div><h3 class="display-font text-2xl">处理时间线</h3><div id="updatesTimeline" class="space-y-5"></div></section>
