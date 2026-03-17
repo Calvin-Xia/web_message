@@ -9,6 +9,7 @@ const dom = {
   heroVersion: document.getElementById('heroVersion'),
   heroTimestamp: document.getElementById('heroTimestamp'),
   heroAlertCount: document.getElementById('heroAlertCount'),
+  healthNotification: document.getElementById('healthNotification'),
   metricRequestCount: document.getElementById('metricRequestCount'),
   metricErrorRate: document.getElementById('metricErrorRate'),
   metricLatency: document.getElementById('metricLatency'),
@@ -67,6 +68,49 @@ function formatTrendLabel(value) {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
+function renderFeedbackBox(message, type = 'info') {
+  const tone = {
+    success: 'feedback-box--success',
+    error: 'feedback-box--error',
+    info: 'feedback-box--info',
+    loading: 'feedback-box--loading',
+  };
+  const role = type === 'error' ? 'alert' : 'status';
+  const content = type === 'loading'
+    ? `<span class="loading-dots">${escapeHtml(message)}</span>`
+    : escapeHtml(message);
+  return `<div class="feedback-box ${tone[type] || tone.info}" role="${role}">${content}</div>`;
+}
+
+function setButtonBusy(button, busy, loadingText, idleText = button.dataset.originalText || button.textContent.trim()) {
+  if (!(button instanceof HTMLElement)) {
+    return;
+  }
+
+  if (busy) {
+    const width = Math.ceil(button.getBoundingClientRect().width);
+    if (width > 0) {
+      button.style.width = `${width}px`;
+    }
+    button.dataset.originalText = idleText;
+    button.disabled = true;
+    button.classList.add('button-busy');
+    button.setAttribute('aria-busy', 'true');
+    button.textContent = loadingText;
+    return;
+  }
+
+  button.disabled = false;
+  button.classList.remove('button-busy');
+  button.removeAttribute('aria-busy');
+  button.style.width = '';
+  button.textContent = idleText;
+}
+
+function setNotification(message = '', type = 'info') {
+  dom.healthNotification.innerHTML = message ? renderFeedbackBox(message, type) : '';
+}
+
 async function fetchWithTimeout(url, options = {}, timeout = REQUEST_TIMEOUT) {
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), timeout);
@@ -84,6 +128,9 @@ async function fetchWithTimeout(url, options = {}, timeout = REQUEST_TIMEOUT) {
 
 function setLoadingState() {
   const skeleton = '<div class="skeleton h-24"></div>';
+  dom.servicesGrid.setAttribute('aria-busy', 'true');
+  dom.alertList.setAttribute('aria-busy', 'true');
+  dom.errorLogList.setAttribute('aria-busy', 'true');
   dom.servicesGrid.innerHTML = `${skeleton}${skeleton}`;
   dom.alertList.innerHTML = '<div class="skeleton h-20"></div>';
   dom.trendChart.innerHTML = '<div class="skeleton h-48"></div>';
@@ -274,13 +321,19 @@ function renderDashboard(data) {
   renderTrendChart(dom.trendChart, data.trends || [], 'latency');
   renderTrendChart(dom.rateLimitChart, data.trends || [], 'rateLimit');
   renderErrorLogs(data.recentErrors || []);
+  dom.servicesGrid.setAttribute('aria-busy', 'false');
+  dom.alertList.setAttribute('aria-busy', 'false');
+  dom.errorLogList.setAttribute('aria-busy', 'false');
 }
 
 function renderFailure(message) {
   dom.heroStatus.dataset.status = 'unhealthy';
   dom.heroStatus.textContent = '检查失败';
   dom.heroSummary.textContent = message;
-  dom.errorLogList.innerHTML = `<div class="rounded-[1.3rem] border border-[rgba(178,58,50,0.18)] bg-[rgba(178,58,50,0.08)] px-4 py-6 text-sm leading-7 text-[#8f2d27]">${escapeHtml(message)}</div>`;
+  dom.servicesGrid.setAttribute('aria-busy', 'false');
+  dom.alertList.setAttribute('aria-busy', 'false');
+  dom.errorLogList.setAttribute('aria-busy', 'false');
+  dom.errorLogList.innerHTML = renderFeedbackBox(message, 'error');
 }
 
 function createHealthLoadError(message, details) {
@@ -290,8 +343,8 @@ function createHealthLoadError(message, details) {
 }
 
 async function loadHealth() {
-  dom.refreshButton.disabled = true;
-  dom.refreshButton.textContent = '刷新中...';
+  setButtonBusy(dom.refreshButton, true, '刷新中...');
+  setNotification('正在获取最新健康检查结果...', 'info');
 
   try {
     const response = await fetchWithTimeout('/api/health');
@@ -302,17 +355,19 @@ async function loadHealth() {
     }
 
     renderDashboard(payload.data);
+    setNotification('健康检查已更新。', 'success');
   } catch (error) {
     if (error.name === 'AbortError') {
       renderFailure(HEALTH_TIMEOUT_MESSAGE);
+      setNotification(HEALTH_TIMEOUT_MESSAGE, 'error');
       return;
     }
 
     console.error('Health dashboard request failed:', error?.details || error);
     renderFailure(HEALTH_FAILURE_MESSAGE);
+    setNotification(HEALTH_FAILURE_MESSAGE, 'error');
   } finally {
-    dom.refreshButton.disabled = false;
-    dom.refreshButton.textContent = '立即刷新';
+    setButtonBusy(dom.refreshButton, false, '', '立即刷新');
   }
 }
 
@@ -326,8 +381,10 @@ function toggleAutoRefresh() {
   if (autoRefreshTimer) {
     window.clearInterval(autoRefreshTimer);
     autoRefreshTimer = null;
+    setNotification('自动刷新已关闭。', 'info');
   } else {
     autoRefreshTimer = window.setInterval(loadHealth, AUTO_REFRESH_MS);
+    setNotification('自动刷新已开启，每 30 秒同步一次。', 'success');
   }
 
   syncAutoRefreshButton();

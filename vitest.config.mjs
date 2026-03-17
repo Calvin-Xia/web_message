@@ -12,6 +12,12 @@ export default defineConfig({
         'functions/api/**/*.js',
         'src/shared/**/*.js',
       ],
+      thresholds: {
+        lines: 80,
+        statements: 80,
+        functions: 80,
+        branches: 60,
+      },
     },
   },
 });

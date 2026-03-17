@@ -55,6 +55,49 @@ function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+function prefersReducedMotion() {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function renderFeedbackBox(message, type = 'info') {
+  const tone = {
+    success: 'feedback-box--success',
+    error: 'feedback-box--error',
+    info: 'feedback-box--info',
+    loading: 'feedback-box--loading',
+  };
+  const role = type === 'error' ? 'alert' : 'status';
+  const content = type === 'loading'
+    ? `<span class="loading-dots">${escapeHtml(message)}</span>`
+    : escapeHtml(message);
+  return `<div class="feedback-box ${tone[type] || tone.info}" role="${role}">${content}</div>`;
+}
+
+function setButtonBusy(button, busy, loadingText, idleText = button.dataset.originalText || button.textContent.trim()) {
+  if (!(button instanceof HTMLElement)) {
+    return;
+  }
+
+  if (busy) {
+    const width = Math.ceil(button.getBoundingClientRect().width);
+    if (width > 0) {
+      button.style.width = `${width}px`;
+    }
+    button.dataset.originalText = idleText;
+    button.disabled = true;
+    button.classList.add('button-busy');
+    button.setAttribute('aria-busy', 'true');
+    button.textContent = loadingText;
+    return;
+  }
+
+  button.disabled = false;
+  button.classList.remove('button-busy');
+  button.removeAttribute('aria-busy');
+  button.style.width = '';
+  button.textContent = idleText;
+}
+
 function highlightText(value, query) {
   const safeValue = escapeHtml(value ?? '');
   const normalized = String(query || '').trim();
@@ -98,12 +141,7 @@ async function fetchWithTimeout(url, options = {}, timeout = REQUEST_TIMEOUT) {
 
 function showNotification(message, type = 'error') {
   const target = document.getElementById('submitNotification');
-  const palette = {
-    success: 'bg-[rgba(19,121,91,0.12)] text-[#0f6b50] border-[rgba(19,121,91,0.2)]',
-    error: 'bg-[rgba(178,58,50,0.12)] text-[#8f2d27] border-[rgba(178,58,50,0.2)]',
-  };
-
-  target.innerHTML = `<div class="rounded-[1.2rem] border px-4 py-3 text-sm ${palette[type] || palette.error}">${escapeHtml(message)}</div>`;
+  target.innerHTML = renderFeedbackBox(message, type);
 }
 
 function clearNotification() {
@@ -260,7 +298,7 @@ function renderPublicList(items, pagination) {
   renderSummary(pagination, filters);
 
   if (!items || items.length === 0) {
-    list.innerHTML = '<div class="notice-box rounded-[1.5rem] px-5 py-8 text-center text-sm leading-7 text-[#4c566b]">当前筛选条件下没有公开问题。你可以清空日期、关键词或排序条件后再试。</div>';
+    list.innerHTML = '<div class="empty-state text-center">当前筛选条件下没有公开问题。你可以清空日期、关键词或排序条件后再试。</div>';
     paginationContainer.innerHTML = '';
     return;
   }
@@ -268,7 +306,7 @@ function renderPublicList(items, pagination) {
   list.innerHTML = items.map((item) => {
     const summary = item.publicSummary || item.content;
     return `
-      <article class="public-card rounded-[1.6rem] p-5 md:p-6">
+      <article class="public-card interactive-card rounded-[1.6rem] p-5 md:p-6">
         <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div class="space-y-3">
             <div class="flex flex-wrap items-center gap-2">
@@ -303,7 +341,8 @@ async function loadPublicList(page = 1) {
   if (filters.q) {
     pushSearchHistory(filters.q);
   }
-  list.innerHTML = '<div class="notice-box rounded-[1.5rem] px-5 py-6 text-center text-sm text-[#4c566b]"><span class="loading-dots">正在加载公开列表</span></div>';
+  list.setAttribute('aria-busy', 'true');
+  list.innerHTML = renderFeedbackBox('正在加载公开列表', 'loading');
 
   try {
     const response = await fetchWithTimeout(`${API_BASE}/issues?${buildQuery(page)}`);
@@ -316,8 +355,10 @@ async function loadPublicList(page = 1) {
     renderPublicList(result.data.items || [], result.data.pagination);
   } catch (error) {
     const message = error.name === 'AbortError' ? '公开列表加载超时' : error.message;
-    list.innerHTML = `<div class="rounded-[1.5rem] border border-[rgba(178,58,50,0.2)] bg-[rgba(178,58,50,0.08)] px-5 py-6 text-center text-sm text-[#8f2d27]">${escapeHtml(message)}</div>`;
+    list.innerHTML = renderFeedbackBox(message, 'error');
     document.getElementById('publicPagination').innerHTML = '';
+  } finally {
+    list.setAttribute('aria-busy', 'false');
   }
 }
 
@@ -341,8 +382,7 @@ async function handleSubmit(event) {
     isReported: document.getElementById('isReported').checked,
   };
 
-  button.disabled = true;
-  button.textContent = '提交中...';
+  setButtonBusy(button, true, '提交中...');
 
   try {
     const response = await fetchWithTimeout(`${API_BASE}/issues`, {
@@ -363,7 +403,10 @@ async function handleSubmit(event) {
     document.getElementById('trackingCodeValue').textContent = data.trackingCode;
     document.getElementById('trackingLink').href = trackingLink;
     document.getElementById('trackingReceipt').hidden = false;
-    document.getElementById('trackingReceipt').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.getElementById('trackingReceipt').scrollIntoView({
+      behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+      block: 'start',
+    });
     document.getElementById('issueForm').reset();
     showNotification('提交成功，追踪编号已生成。', 'success');
     await loadPublicList(1);
@@ -371,8 +414,7 @@ async function handleSubmit(event) {
     const message = error.name === 'AbortError' ? '请求超时，请重试' : error.message;
     showNotification(message, 'error');
   } finally {
-    button.disabled = false;
-    button.textContent = '提交并生成追踪编号';
+    setButtonBusy(button, false, '', '提交并生成追踪编号');
   }
 }
 

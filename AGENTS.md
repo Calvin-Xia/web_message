@@ -78,9 +78,9 @@ npx vitest run test/validation.test.js -t "accepts counseling category"
 - CI runs `npm ci`, `npm test`, and `npm run test:coverage`.
 - In restricted sandboxes, Vitest/Vite may need permission to spawn `esbuild`; do not change repo config just to bypass sandbox policy.
 ## Linting And Formatting
-- There is no `npm run lint` script.
-- There is no ESLint, Prettier, Biome, or `.editorconfig` file.
-- Do not document or wire up a lint step unless you also add the real tooling.
+- Run `npm run lint` to execute the repo ESLint checks.
+- ESLint uses the flat config in `eslint.config.mjs`.
+- There is no Prettier, Biome, or `.editorconfig` file.
 - Preserve the existing style manually when editing.
 ## Cursor And Copilot Rules
 - No `.cursor/rules/` directory exists.

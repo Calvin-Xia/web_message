@@ -35,6 +35,7 @@ const state = {
   exportHistory: loadStorageArray(EXPORT_HISTORY_KEY),
 };
 let copyHintTimer = null;
+let lastDrawerTrigger = null;
 
 function loadStorageArray(key) {
   try {
@@ -58,6 +59,45 @@ function escapeHtml(value) {
 
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function renderFeedbackBox(message, type = 'info') {
+  const tone = {
+    success: 'feedback-box--success',
+    error: 'feedback-box--error',
+    info: 'feedback-box--info',
+    loading: 'feedback-box--loading',
+  };
+  const role = type === 'error' ? 'alert' : 'status';
+  const content = type === 'loading'
+    ? `<span class="loading-dots">${escapeHtml(message)}</span>`
+    : escapeHtml(message);
+  return `<div class="feedback-box ${tone[type] || tone.info}" role="${role}">${content}</div>`;
+}
+
+function setButtonBusy(button, busy, loadingText, idleText = button.dataset.originalText || button.textContent.trim()) {
+  if (!(button instanceof HTMLElement)) {
+    return;
+  }
+
+  if (busy) {
+    const width = Math.ceil(button.getBoundingClientRect().width);
+    if (width > 0) {
+      button.style.width = `${width}px`;
+    }
+    button.dataset.originalText = idleText;
+    button.disabled = true;
+    button.classList.add('button-busy');
+    button.setAttribute('aria-busy', 'true');
+    button.textContent = loadingText;
+    return;
+  }
+
+  button.disabled = false;
+  button.classList.remove('button-busy');
+  button.removeAttribute('aria-busy');
+  button.style.width = '';
+  button.textContent = idleText;
 }
 
 function highlightText(value, query) {
@@ -156,11 +196,6 @@ async function apiFetch(path, options = {}) {
 }
 
 function setNotification(targetId, message = '', type = 'info') {
-  const palette = {
-    success: 'border-[rgba(19,121,91,0.2)] bg-[rgba(19,121,91,0.12)] text-[#0f6b50]',
-    error: 'border-[rgba(178,58,50,0.2)] bg-[rgba(178,58,50,0.12)] text-[#8f2d27]',
-    info: 'border-[rgba(36,87,214,0.16)] bg-[rgba(36,87,214,0.1)] text-[#2147ac]',
-  };
   const target = document.getElementById(targetId);
   if (!target) {
     return;
@@ -171,7 +206,7 @@ function setNotification(targetId, message = '', type = 'info') {
     return;
   }
 
-  target.innerHTML = `<div class="rounded-[1.2rem] border px-4 py-3 text-sm ${palette[type] || palette.info}">${escapeHtml(message)}</div>`;
+  target.innerHTML = renderFeedbackBox(message, type);
 }
 
 function showButtonHint(targetId, message, type = 'success') {
@@ -610,13 +645,13 @@ function renderIssueList(items, pagination) {
   renderQueueSummary(pagination, filters);
 
   if (!items.length) {
-    container.innerHTML = '<div class="empty-state rounded-[1.5rem] px-5 py-8 text-center text-sm leading-7 text-[#5f6b80]">当前筛选条件下没有问题，尝试放宽日期或布尔筛选。</div>';
+    container.innerHTML = '<div class="empty-state text-center">当前筛选条件下没有问题，尝试放宽日期或布尔筛选。</div>';
     document.getElementById('paginationContainer').innerHTML = '';
     return;
   }
 
   container.innerHTML = items.map((item) => `
-    <article class="issue-card rounded-[1.7rem] p-5 md:p-6">
+    <article class="issue-card interactive-card rounded-[1.7rem] p-5 md:p-6">
       <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div class="space-y-3">
           <div class="flex flex-wrap items-center gap-2">
@@ -644,14 +679,14 @@ function renderIssueList(items, pagination) {
             <div><strong class="text-[#172033]">提交：</strong>${escapeHtml(formatDate(item.createdAt))}</div>
             <div class="mt-2"><strong class="text-[#172033]">摘要：</strong>${highlightText(item.publicSummary || '暂无', filters.q)}</div>
           </div>
-          <button class="open-detail rounded-full bg-[#172033] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#0c1424]" type="button" data-id="${item.id}">查看详情</button>
+          <button class="open-detail dark-button rounded-full px-4 py-3 text-sm font-semibold transition" type="button" data-id="${item.id}">查看详情</button>
         </div>
       </div>
     </article>
   `).join('');
 
   container.querySelectorAll('.open-detail').forEach((button) => {
-    button.addEventListener('click', () => openDrawer(Number(button.dataset.id)));
+    button.addEventListener('click', () => openDrawer(Number(button.dataset.id), button));
   });
 
   renderPagination(document.getElementById('paginationContainer'), pagination, (nextPage) => loadDashboard(nextPage, { refreshMetrics: false }).catch((error) => setNotification('adminNotification', error.message, 'error')));
@@ -659,12 +694,18 @@ function renderIssueList(items, pagination) {
 
 async function loadIssues(page = 1) {
   state.page = page;
-  document.getElementById('issuesList').innerHTML = '<div class="empty-state rounded-[1.5rem] px-5 py-8 text-center text-sm leading-7 text-[#5f6b80]">正在加载问题列表...</div>';
-  const data = await apiFetch(`/admin/issues?${buildListQuery(page)}`);
-  state.availableAssignees = data.meta?.availableAssignees || [];
-  document.getElementById('assigneeSuggestions').innerHTML = state.availableAssignees.map((value) => `<option value="${escapeHtml(value)}"></option>`).join('');
-  renderIssueList(data.items || [], data.pagination);
-  return data;
+  const issuesList = document.getElementById('issuesList');
+  issuesList.setAttribute('aria-busy', 'true');
+  issuesList.innerHTML = renderFeedbackBox('正在加载问题列表', 'loading');
+  try {
+    const data = await apiFetch(`/admin/issues?${buildListQuery(page)}`);
+    state.availableAssignees = data.meta?.availableAssignees || [];
+    document.getElementById('assigneeSuggestions').innerHTML = state.availableAssignees.map((value) => `<option value="${escapeHtml(value)}"></option>`).join('');
+    renderIssueList(data.items || [], data.pagination);
+    return data;
+  } finally {
+    issuesList.setAttribute('aria-busy', 'false');
+  }
 }
 
 async function loadMetrics(refresh = false) {
@@ -683,23 +724,37 @@ async function loadDashboard(page = 1, { refreshMetrics = false } = {}) {
     loadIssues(page),
     loadMetrics(refreshMetrics),
   ]);
-  setNotification('adminNotification', '后台数据已同步。', 'success');
-  setNotification('metricsNotification', '', 'info');
+  setNotification('adminNotification', '');
+  setNotification('metricsNotification', '');
   return issuesResult;
 }
 
-function openDrawerShell() {
+function openDrawerShell(trigger) {
+  const drawer = document.getElementById('issueDrawer');
+  lastDrawerTrigger = trigger instanceof HTMLElement
+    ? trigger
+    : document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
   document.getElementById('drawerBackdrop').hidden = false;
-  document.getElementById('issueDrawer').hidden = false;
+  drawer.hidden = false;
+  drawer.setAttribute('aria-hidden', 'false');
   document.body.classList.add('overflow-hidden');
+  document.getElementById('drawerTitle').focus();
 }
 
 function closeDrawer() {
+  const drawer = document.getElementById('issueDrawer');
   document.getElementById('drawerBackdrop').hidden = true;
-  document.getElementById('issueDrawer').hidden = true;
+  drawer.hidden = true;
+  drawer.setAttribute('aria-hidden', 'true');
   document.body.classList.remove('overflow-hidden');
   state.activeIssueId = null;
   state.activeIssue = null;
+  if (lastDrawerTrigger?.isConnected) {
+    lastDrawerTrigger.focus();
+  }
+  lastDrawerTrigger = null;
 }
 
 function buildStatusOptions(current) {
@@ -785,7 +840,7 @@ function renderDrawer(detail) {
         <div><div class="text-xs font-semibold uppercase tracking-[0.3em] text-[#72809a]">Editable Fields</div><h3 class="display-font mt-2 text-2xl">问题编辑</h3></div>
         <button id="saveIssueButton" class="primary-button rounded-full px-4 py-2 text-sm font-semibold transition" type="button">保存修改</button>
       </div>
-      <div id="drawerNotification"></div>
+      <div id="drawerNotification" aria-live="polite" aria-atomic="true"></div>
       <div class="grid gap-4 md:grid-cols-2">
         <label class="space-y-2 text-sm font-medium text-[#25314a]"><span>状态</span><select id="detailStatus" class="field-shell h-11 w-full rounded-2xl px-4 text-sm">${buildStatusOptions(detail.status)}</select><span class="block text-xs leading-6 text-[#72809a]">允许流转：${escapeHtml((statusTransitions[detail.status] || [detail.status]).map((status) => statusLabels[status] || status).join('、'))}</span></label>
         <label class="space-y-2 text-sm font-medium text-[#25314a]"><span>分类</span><select id="detailCategory" class="field-shell h-11 w-full rounded-2xl px-4 text-sm">${Object.entries(categoryLabels).map(([value, label]) => `<option value="${value}" ${detail.category === value ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
@@ -810,17 +865,20 @@ function renderDrawer(detail) {
   renderNotes(detail.internalNotes);
   renderReplies((detail.updates || []).filter((item) => item.type === 'public_reply'));
   renderHistory(detail.history);
+  window.requestAnimationFrame(() => {
+    document.getElementById('detailStatus')?.focus();
+  });
 }
 
-async function openDrawer(issueId) {
+async function openDrawer(issueId, trigger = null) {
   state.activeIssueId = issueId;
-  openDrawerShell();
-  document.getElementById('drawerContent').innerHTML = '<div class="empty-state rounded-[1.5rem] px-5 py-8 text-center text-sm leading-7 text-[#5f6b80]">正在加载问题详情...</div>';
+  openDrawerShell(trigger);
+  document.getElementById('drawerContent').innerHTML = renderFeedbackBox('正在加载问题详情', 'loading');
   try {
     const detail = await apiFetch(`/admin/issues/${issueId}`);
     renderDrawer(detail);
   } catch (error) {
-    document.getElementById('drawerContent').innerHTML = `<div class="rounded-[1.5rem] border border-[rgba(178,58,50,0.2)] bg-[rgba(178,58,50,0.08)] px-5 py-8 text-center text-sm leading-7 text-[#8f2d27]">${escapeHtml(error.message)}</div>`;
+    document.getElementById('drawerContent').innerHTML = renderFeedbackBox(error.message, 'error');
   }
 }
 
@@ -860,8 +918,10 @@ async function saveIssueChanges() {
   }
 
   patch.updatedAt = state.activeIssue.updatedAt;
+  const button = document.getElementById('saveIssueButton');
 
   try {
+    setButtonBusy(button, true, '保存中...');
     await apiFetch(`/admin/issues/${state.activeIssueId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -871,11 +931,14 @@ async function saveIssueChanges() {
     await refreshActiveIssue();
   } catch (error) {
     setNotification('drawerNotification', error.message, 'error');
+  } finally {
+    setButtonBusy(button, false, '', '保存修改');
   }
 }
 
 async function submitNote(event) {
   event.preventDefault();
+  const button = event.currentTarget.querySelector('button[type="submit"]');
   const content = document.getElementById('noteContent').value.trim();
   if (!content) {
     setNotification('drawerNotification', '备注内容不能为空。', 'error');
@@ -883,6 +946,7 @@ async function submitNote(event) {
   }
 
   try {
+    setButtonBusy(button, true, '保存中...');
     await apiFetch(`/admin/issues/${state.activeIssueId}/notes`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -893,11 +957,14 @@ async function submitNote(event) {
     await refreshActiveIssue();
   } catch (error) {
     setNotification('drawerNotification', error.message, 'error');
+  } finally {
+    setButtonBusy(button, false, '', '添加备注');
   }
 }
 
 async function submitReply(event) {
   event.preventDefault();
+  const button = event.currentTarget.querySelector('button[type="submit"]');
   const content = document.getElementById('replyContent').value.trim();
   const isPublic = document.getElementById('replyIsPublic').checked;
   if (!content) {
@@ -906,6 +973,7 @@ async function submitReply(event) {
   }
 
   try {
+    setButtonBusy(button, true, '发送中...');
     await apiFetch(`/admin/issues/${state.activeIssueId}/replies`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -917,14 +985,15 @@ async function submitReply(event) {
     await refreshActiveIssue();
   } catch (error) {
     setNotification('drawerNotification', error.message, 'error');
+  } finally {
+    setButtonBusy(button, false, '', '发送回复');
   }
 }
 
 async function exportIssues() {
   const button = document.getElementById('exportButton');
   const summary = summarizeFilters(getFilters());
-  button.disabled = true;
-  button.textContent = '导出中...';
+  setButtonBusy(button, true, '导出中...');
   setNotification('adminNotification', '正在生成导出文件...', 'info');
 
   try {
@@ -965,8 +1034,7 @@ async function exportIssues() {
   } catch (error) {
     setNotification('adminNotification', error.name === 'AbortError' ? '导出超时，请缩小筛选范围后重试。' : error.message, 'error');
   } finally {
-    button.disabled = false;
-    button.textContent = '导出 CSV';
+    setButtonBusy(button, false, '', '导出 CSV');
   }
 }
 
@@ -985,8 +1053,8 @@ async function copyFilterLink() {
 async function login(secretKey) {
   state.token = secretKey;
   sessionStorage.setItem(STORAGE_KEY, secretKey);
-  document.getElementById('loginButton').disabled = true;
-  document.getElementById('loginButton').textContent = '验证中...';
+  const button = document.getElementById('loginButton');
+  setButtonBusy(button, true, '验证中...');
   setNotification('loginNotification', '正在验证并加载后台数据...', 'info');
 
   try {
@@ -994,13 +1062,13 @@ async function login(secretKey) {
     document.getElementById('loginSection').hidden = true;
     document.getElementById('adminShell').hidden = false;
     setNotification('loginNotification', '');
+    document.getElementById('searchInput')?.focus();
   } catch (error) {
     sessionStorage.removeItem(STORAGE_KEY);
     state.token = null;
     setNotification('loginNotification', error.message, 'error');
   } finally {
-    document.getElementById('loginButton').disabled = false;
-    document.getElementById('loginButton').textContent = '登录并加载后台';
+    setButtonBusy(button, false, '', '登录并加载后台');
   }
 }
 
@@ -1010,9 +1078,10 @@ function logout() {
   state.activeIssueId = null;
   sessionStorage.removeItem(STORAGE_KEY);
   document.getElementById('secretKey').value = '';
+  closeDrawer();
   document.getElementById('loginSection').hidden = false;
   document.getElementById('adminShell').hidden = true;
-  closeDrawer();
+  document.getElementById('secretKey').focus();
 }
 
 function bindEvents() {
@@ -1043,8 +1112,17 @@ function bindEvents() {
     loadDashboard(1, { refreshMetrics: true }).catch((error) => setNotification('adminNotification', error.message, 'error'));
   });
 
-  document.getElementById('refreshButton').addEventListener('click', () => {
-    loadDashboard(state.page, { refreshMetrics: true }).catch((error) => setNotification('adminNotification', error.message, 'error'));
+  document.getElementById('refreshButton').addEventListener('click', async () => {
+    const button = document.getElementById('refreshButton');
+    setButtonBusy(button, true, '同步中...');
+    try {
+      await loadDashboard(state.page, { refreshMetrics: true });
+      setNotification('metricsNotification', '统计与问题列表已同步。', 'success');
+    } catch (error) {
+      setNotification('adminNotification', error.message, 'error');
+    } finally {
+      setButtonBusy(button, false, '', '刷新面板');
+    }
   });
   document.getElementById('exportButton').addEventListener('click', exportIssues);
   document.getElementById('copyFilterLinkButton').addEventListener('click', copyFilterLink);

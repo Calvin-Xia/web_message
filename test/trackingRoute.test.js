@@ -29,6 +29,77 @@ function createDbMock(results) {
 }
 
 describe('tracking route', () => {
+  it('supports preflight requests for the public tracking API', async () => {
+    const response = await onRequest({
+      request: new Request('http://localhost/api/issues/ABCD23EF', {
+        method: 'OPTIONS',
+      }),
+      env: {
+        RATE_LIMIT_STORE: createD1Database(),
+        DB: createD1Database(),
+      },
+      params: {
+        trackingCode: 'ABCD23EF',
+      },
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Access-Control-Allow-Methods')).toBe('GET, OPTIONS');
+  });
+
+  it('rejects unsupported methods before hitting the database', async () => {
+    const response = await onRequest({
+      request: new Request('http://localhost/api/issues/ABCD23EF', {
+        method: 'POST',
+      }),
+      env: {
+        RATE_LIMIT_STORE: createD1Database(),
+        DB: createD1Database(),
+      },
+      params: {
+        trackingCode: 'ABCD23EF',
+      },
+    });
+    const payload = await response.json();
+
+    expect(response.status).toBe(405);
+    expect(payload.error).toBe('Method not allowed');
+  });
+
+  it('returns a validation error for malformed tracking codes', async () => {
+    const response = await onRequest({
+      request: new Request('http://localhost/api/issues/bad-code'),
+      env: {
+        RATE_LIMIT_STORE: createD1Database(),
+        DB: createD1Database(),
+      },
+      params: {
+        trackingCode: 'bad-code',
+      },
+    });
+    const payload = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(payload.error).toBe('追踪编号格式无效');
+  });
+
+  it('returns 404 when the tracking code does not exist', async () => {
+    const response = await onRequest({
+      request: new Request('http://localhost/api/issues/ABCD23EF'),
+      env: {
+        RATE_LIMIT_STORE: createD1Database(),
+        DB: createD1Database(),
+      },
+      params: {
+        trackingCode: 'ABCD23EF',
+      },
+    });
+    const payload = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(payload.error).toBe('追踪编号不存在');
+  });
+
   it('uses strict boolean conversion for public updates and disables browser caching', async () => {
     const db = createDbMock([
       {
@@ -78,4 +149,5 @@ describe('tracking route', () => {
     expect(payload.data.updates[0].isPublic).toBe(false);
   });
 });
+
 
