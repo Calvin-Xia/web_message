@@ -14,6 +14,11 @@ const NOTIFIABLE_STATUSES = new Set(['in_progress', 'resolved', 'closed']);
 const RETRYABLE_STATUS_CODES = new Set([429, 500]);
 const RETRY_DELAYS_MS = [200, 400];
 
+function hasValidResendApiKey(apiKey) {
+  const normalized = String(apiKey || '').trim();
+  return normalized.startsWith('re_');
+}
+
 function escapeHtml(value) {
   return String(value ?? '')
     .replaceAll('&', '&amp;')
@@ -24,7 +29,11 @@ function escapeHtml(value) {
 }
 
 function normalizeBaseUrl(value) {
-  return String(value || '').trim().replace(/\/+$/, '');
+  if (value === null || value === undefined) {
+    return '';
+  }
+
+  return String(value).trim().replace(/\/+$/, '');
 }
 
 function summarizeText(value, maxLength = 280) {
@@ -119,6 +128,14 @@ async function sendEmailRequest(env, payload, idempotencyKey) {
       skipped: true,
       retryable: false,
       error: 'RESEND_API_KEY not configured',
+    };
+  }
+
+  if (!hasValidResendApiKey(env.RESEND_API_KEY)) {
+    return {
+      success: false,
+      retryable: false,
+      error: 'RESEND_API_KEY has unexpected format',
     };
   }
 

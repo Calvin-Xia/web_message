@@ -336,38 +336,40 @@ export async function onRequest(context) {
       });
     }
 
-    if (statusChange && isNotifiableStatus(statusChange.newValue) && shouldNotifyIssue(existingIssue)) {
+    if (statusChange && isNotifiableStatus(statusChange.newValue)) {
       const notificationIssue = {
         ...existingIssue,
         status: statusChange.newValue,
         public_summary: payload.publicSummary ?? existingIssue.public_summary,
         updated_at: now,
       };
-      const idempotencyKey = createNotificationIdempotencyKey(
-        issueId,
-        `status-${statusChange.newValue}`,
-        now,
-      );
+      if (shouldNotifyIssue(notificationIssue)) {
+        const idempotencyKey = createNotificationIdempotencyKey(
+          issueId,
+          `status-${statusChange.newValue}`,
+          now,
+        );
 
-      queueBackgroundTask(context, (async () => {
-        const result = await sendIssueStatusNotification({
-          env,
-          requestUrl: request.url,
-          issue: notificationIssue,
-          status: statusChange.newValue,
-          idempotencyKey,
-        });
-
-        if (!result.success && !result.skipped) {
-          console.error('Issue status notification failed:', {
-            issueId,
-            trackingCode: existingIssue.tracking_code,
+        queueBackgroundTask(context, (async () => {
+          const result = await sendIssueStatusNotification({
+            env,
+            requestUrl: request.url,
+            issue: notificationIssue,
             status: statusChange.newValue,
-            error: result.error,
-            responseStatus: result.status ?? null,
+            idempotencyKey,
           });
-        }
-      })());
+
+          if (!result.success && !result.skipped) {
+            console.error('Issue status notification failed:', {
+              issueId,
+              trackingCode: existingIssue.tracking_code,
+              status: statusChange.newValue,
+              error: result.error,
+              responseStatus: result.status ?? null,
+            });
+          }
+        })());
+      }
     }
 
     return successResponse({

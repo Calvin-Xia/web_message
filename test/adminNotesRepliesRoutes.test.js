@@ -213,4 +213,49 @@ describe('admin note and reply routes', () => {
       responseStatus: 400,
     }));
   });
+
+  it('still notifies for a public reply on a closed issue', async () => {
+    const fetchSpy = vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: 'email_456' }), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    }));
+    vi.stubGlobal('fetch', fetchSpy);
+
+    const db = createD1Database();
+    db.issues.push(createIssue({
+      status: 'closed',
+      email: 'student@example.com',
+      notify_by_email: 1,
+    }));
+    const backgroundTasks = [];
+
+    const response = await onReplyRequest({
+      request: createAdminRequest('http://localhost/api/admin/issues/1/replies', {
+        content: '问题虽然已关闭，但这里补充最终处理结果。',
+        isPublic: true,
+      }),
+      env: createAdminEnv(db, {
+        PUBLIC_BASE_URL: 'https://issue.calvin-xia.cn',
+        RESEND_API_KEY: 're_test_key',
+      }),
+      params: {
+        id: '1',
+      },
+      waitUntil(promise) {
+        backgroundTasks.push(promise);
+      },
+    });
+
+    await Promise.all(backgroundTasks);
+
+    expect(response.status).toBe(201);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+    const [, options] = fetchSpy.mock.calls[0];
+    const payload = JSON.parse(options.body);
+    expect(payload.subject).toBe('管理员已回复你的问题（ABCD23EF）');
+    expect(payload.text).toContain('当前状态：已关闭');
+  });
 });

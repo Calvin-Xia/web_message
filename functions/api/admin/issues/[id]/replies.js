@@ -21,6 +21,11 @@ function queueBackgroundTask(context, promise) {
   void promise;
 }
 
+function shouldSendReplyNotification(issue, reply) {
+  // 已关闭的问题仍可能收到公开补充说明，这类更新对提交者依然有通知价值。
+  return reply.isPublic && shouldNotifyIssue(issue);
+}
+
 export async function onRequest(context) {
   const { request, env, params } = context;
   const origin = request.headers.get('Origin');
@@ -101,7 +106,7 @@ export async function onRequest(context) {
       }),
     ]);
 
-    if (reply.isPublic && shouldNotifyIssue(issue)) {
+    if (shouldSendReplyNotification(issue, reply)) {
       const replyId = Number(insertResult.meta?.last_row_id) || now;
       const idempotencyKey = createNotificationIdempotencyKey(issueId, 'public-reply', replyId);
 

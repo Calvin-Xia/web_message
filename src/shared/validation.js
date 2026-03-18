@@ -122,6 +122,7 @@ export const issueSchema = z.object({
     error: () => ({ message: '分类无效' }),
   }),
 }).strict().transform((value) => ({
+  // 邮箱是提醒能力的前提；未提供邮箱时统一关闭提醒，避免出现“开启提醒但无投递目标”的状态。
   ...value,
   email: value.email?.toLowerCase(),
   notifyByEmail: Boolean(value.email) && value.notifyByEmail,

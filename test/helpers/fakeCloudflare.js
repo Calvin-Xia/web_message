@@ -2,6 +2,15 @@ function normalizeSql(sql) {
   return sql.replace(/\s+/g, ' ').trim();
 }
 
+function parseInsertColumns(sql, tableName) {
+  const match = sql.match(new RegExp(`^INSERT INTO ${tableName} \\((.+?)\\) VALUES`));
+  if (!match) {
+    return [];
+  }
+
+  return match[1].split(',').map((column) => column.trim());
+}
+
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
@@ -130,56 +139,32 @@ class FakeD1Database {
     }
 
     if (sql.startsWith('INSERT INTO issues (')) {
-      const hasEmailFields = bindings.length === 13;
-      const [
-        trackingCode,
-        name,
-        studentId,
-        emailOrContent,
-        notifyByEmailOrIsPublic,
-        contentOrIsReported,
-        isPublicOrCategory,
-        isReportedOrPriority,
-        categoryOrStatus,
-        priorityOrCreatedAt,
-        statusOrUpdatedAt,
-        createdAtMaybe,
-        updatedAtMaybe,
-      ] = bindings;
+      const columns = parseInsertColumns(sql, 'issues');
+      const valuesByColumn = Object.fromEntries(columns.map((column, index) => [column, bindings[index]]));
+      const trackingCode = valuesByColumn.tracking_code;
       if (this.findIssueByTrackingCode(trackingCode)) {
         throw new Error('UNIQUE constraint failed: issues.tracking_code');
       }
 
-      const email = hasEmailFields ? emailOrContent : null;
-      const notifyByEmail = hasEmailFields ? notifyByEmailOrIsPublic : 0;
-      const content = hasEmailFields ? contentOrIsReported : emailOrContent;
-      const isPublic = hasEmailFields ? isPublicOrCategory : notifyByEmailOrIsPublic;
-      const isReported = hasEmailFields ? isReportedOrPriority : contentOrIsReported;
-      const category = hasEmailFields ? categoryOrStatus : isPublicOrCategory;
-      const priority = hasEmailFields ? priorityOrCreatedAt : isReportedOrPriority;
-      const status = hasEmailFields ? statusOrUpdatedAt : categoryOrStatus;
-      const createdAt = hasEmailFields ? createdAtMaybe : priorityOrCreatedAt;
-      const updatedAt = hasEmailFields ? updatedAtMaybe : statusOrUpdatedAt;
-
       const issue = {
         id: this.ids.issue++,
         tracking_code: trackingCode,
-        name,
-        student_id: studentId,
-        email,
-        notify_by_email: notifyByEmail,
-        content,
-        is_public: isPublic,
-        is_reported: isReported,
-        category,
-        priority,
-        status,
+        name: valuesByColumn.name,
+        student_id: valuesByColumn.student_id,
+        email: valuesByColumn.email ?? null,
+        notify_by_email: valuesByColumn.notify_by_email ?? 0,
+        content: valuesByColumn.content,
+        is_public: valuesByColumn.is_public,
+        is_reported: valuesByColumn.is_reported,
+        category: valuesByColumn.category,
+        priority: valuesByColumn.priority,
+        status: valuesByColumn.status,
         public_summary: null,
         assigned_to: null,
         first_response_at: null,
         resolved_at: null,
-        created_at: createdAt,
-        updated_at: updatedAt,
+        created_at: valuesByColumn.created_at,
+        updated_at: valuesByColumn.updated_at,
       };
       this.issues.push(issue);
       return { success: true, meta: { last_row_id: issue.id, changes: 1 } };
