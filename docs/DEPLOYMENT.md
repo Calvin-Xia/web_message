@@ -40,7 +40,9 @@ npx wrangler kv namespace create RATE_LIMIT_KV
 
 ```bash
 ADMIN_SECRET_KEY="replace-with-real-secret"
+RESEND_API_KEY="re_xxxxxxxxx"
 ENVIRONMENT="local"
+PUBLIC_BASE_URL="http://localhost:8787"
 ```
 
 ### Pages Dashboard
@@ -49,6 +51,11 @@ ENVIRONMENT="local"
 
 - `ADMIN_SECRET_KEY`
 - `ENVIRONMENT`
+- `RESEND_API_KEY`
+
+可选配置：
+
+- `PUBLIC_BASE_URL`
 
 ## 4. 本地开发与迁移
 
@@ -98,6 +105,7 @@ npm run d1:migrate:preview
 ## 8. 发布检查建议
 
 - 确认 `ADMIN_SECRET_KEY` 已在目标环境配置
+- 确认 `RESEND_API_KEY` 已在目标环境配置，且 `support@calvin-xia.cn` 可作为 Resend 发件人与回复地址
 - 确认 D1 与 KV 绑定存在
 - 访问 `/health.html` 检查 D1 / KV 状态
 - 在后台执行一次导出，确认审计日志与 CSV 正常

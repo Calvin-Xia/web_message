@@ -1,14 +1,15 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { onRequest as onNoteRequest } from '../functions/api/admin/issues/[id]/notes.js';
 import { onRequest as onReplyRequest } from '../functions/api/admin/issues/[id]/replies.js';
 import { createD1Database } from './helpers/fakeCloudflare.js';
 
-function createAdminEnv(db) {
+function createAdminEnv(db, overrides = {}) {
   return {
     ADMIN_SECRET_KEY: 'test-secret',
     ENVIRONMENT: 'development',
     RATE_LIMIT_STORE: createD1Database(),
     DB: db,
+    ...overrides,
   };
 }
 
@@ -21,6 +22,8 @@ function createIssue(overrides = {}) {
     content: '图书馆空调不制冷，需要尽快安排处理。',
     is_public: 0,
     is_reported: 0,
+    email: null,
+    notify_by_email: 0,
     category: 'facility',
     priority: 'high',
     status: 'in_review',
@@ -44,6 +47,11 @@ function createAdminRequest(url, body) {
     body: JSON.stringify(body),
   });
 }
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 describe('admin note and reply routes', () => {
   it('creates an internal note, timestamps the first response, and records an audit action', async () => {
@@ -107,5 +115,102 @@ describe('admin note and reply routes', () => {
     });
     expect(db.issues[0].first_response_at).toBe('2026-03-11T09:00:00.000Z');
     expect(db.issues[0].updated_at).not.toBe('2026-03-11T08:00:00.000Z');
+  });
+
+  it('sends a public reply notification when email reminders are enabled', async () => {
+    const fetchSpy = vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: 'email_123' }), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    }));
+    vi.stubGlobal('fetch', fetchSpy);
+
+    const db = createD1Database();
+    db.issues.push(createIssue({
+      email: 'student@example.com',
+      notify_by_email: 1,
+    }));
+    const backgroundTasks = [];
+
+    const response = await onReplyRequest({
+      request: createAdminRequest('http://localhost/api/admin/issues/1/replies', {
+        content: '已经安排今天下午检修，处理完成后会同步结果。',
+        isPublic: true,
+      }),
+      env: createAdminEnv(db, {
+        PUBLIC_BASE_URL: 'https://issue.calvin-xia.cn',
+        RESEND_API_KEY: 're_test_key',
+      }),
+      params: {
+        id: '1',
+      },
+      waitUntil(promise) {
+        backgroundTasks.push(promise);
+      },
+    });
+
+    await Promise.all(backgroundTasks);
+
+    expect(response.status).toBe(201);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(fetchSpy).toHaveBeenCalledWith('https://api.resend.com/emails', expect.any(Object));
+
+    const [, options] = fetchSpy.mock.calls[0];
+    const payload = JSON.parse(options.body);
+    expect(options.headers['Idempotency-Key']).toContain('issue-notify/1/public-reply/');
+    expect(payload).toMatchObject({
+      from: 'support@calvin-xia.cn',
+      to: ['student@example.com'],
+      reply_to: ['support@calvin-xia.cn'],
+      subject: '管理员已回复你的问题（ABCD23EF）',
+    });
+    expect(payload.text).toContain('查看追踪页：https://issue.calvin-xia.cn/tracking.html?code=ABCD23EF');
+  });
+
+  it('keeps reply creation successful when email delivery fails', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const fetchSpy = vi.fn().mockResolvedValue(new Response(JSON.stringify({ message: 'invalid email payload' }), {
+      status: 400,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    }));
+    vi.stubGlobal('fetch', fetchSpy);
+
+    const db = createD1Database();
+    db.issues.push(createIssue({
+      email: 'student@example.com',
+      notify_by_email: 1,
+    }));
+    const backgroundTasks = [];
+
+    const response = await onReplyRequest({
+      request: createAdminRequest('http://localhost/api/admin/issues/1/replies', {
+        content: '已经安排今天下午检修，处理完成后会同步结果。',
+        isPublic: true,
+      }),
+      env: createAdminEnv(db, {
+        PUBLIC_BASE_URL: 'https://issue.calvin-xia.cn',
+        RESEND_API_KEY: 're_test_key',
+      }),
+      params: {
+        id: '1',
+      },
+      waitUntil(promise) {
+        backgroundTasks.push(promise);
+      },
+    });
+
+    await Promise.all(backgroundTasks);
+
+    expect(response.status).toBe(201);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(errorSpy).toHaveBeenCalledWith('Issue reply notification failed:', expect.objectContaining({
+      issueId: 1,
+      trackingCode: 'ABCD23EF',
+      error: 'invalid email payload',
+      responseStatus: 400,
+    }));
   });
 });

@@ -5,6 +5,8 @@ CREATE TABLE IF NOT EXISTS issues (
   tracking_code TEXT NOT NULL UNIQUE,
   name TEXT NOT NULL,
   student_id TEXT NOT NULL,
+  email TEXT,
+  notify_by_email INTEGER NOT NULL DEFAULT 0,
   content TEXT NOT NULL,
   is_public INTEGER NOT NULL DEFAULT 0,
   is_reported INTEGER NOT NULL DEFAULT 0,

@@ -130,6 +130,12 @@
           </div>
 
           <label class="space-y-2 text-sm font-medium text-[#25314a]">
+            <span>邮箱（选填）</span>
+            <input id="email" name="email" type="email" class="field-shell h-12 w-full rounded-2xl px-4 text-[15px]" maxlength="254" placeholder="用于接收关键处理进展提醒">
+            <span class="block text-xs leading-6 text-[#72809a]">邮箱仅用于接收通知，不作为登录方式或公开展示字段。</span>
+          </label>
+
+          <label class="space-y-2 text-sm font-medium text-[#25314a]">
             <span>分类</span>
             <select id="category" name="category" class="field-shell h-12 w-full rounded-2xl px-4 text-[15px]" required>
               <option value="academic">学业相关</option>
@@ -148,6 +154,7 @@
 
           <div class="grid gap-3">
             <div class="section-caption">处理偏好</div>
+            <label class="option-card flex items-start gap-3 rounded-[1.4rem] px-4 py-3 text-sm leading-6 text-[#445069]"><input id="notifyByEmail" name="notifyByEmail" type="checkbox" class="mt-1 h-4 w-4 rounded border-[#b9c3d6] text-[#2457d6] focus:ring-[#2457d6]" disabled><span><strong class="block text-[#172033]">接收邮件提醒</strong>填写邮箱后，可在处理进入关键阶段或收到管理员公开回复时收到提醒。</span></label>
             <label class="option-card flex items-start gap-3 rounded-[1.4rem] px-4 py-3 text-sm leading-6 text-[#445069]"><input id="isPublic" name="isPublic" type="checkbox" class="mt-1 h-4 w-4 rounded border-[#b9c3d6] text-[#2457d6] focus:ring-[#2457d6]"><span><strong class="block text-[#172033]">加入公开列表</strong>允许问题内容和处理摘要出现在首页公开列表中，便于同步进展。</span></label>
             <label class="option-card flex items-start gap-3 rounded-[1.4rem] px-4 py-3 text-sm leading-6 text-[#445069]"><input id="isReported" name="isReported" type="checkbox" class="mt-1 h-4 w-4 rounded border-[#b9c3d6] text-[#2457d6] focus:ring-[#2457d6]"><span><strong class="block text-[#172033]">需要上报</strong>如果你希望该问题进入上报流程，请勾选此项，后台会据此优先处理。</span></label>
           </div>

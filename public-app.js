@@ -371,14 +371,30 @@ function schedulePublicReload() {
     loadPublicList(1);
   }, 320);
 }
+
+function syncNotificationPreference() {
+  const emailInput = document.getElementById('email');
+  const notifyCheckbox = document.getElementById('notifyByEmail');
+  const hasEmail = emailInput.value.trim() !== '';
+
+  notifyCheckbox.disabled = !hasEmail;
+  notifyCheckbox.setAttribute('aria-disabled', String(!hasEmail));
+  if (!hasEmail) {
+    notifyCheckbox.checked = false;
+  }
+}
+
 async function handleSubmit(event) {
   event.preventDefault();
   clearNotification();
 
   const button = document.getElementById('submitButton');
+  const email = document.getElementById('email').value.trim();
   const payload = {
     name: document.getElementById('name').value.trim(),
     studentId: document.getElementById('studentId').value.trim(),
+    email,
+    notifyByEmail: Boolean(email) && document.getElementById('notifyByEmail').checked,
     category: document.getElementById('category').value,
     content: document.getElementById('content').value.trim(),
     isPublic: document.getElementById('isPublic').checked,
@@ -411,6 +427,7 @@ async function handleSubmit(event) {
       block: 'start',
     });
     document.getElementById('issueForm').reset();
+    syncNotificationPreference();
     showNotification('提交成功，追踪编号已生成。', 'success');
     await loadPublicList(1);
   } catch (error) {
@@ -437,6 +454,7 @@ async function copyTrackingCode() {
 
 function bindEvents() {
   document.getElementById('issueForm').addEventListener('submit', handleSubmit);
+  document.getElementById('email').addEventListener('input', syncNotificationPreference);
   document.getElementById('filterForm').addEventListener('submit', (event) => {
     event.preventDefault();
     loadPublicList(1);
@@ -458,6 +476,7 @@ function bindEvents() {
 restoreFiltersFromUrl();
 renderSearchHistory();
 bindEvents();
+syncNotificationPreference();
 
 
 loadPublicList(state.page);

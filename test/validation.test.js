@@ -68,6 +68,52 @@ describe('issueSchema', () => {
     expect(result.success).toBe(false);
     expect(result.error.issues[0].message).toBe('分类无效');
   });
+
+  it('normalizes optional email notifications', () => {
+    const result = issueSchema.safeParse({
+      name: '张三',
+      studentId: '12345',
+      email: ' USER@EXAMPLE.COM ',
+      notifyByEmail: true,
+      content: '图书馆空调在下午完全不制冷，需要尽快维修。',
+      category: 'facility',
+      isPublic: false,
+      isReported: false,
+    });
+    const blankEmailResult = issueSchema.safeParse({
+      name: '张三',
+      studentId: '12345',
+      email: '   ',
+      notifyByEmail: true,
+      content: '图书馆空调在下午完全不制冷，需要尽快维修。',
+      category: 'facility',
+      isPublic: false,
+      isReported: false,
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.data.email).toBe('user@example.com');
+    expect(result.data.notifyByEmail).toBe(true);
+    expect(blankEmailResult.success).toBe(true);
+    expect(blankEmailResult.data.email).toBeUndefined();
+    expect(blankEmailResult.data.notifyByEmail).toBe(false);
+  });
+
+  it('rejects invalid email formats', () => {
+    const result = issueSchema.safeParse({
+      name: '张三',
+      studentId: '12345',
+      email: 'bad-email',
+      notifyByEmail: true,
+      content: '图书馆空调在下午完全不制冷，需要尽快维修。',
+      category: 'facility',
+      isPublic: false,
+      isReported: false,
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error.issues[0].message).toBe('邮箱格式无效');
+  });
 });
 
 describe('statusUpdateSchema', () => {

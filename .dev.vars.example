@@ -6,6 +6,12 @@
 # Quote the value if it contains #, &, $, or spaces.
 ADMIN_SECRET_KEY="your-secret-key-here-change-me"
 
+# Resend API key for transactional notification emails.
+RESEND_API_KEY="re_xxxxxxxxx"
+
 # Optional explicit environment label for local development.
 # The repository defaults to local in wrangler.toml, but keeping it here helps when debugging.
 ENVIRONMENT="local"
+
+# Optional public base URL used in email tracking links.
+PUBLIC_BASE_URL="http://localhost:8787"

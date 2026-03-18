@@ -130,16 +130,44 @@ class FakeD1Database {
     }
 
     if (sql.startsWith('INSERT INTO issues (')) {
-      const [trackingCode, name, studentId, content, isPublic, isReported, category, priority, status, createdAt, updatedAt] = bindings;
+      const hasEmailFields = bindings.length === 13;
+      const [
+        trackingCode,
+        name,
+        studentId,
+        emailOrContent,
+        notifyByEmailOrIsPublic,
+        contentOrIsReported,
+        isPublicOrCategory,
+        isReportedOrPriority,
+        categoryOrStatus,
+        priorityOrCreatedAt,
+        statusOrUpdatedAt,
+        createdAtMaybe,
+        updatedAtMaybe,
+      ] = bindings;
       if (this.findIssueByTrackingCode(trackingCode)) {
         throw new Error('UNIQUE constraint failed: issues.tracking_code');
       }
+
+      const email = hasEmailFields ? emailOrContent : null;
+      const notifyByEmail = hasEmailFields ? notifyByEmailOrIsPublic : 0;
+      const content = hasEmailFields ? contentOrIsReported : emailOrContent;
+      const isPublic = hasEmailFields ? isPublicOrCategory : notifyByEmailOrIsPublic;
+      const isReported = hasEmailFields ? isReportedOrPriority : contentOrIsReported;
+      const category = hasEmailFields ? categoryOrStatus : isPublicOrCategory;
+      const priority = hasEmailFields ? priorityOrCreatedAt : isReportedOrPriority;
+      const status = hasEmailFields ? statusOrUpdatedAt : categoryOrStatus;
+      const createdAt = hasEmailFields ? createdAtMaybe : priorityOrCreatedAt;
+      const updatedAt = hasEmailFields ? updatedAtMaybe : statusOrUpdatedAt;
 
       const issue = {
         id: this.ids.issue++,
         tracking_code: trackingCode,
         name,
         student_id: studentId,
+        email,
+        notify_by_email: notifyByEmail,
         content,
         is_public: isPublic,
         is_reported: isReported,

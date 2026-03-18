@@ -111,14 +111,16 @@ export async function onRequest(context) {
       env.DB.batch([
         env.DB.prepare(`
           INSERT INTO issues (
-            tracking_code, name, student_id, content, is_public, is_reported,
-            category, priority, status, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            tracking_code, name, student_id, email, notify_by_email, content,
+            is_public, is_reported, category, priority, status, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `)
           .bind(
             nextTrackingCode,
             payload.name,
             payload.studentId,
+            payload.email ?? null,
+            payload.notifyByEmail ? 1 : 0,
             payload.content,
             payload.isPublic ? 1 : 0,
             payload.isReported ? 1 : 0,

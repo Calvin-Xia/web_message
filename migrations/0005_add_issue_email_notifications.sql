@@ -1,0 +1,3 @@
+ALTER TABLE issues ADD COLUMN email TEXT;
+
+ALTER TABLE issues ADD COLUMN notify_by_email INTEGER NOT NULL DEFAULT 0;

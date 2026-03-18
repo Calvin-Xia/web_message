@@ -44,6 +44,8 @@ function createIssuePayload() {
   return {
     name: '测试用户',
     studentId: '2024001001001',
+    email: 'student@example.com',
+    notifyByEmail: true,
     category: 'facility',
     content: '测试内容已经超过十个字符，用于验证公开提交流程。',
     isPublic: true,
@@ -113,5 +115,28 @@ describe('public issues route', () => {
     expect(env.DB.issues).toHaveLength(0);
     expect(env.DB.issueUpdates).toHaveLength(0);
     expect(env.DB.adminActions).toHaveLength(0);
+  });
+
+  it('stores email notification preferences without exposing them in the response', async () => {
+    const env = createAppEnv();
+
+    const response = await onRequest({
+      request: new Request('http://localhost/api/issues', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(createIssuePayload()),
+      }),
+      env,
+      params: {},
+    });
+    const payload = await response.json();
+
+    expect(response.status).toBe(201);
+    expect(payload.success).toBe(true);
+    expect(payload.data).not.toHaveProperty('email');
+    expect(env.DB.issues[0].email).toBe('student@example.com');
+    expect(env.DB.issues[0].notify_by_email).toBe(1);
   });
 });

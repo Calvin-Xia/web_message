@@ -108,17 +108,24 @@ const paginationSchema = z.object({
 });
 const dateQuerySchema = z.preprocess(emptyToUndefined, z.string().regex(datePattern, '日期格式必须为 YYYY-MM-DD').optional());
 const booleanQuerySchema = z.preprocess(stringToBoolean, z.boolean().optional());
+const optionalEmailSchema = z.preprocess(emptyToUndefined, z.string().trim().max(254, '邮箱不能超过254个字符').email('邮箱格式无效').optional());
 
 export const issueSchema = z.object({
   name: z.string().trim().min(1, '姓名不能为空').max(50, '姓名不能超过50个字符'),
   studentId: z.string().trim().regex(studentIdPattern, '学号必须为4位、5位或13位数字'),
+  email: optionalEmailSchema,
+  notifyByEmail: z.boolean().default(false),
   content: z.string().trim().min(10, '问题内容至少需要10个字符').max(2000, '问题内容不能超过2000个字符'),
   isPublic: z.boolean().default(false),
   isReported: z.boolean().default(false),
   category: z.enum(CATEGORY_VALUES, {
     error: () => ({ message: '分类无效' }),
   }),
-}).strict();
+}).strict().transform((value) => ({
+  ...value,
+  email: value.email?.toLowerCase(),
+  notifyByEmail: Boolean(value.email) && value.notifyByEmail,
+}));
 
 export const publicIssueListQuerySchema = paginationSchema.extend({
   status: enumListSchema(STATUS_VALUES, '状态无效'),

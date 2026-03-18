@@ -1,11 +1,25 @@
 import { getAdminCorsPolicy, createForbiddenOriginResponse, authorizeAdminRequest } from '../../../../../src/shared/auth.js';
 import { createAdminActionStatement, getIssueById, mapIssueUpdate } from '../../../../../src/shared/issueData.js';
+import {
+  createNotificationIdempotencyKey,
+  sendIssueReplyNotification,
+  shouldNotifyIssue,
+} from '../../../../../src/shared/email.js';
 import { successResponse, errorResponse, createOptionsResponse, methodNotAllowedResponse, notFoundResponse } from '../../../../../src/shared/response.js';
 import { formatZodError, issueIdSchema, replySchema } from '../../../../../src/shared/validation.js';
 import { checkAdminRateLimit, getClientIP } from '../../../../../src/shared/rateLimit.js';
 import { parseJsonBody } from '../../../../../src/shared/request.js';
 
 const ALLOWED_METHODS = 'POST, OPTIONS';
+
+function queueBackgroundTask(context, promise) {
+  if (typeof context.waitUntil === 'function') {
+    context.waitUntil(promise);
+    return;
+  }
+
+  void promise;
+}
 
 export async function onRequest(context) {
   const { request, env, params } = context;
@@ -86,6 +100,30 @@ export async function onRequest(context) {
         performedAt: now,
       }),
     ]);
+
+    if (reply.isPublic && shouldNotifyIssue(issue)) {
+      const replyId = Number(insertResult.meta?.last_row_id) || now;
+      const idempotencyKey = createNotificationIdempotencyKey(issueId, 'public-reply', replyId);
+
+      queueBackgroundTask(context, (async () => {
+        const result = await sendIssueReplyNotification({
+          env,
+          requestUrl: request.url,
+          issue,
+          replyContent: reply.content,
+          idempotencyKey,
+        });
+
+        if (!result.success && !result.skipped) {
+          console.error('Issue reply notification failed:', {
+            issueId,
+            trackingCode: issue.tracking_code,
+            error: result.error,
+            responseStatus: result.status ?? null,
+          });
+        }
+      })());
+    }
 
     return successResponse(mapIssueUpdate({
       id: Number(insertResult.meta?.last_row_id),

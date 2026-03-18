@@ -92,12 +92,17 @@
 {
   "name": "张三",
   "studentId": "2024001001001",
+  "email": "student@example.com",
+  "notifyByEmail": true,
   "category": "facility",
   "content": "图书馆空调故障，需要尽快处理。",
   "isPublic": false,
   "isReported": false
 }
 ```
+
+- `email`：可选，仅用于接收关键进展邮件提醒
+- `notifyByEmail`：可选，默认 `false`；未填写邮箱时即使传 `true` 也不会启用提醒
 
 ### `GET /api/issues/:trackingCode`
 

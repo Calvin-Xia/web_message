@@ -1,6 +1,12 @@
 import { canTransitionStatus } from '../../../../src/shared/constants.js';
 import { getAdminCorsPolicy, createForbiddenOriginResponse, authorizeAdminRequest } from '../../../../src/shared/auth.js';
 import {
+  createNotificationIdempotencyKey,
+  isNotifiableStatus,
+  sendIssueStatusNotification,
+  shouldNotifyIssue,
+} from '../../../../src/shared/email.js';
+import {
   createAdminActionStatement,
   getIssueById,
   mapAdminAction,
@@ -15,6 +21,15 @@ import { checkAdminRateLimit, getClientIP } from '../../../../src/shared/rateLim
 import { parseJsonBody } from '../../../../src/shared/request.js';
 
 const ALLOWED_METHODS = 'GET, PATCH, OPTIONS';
+
+function queueBackgroundTask(context, promise) {
+  if (typeof context.waitUntil === 'function') {
+    context.waitUntil(promise);
+    return;
+  }
+
+  void promise;
+}
 
 async function loadIssueDetail(db, issueId) {
   const issue = await getIssueById(db, issueId);
@@ -319,6 +334,40 @@ export async function onRequest(context) {
         status: 409,
         headers: authResult.corsHeaders,
       });
+    }
+
+    if (statusChange && isNotifiableStatus(statusChange.newValue) && shouldNotifyIssue(existingIssue)) {
+      const notificationIssue = {
+        ...existingIssue,
+        status: statusChange.newValue,
+        public_summary: payload.publicSummary ?? existingIssue.public_summary,
+        updated_at: now,
+      };
+      const idempotencyKey = createNotificationIdempotencyKey(
+        issueId,
+        `status-${statusChange.newValue}`,
+        now,
+      );
+
+      queueBackgroundTask(context, (async () => {
+        const result = await sendIssueStatusNotification({
+          env,
+          requestUrl: request.url,
+          issue: notificationIssue,
+          status: statusChange.newValue,
+          idempotencyKey,
+        });
+
+        if (!result.success && !result.skipped) {
+          console.error('Issue status notification failed:', {
+            issueId,
+            trackingCode: existingIssue.tracking_code,
+            status: statusChange.newValue,
+            error: result.error,
+            responseStatus: result.status ?? null,
+          });
+        }
+      })());
     }
 
     return successResponse({
