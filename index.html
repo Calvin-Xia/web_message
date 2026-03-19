@@ -96,7 +96,7 @@
   <main class="mx-auto mt-6 max-w-6xl space-y-8 pb-8 md:mt-8">
     <section class="grid gap-6 lg:grid-cols-[1.08fr_0.92fr]">
       <div class="hero-rail surface-panel rounded-[2rem] p-7 md:p-9">
-        <div class="max-w-xl">
+        <div class="max-w-2xl">
           <div class="inline-flex items-center rounded-full bg-[rgba(36,87,214,0.1)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-[#2147ac]">公开同步 + 私密追踪</div>
           <h2 class="display-font mt-5 text-4xl leading-tight md:text-5xl">让每一条留言都有编号、有状态、有回音。</h2>
           <p class="mt-4 text-base leading-7 text-[#4c566b] md:text-lg">提交后系统会立即生成追踪编号。选择公开的问题会进入下方公开列表；未公开的问题不会出现在列表中，但依然可以通过追踪页查看处理状态与公开回复。</p>
@@ -105,7 +105,10 @@
             <div class="rounded-3xl border border-[rgba(23,32,51,0.08)] bg-white/60 p-4"><div class="text-xs uppercase tracking-[0.25em] text-[#72809a]">Step 02</div><div class="mt-2 text-lg font-semibold">保存编号</div><div class="mt-1 text-sm text-[#5f6b80]">追踪页随时查询</div></div>
             <div class="rounded-3xl border border-[rgba(23,32,51,0.08)] bg-white/60 p-4"><div class="text-xs uppercase tracking-[0.25em] text-[#72809a]">Step 03</div><div class="mt-2 text-lg font-semibold">查看回执</div><div class="mt-1 text-sm text-[#5f6b80]">状态变化会被记录</div></div>
           </div>
-          <div class="notice-box mt-6 rounded-[1.5rem] p-4 text-sm leading-6 text-[#445069]">姓名和学号仅用于后台处理，不会进入公开接口。若你不勾选“加入公开列表”，他人不会在首页看到你的问题内容。</div>
+          <div class="notice-box mt-6 space-y-3 rounded-[1.5rem] p-4 text-sm leading-6 text-[#445069]">
+            <p>姓名和学号仅用于后台处理与追踪，不会进入公开接口，也不会直接出现在首页公开列表。</p>
+            <p>只有在你勾选“加入公开列表”后，分类、内容和处理摘要才会对外展示。提交后建议立即复制追踪编号；未公开的问题只有凭编号才能查看进度。</p>
+          </div>
         </div>
       </div>
 
@@ -121,9 +124,6 @@
         <div id="submitNotification" class="mt-4" aria-live="polite" aria-atomic="true"></div>
 
         <form id="issueForm" class="mt-4 space-y-4">
-          <div class="rounded-[1.2rem] border border-[rgba(23,32,51,0.08)] bg-white/60 px-4 py-3 text-sm leading-6 text-[#5f6b80]">
-            姓名和学号仅用于处理与追踪，不会进入公开列表。分类、内容和处理摘要只会在你勾选“加入公开列表”后对外展示。提交后建议立即复制追踪编号，未公开的问题只有凭编号才能查看进度。
-          </div>
           <div class="grid gap-4 sm:grid-cols-2">
             <label class="space-y-2 text-sm font-medium text-[#25314a]"><span>姓名</span><input id="name" name="name" class="field-shell h-12 w-full rounded-2xl px-4 text-[15px]" maxlength="50" placeholder="请输入姓名" required></label>
             <label class="space-y-2 text-sm font-medium text-[#25314a]"><span>学号</span><input id="studentId" name="studentId" class="field-shell h-12 w-full rounded-2xl px-4 text-[15px]" placeholder="4位 / 5位 / 13位数字" required></label>
