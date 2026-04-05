@@ -197,11 +197,11 @@ export function resolvePublicOrderBy({ sort, sortField, sortOrder }, { tableAlia
   return `${getColumnName(tableAlias, 'created_at')} ${order}, ${getColumnName(tableAlias, 'id')} ${order}`;
 }
 
-export function isLegacyAdminSort(value) {
+export function isSupportedLegacyAdminSort(value) {
   return typeof value === 'string' && ADMIN_SORT_VALUES.includes(value);
 }
 
-export function isLegacyPublicSort(value) {
+export function isSupportedLegacyPublicSort(value) {
   return typeof value === 'string' && PUBLIC_SORT_VALUES.includes(value);
 }
 
@@ -226,6 +226,8 @@ export function calculatePercentiles(values) {
     };
   }
 
+  // 仪表盘只需要稳定、可解释的近似分位数，因此这里采用 nearest-rank 风格取样，
+  // 再对最终展示值取整，避免把统计面板变成高精度数值分析工具。
   const pick = (percentile) => {
     const index = Math.min(sorted.length - 1, Math.max(0, Math.ceil(sorted.length * percentile) - 1));
     return Math.round(sorted[index]);

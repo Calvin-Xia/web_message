@@ -143,11 +143,12 @@ function setHero(data) {
   const alerts = data.alerts || [];
   const statusText = status === 'healthy' ? '系统健康' : status === 'degraded' ? '系统降级' : '系统异常';
   const summary = status === 'healthy'
-    ? '关键依赖可用，最近采样窗口未发现严重异常。'
+    ? `关键依赖可用，当前${alerts.length > 0 ? `仍有 ${alerts.length} 条活动告警` : '没有活动告警'}。`
     : status === 'degraded'
-      ? '部分依赖或性能指标触发预警，需要关注当前面板中的告警项。'
-      : '存在关键依赖故障或高风险告警，请优先处理数据库或接口异常。';
+      ? `部分依赖或性能指标触发预警，当前有 ${alerts.length} 条活动告警。`
+      : `存在关键依赖故障或高风险告警，当前有 ${alerts.length} 条活动告警。`;
 
+  document.body.dataset.healthStatus = status;
   dom.heroStatus.dataset.status = status;
   dom.heroStatus.textContent = statusText;
   dom.heroSummary.textContent = summary;
@@ -327,6 +328,7 @@ function renderDashboard(data) {
 }
 
 function renderFailure(message) {
+  document.body.dataset.healthStatus = 'unhealthy';
   dom.heroStatus.dataset.status = 'unhealthy';
   dom.heroStatus.textContent = '检查失败';
   dom.heroSummary.textContent = message;

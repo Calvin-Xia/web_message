@@ -8,6 +8,9 @@ import { buildAdminIssueWhere } from '../../../src/shared/issueQueries.js';
 
 const ALLOWED_METHODS = 'GET, OPTIONS';
 const CURSOR_PAGE_SIZE = 1000;
+const MAX_EXPORT_ROWS = 50_000;
+// 管理端导出用于内部运营和审计留档，默认保留原始字段以避免二次核对时信息丢失。
+// 导出文件会落地到管理员本机，因此必须继续通过后台鉴权、限流和操作审计控制访问边界。
 const EXPORT_HEADERS = [
   'id',
   'tracking_code',
@@ -93,6 +96,18 @@ export async function onRequest(context) {
     }
 
     const { whereSql, bindings } = buildAdminIssueWhere(query, { tableAlias: 'issues' });
+    const totalRow = await env.DB.prepare(`SELECT COUNT(*) AS total FROM issues ${whereSql}`)
+      .bind(...bindings)
+      .first();
+    const total = Number(totalRow?.total) || 0;
+
+    if (total > MAX_EXPORT_ROWS) {
+      return errorResponse(`导出结果超过 ${MAX_EXPORT_ROWS} 条，请缩小筛选范围后重试`, {
+        status: 413,
+        headers: authResult.corsHeaders,
+      });
+    }
+
     const rows = [];
     let lastId = 0;
 

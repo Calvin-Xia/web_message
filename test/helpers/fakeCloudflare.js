@@ -15,6 +15,22 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function extractPlaceholderCount(sql, pattern) {
+  const match = sql.match(pattern);
+  if (!match) {
+    return 0;
+  }
+
+  return (match[1].match(/\?/g) || []).length;
+}
+
+function normalizeSearchPattern(value) {
+  return String(value || '')
+    .replace(/^%|%$/g, '')
+    .replace(/\\([%_\\])/g, '$1')
+    .toLowerCase();
+}
+
 export function createRateLimitKv(initial = {}) {
   const store = new Map(Object.entries(initial));
   return {
@@ -116,6 +132,91 @@ class FakeD1Database {
 
   findIssueByTrackingCode(trackingCode) {
     return this.issues.find((issue) => issue.tracking_code === trackingCode);
+  }
+
+  filterAdminIssues(sql, bindings = []) {
+    let bindingIndex = 0;
+    let issues = this.issues.slice();
+
+    const statusCount = extractPlaceholderCount(sql, /issues\.status IN \(([^)]+)\)/);
+    if (statusCount > 0) {
+      const values = bindings.slice(bindingIndex, bindingIndex + statusCount);
+      bindingIndex += statusCount;
+      issues = issues.filter((issue) => values.includes(issue.status));
+    }
+
+    const categoryCount = extractPlaceholderCount(sql, /issues\.category IN \(([^)]+)\)/);
+    if (categoryCount > 0) {
+      const values = bindings.slice(bindingIndex, bindingIndex + categoryCount);
+      bindingIndex += categoryCount;
+      issues = issues.filter((issue) => values.includes(issue.category));
+    }
+
+    const priorityCount = extractPlaceholderCount(sql, /issues\.priority IN \(([^)]+)\)/);
+    if (priorityCount > 0) {
+      const values = bindings.slice(bindingIndex, bindingIndex + priorityCount);
+      bindingIndex += priorityCount;
+      issues = issues.filter((issue) => values.includes(issue.priority));
+    }
+
+    if (sql.includes('issues.assigned_to = ?')) {
+      const assignedTo = bindings[bindingIndex];
+      bindingIndex += 1;
+      issues = issues.filter((issue) => issue.assigned_to === assignedTo);
+    }
+
+    if (sql.includes("COALESCE(TRIM(issues.assigned_to), '') <> ''")) {
+      issues = issues.filter((issue) => String(issue.assigned_to || '').trim() !== '');
+    } else if (sql.includes("COALESCE(TRIM(issues.assigned_to), '') = ''")) {
+      issues = issues.filter((issue) => String(issue.assigned_to || '').trim() === '');
+    }
+
+    if (sql.includes('date(issues.created_at) >= date(?)')) {
+      const startDate = bindings[bindingIndex];
+      bindingIndex += 1;
+      issues = issues.filter((issue) => String(issue.created_at || '').slice(0, 10) >= startDate);
+    }
+
+    if (sql.includes('date(issues.created_at) <= date(?)')) {
+      const endDate = bindings[bindingIndex];
+      bindingIndex += 1;
+      issues = issues.filter((issue) => String(issue.created_at || '').slice(0, 10) <= endDate);
+    }
+
+    if (sql.includes('date(issues.updated_at) >= date(?)')) {
+      const updatedAfter = bindings[bindingIndex];
+      bindingIndex += 1;
+      issues = issues.filter((issue) => String(issue.updated_at || '').slice(0, 10) >= updatedAfter);
+    }
+
+    if (sql.includes('EXISTS (SELECT 1 FROM issue_internal_notes notes WHERE notes.issue_id = issues.id)')) {
+      issues = issues.filter((issue) => this.issueInternalNotes.some((note) => note.issue_id === issue.id));
+    } else if (sql.includes('NOT EXISTS (SELECT 1 FROM issue_internal_notes notes WHERE notes.issue_id = issues.id)')) {
+      issues = issues.filter((issue) => !this.issueInternalNotes.some((note) => note.issue_id === issue.id));
+    }
+
+    if (sql.includes("EXISTS (SELECT 1 FROM issue_updates updates WHERE updates.issue_id = issues.id AND updates.update_type = 'public_reply')")) {
+      issues = issues.filter((issue) => this.issueUpdates.some((update) => update.issue_id === issue.id && update.update_type === 'public_reply'));
+    } else if (sql.includes("NOT EXISTS (SELECT 1 FROM issue_updates updates WHERE updates.issue_id = issues.id AND updates.update_type = 'public_reply')")) {
+      issues = issues.filter((issue) => !this.issueUpdates.some((update) => update.issue_id === issue.id && update.update_type === 'public_reply'));
+    }
+
+    if (sql.includes('issues.tracking_code LIKE ? ESCAPE')) {
+      const keyword = normalizeSearchPattern(bindings[bindingIndex]);
+      bindingIndex += 5;
+      issues = issues.filter((issue) => {
+        const values = [
+          issue.tracking_code,
+          issue.name,
+          issue.student_id,
+          issue.content,
+          issue.public_summary,
+        ];
+        return values.some((value) => String(value || '').toLowerCase().includes(keyword));
+      });
+    }
+
+    return issues;
   }
 
   insertAdminAction({ actionType, targetType, targetId, details, performedBy, performedAt, ipAddress }) {
@@ -354,6 +455,12 @@ class FakeD1Database {
       return row ? clone(row) : null;
     }
 
+    if (sql.startsWith('SELECT COUNT(*) AS total FROM issues')) {
+      return {
+        total: this.filterAdminIssues(sql, bindings).length,
+      };
+    }
+
     if (sql.includes('FROM issue_updates WHERE issue_id = ?') && sql.includes("AND (update_type = 'status_change' OR is_public = 1)")) {
       const [issueId] = bindings;
       const results = this.issueUpdates
@@ -483,7 +590,8 @@ class FakeD1Database {
     if (sql.startsWith('SELECT issues.id,') && sql.includes('FROM issues')) {
       const lastId = Number(bindings[bindings.length - 2]) || 0;
       const limit = Number(bindings[bindings.length - 1]) || this.issues.length;
-      const rows = this.issues
+      const filterBindings = bindings.slice(0, -2);
+      const rows = this.filterAdminIssues(sql, filterBindings)
         .filter((issue) => issue.id > lastId)
         .sort((left, right) => left.id - right.id)
         .slice(0, limit)

@@ -246,7 +246,7 @@ function updateMultiFilterSummary(key) {
   summaryNode.textContent = selected.length === 0 ? '全部' : `已选 ${selected.length}`;
 }
 
-function getBooleanValue(id) {
+function getTriStateFilterValue(id) {
   const value = document.getElementById(id).value;
   return value === '' ? '' : value;
 }
@@ -261,9 +261,9 @@ function getFilters() {
     startDate: document.getElementById('startDateFilter').value,
     endDate: document.getElementById('endDateFilter').value,
     updatedAfter: document.getElementById('updatedAfterFilter').value,
-    hasNotes: getBooleanValue('hasNotesFilter'),
-    hasReplies: getBooleanValue('hasRepliesFilter'),
-    isAssigned: getBooleanValue('isAssignedFilter'),
+    hasNotes: getTriStateFilterValue('hasNotesFilter'),
+    hasReplies: getTriStateFilterValue('hasRepliesFilter'),
+    isAssigned: getTriStateFilterValue('isAssignedFilter'),
     sortField: document.getElementById('sortFieldFilter').value,
     sortOrder: document.getElementById('sortOrderFilter').value,
   };
@@ -375,6 +375,25 @@ function restoreFiltersFromUrl() {
   document.querySelectorAll('[data-period-button]').forEach((button) => {
     button.dataset.active = button.dataset.periodButton === state.metricsPeriod ? 'true' : 'false';
   });
+}
+
+function syncAdvancedAdminFiltersState() {
+  const details = document.getElementById('advancedAdminFilters');
+  if (!(details instanceof HTMLDetailsElement)) {
+    return;
+  }
+
+  const hasAdvancedFilters = Boolean(
+    document.getElementById('assignedToFilter').value.trim()
+    || document.getElementById('updatedAfterFilter').value
+    || document.getElementById('hasNotesFilter').value
+    || document.getElementById('hasRepliesFilter').value
+    || document.getElementById('isAssignedFilter').value
+    || document.getElementById('sortFieldFilter').value !== 'createdAt'
+    || document.getElementById('sortOrderFilter').value !== 'desc',
+  );
+
+  details.open = hasAdvancedFilters;
 }
 
 function pushSearchHistory(term) {
@@ -1111,6 +1130,10 @@ function bindEvents() {
     setMultiFilterValues('status', []);
     setMultiFilterValues('category', []);
     setMultiFilterValues('priority', []);
+    const advancedFilters = document.getElementById('advancedAdminFilters');
+    if (advancedFilters instanceof HTMLDetailsElement) {
+      advancedFilters.open = false;
+    }
     state.metricsPeriod = 'week';
     document.querySelectorAll('[data-period-button]').forEach((button) => {
       button.dataset.active = button.dataset.periodButton === 'week' ? 'true' : 'false';
@@ -1157,9 +1180,14 @@ function bindEvents() {
       loadMetrics(true).then(() => syncUrl(state.page)).catch((error) => setNotification('metricsNotification', error.message, 'error'));
     });
   });
+
+  ['assignedToFilter', 'updatedAfterFilter', 'hasNotesFilter', 'hasRepliesFilter', 'isAssignedFilter', 'sortFieldFilter', 'sortOrderFilter'].forEach((id) => {
+    document.getElementById(id).addEventListener('change', syncAdvancedAdminFiltersState);
+  });
 }
 
 restoreFiltersFromUrl();
+syncAdvancedAdminFiltersState();
 renderSearchHistory();
 renderExportHistory();
 bindEvents();

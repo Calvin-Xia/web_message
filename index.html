@@ -8,8 +8,6 @@
   <style>
     :root {
       color-scheme: light;
-      --paper: #f5efe4;
-      --paper-strong: rgba(255, 252, 246, 0.9);
       --ink: #172033;
       --ink-soft: #4c566b;
       --line: rgba(23, 32, 51, 0.12);
@@ -21,26 +19,6 @@
       --panel-blur: 20px;
     }
 
-    body {
-      font-family: "Aptos", "Segoe UI", "PingFang SC", sans-serif;
-      background:
-        radial-gradient(circle at top left, rgba(36, 87, 214, 0.12), transparent 35%),
-        radial-gradient(circle at top right, rgba(217, 138, 23, 0.12), transparent 28%),
-        linear-gradient(180deg, #f8f3ea 0%, #efe8dc 100%);
-      color: var(--ink);
-    }
-
-    .grid-overlay {
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      opacity: 0.24;
-      background-image:
-        linear-gradient(rgba(23, 32, 51, 0.05) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(23, 32, 51, 0.05) 1px, transparent 1px);
-      background-size: 24px 24px;
-      mask-image: radial-gradient(circle at center, black 30%, transparent 92%);
-    }
     .hero-rail { position: relative; overflow: hidden; }
     .hero-rail::after {
       content: "";
@@ -79,12 +57,12 @@
     }
   </style>
 </head>
-<body class="min-h-screen px-4 py-5 md:px-8 md:py-8">
-  <div class="grid-overlay"></div>
+<body data-page-role="public" class="min-h-screen px-4 py-5 md:px-8 md:py-8">
   <header class="mx-auto flex max-w-6xl flex-col gap-4 md:flex-row md:items-center md:justify-between">
     <div>
       <div class="text-xs font-semibold uppercase tracking-[0.35em] text-[#5f6b80]">Public Desk</div>
       <h1 class="display-font mt-2 text-3xl text-[#172033] md:text-4xl">留言处理台</h1>
+      <p class="mt-3 max-w-2xl text-sm leading-7 text-[#4c566b]">同一个入口完成问题提交、公开同步和私密追踪，适合需要留痕、回执和后续回看的校园反馈场景。</p>
     </div>
     <nav class="flex flex-wrap gap-2 text-sm text-[#445069]">
       <a class="ghost-button rounded-full px-4 py-2 transition-colors" href="/tracking.html">追踪进度</a>
@@ -95,24 +73,24 @@
 
   <main class="mx-auto mt-6 max-w-6xl space-y-8 pb-8 md:mt-8">
     <section class="grid gap-6 lg:grid-cols-[1.08fr_0.92fr]">
-      <div class="hero-rail surface-panel rounded-[2rem] p-7 md:p-9">
+      <div class="hero-rail hero-slab rounded-[2rem] p-7 md:p-9">
         <div class="max-w-2xl">
-          <div class="inline-flex items-center rounded-full bg-[rgba(36,87,214,0.1)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-[#2147ac]">公开同步 + 私密追踪</div>
+          <div class="inline-flex items-center rounded-full bg-[rgba(36,87,214,0.1)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-[#2147ac]">Public Service Intake</div>
           <h2 class="display-font mt-5 text-4xl leading-tight md:text-5xl">让每一条留言都有编号、有状态、有回音。</h2>
-          <p class="mt-4 text-base leading-7 text-[#4c566b] md:text-lg">提交后系统会立即生成追踪编号。选择公开的问题会进入下方公开列表；未公开的问题不会出现在列表中，但依然可以通过追踪页查看处理状态与公开回复。</p>
-          <div class="mt-6 grid gap-3 sm:grid-cols-3">
-            <div class="rounded-3xl border border-[rgba(23,32,51,0.08)] bg-white/60 p-4"><div class="text-xs uppercase tracking-[0.25em] text-[#72809a]">Step 01</div><div class="mt-2 text-lg font-semibold">提交留言</div><div class="mt-1 text-sm text-[#5f6b80]">填写分类与内容</div></div>
-            <div class="rounded-3xl border border-[rgba(23,32,51,0.08)] bg-white/60 p-4"><div class="text-xs uppercase tracking-[0.25em] text-[#72809a]">Step 02</div><div class="mt-2 text-lg font-semibold">保存编号</div><div class="mt-1 text-sm text-[#5f6b80]">追踪页随时查询</div></div>
-            <div class="rounded-3xl border border-[rgba(23,32,51,0.08)] bg-white/60 p-4"><div class="text-xs uppercase tracking-[0.25em] text-[#72809a]">Step 03</div><div class="mt-2 text-lg font-semibold">查看回执</div><div class="mt-1 text-sm text-[#5f6b80]">状态变化会被记录</div></div>
+          <p class="mt-4 max-w-xl text-base leading-7 text-[#4c566b] md:text-lg">提交后系统会立即生成追踪编号。你可以选择公开同步，让其他人看到处理摘要；也可以只保留私人编号，在追踪页查看状态和公开回复。</p>
+          <div class="hero-actions mt-6">
+            <a class="primary-button rounded-full px-5 py-3 text-sm font-semibold transition" href="#newSubmission">开始提交</a>
+            <a class="ghost-button rounded-full px-5 py-3 text-sm font-semibold transition" href="/tracking.html">已有编号，直接查询</a>
           </div>
-          <div class="notice-box mt-6 space-y-3 rounded-[1.5rem] p-4 text-sm leading-6 text-[#445069]">
-            <p>姓名和学号仅用于后台处理与追踪，不会进入公开接口，也不会直接出现在首页公开列表。</p>
-            <p>只有在你勾选“加入公开列表”后，分类、内容和处理摘要才会对外展示。提交后建议立即复制追踪编号；未公开的问题只有凭编号才能查看进度。</p>
+          <div class="mt-6 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-[#72809a]">
+            <span class="rounded-full bg-white/65 px-3 py-2">公开可选</span>
+            <span class="rounded-full bg-white/65 px-3 py-2">默认私密追踪</span>
+            <span class="rounded-full bg-white/65 px-3 py-2">提交即生成编号</span>
           </div>
         </div>
       </div>
 
-      <section class="surface-panel rounded-[2rem] p-6 md:p-7">
+      <section id="newSubmission" class="surface-panel rounded-[2rem] p-6 md:p-7">
         <div class="flex items-center justify-between gap-3">
           <div>
             <div class="text-xs font-semibold uppercase tracking-[0.28em] text-[#72809a]">New Submission</div>
@@ -183,30 +161,43 @@
       </div>
     </section>
 
-    <section class="surface-panel rounded-[2rem] p-6 md:p-7">
+    <section id="publicFeed" class="surface-panel rounded-[2rem] p-6 md:p-7">
       <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <div class="text-xs font-semibold uppercase tracking-[0.3em] text-[#72809a]">Public Board</div>
-          <h3 class="display-font mt-2 text-3xl">公开同步问题</h3>
-          <p class="mt-2 max-w-2xl text-sm leading-6 text-[#4c566b]">这里只展示主动选择公开的问题。支持关键词、防抖搜索、日期范围筛选和多种排序，并且筛选条件会自动写入 URL。</p>
+          <div class="text-xs font-semibold uppercase tracking-[0.3em] text-[#72809a]">Public Feed</div>
+          <h3 class="display-font mt-2 text-3xl">公开同步区</h3>
+          <p class="mt-2 max-w-2xl text-sm leading-6 text-[#4c566b]">这里只展示主动选择公开的问题和处理摘要。关键词、状态、分类常驻，日期和排序放在高级筛选里。</p>
         </div>
-        <div id="publicSummary" class="rounded-[1.5rem] border border-[rgba(23,32,51,0.08)] bg-white/72 px-4 py-3 text-sm text-[#4c566b]" aria-live="polite" aria-atomic="true">尚未加载公开列表。</div>
+        <div id="publicSummary" class="support-panel rounded-[1.5rem] px-4 py-3 text-sm text-[#4c566b]" aria-live="polite" aria-atomic="true">尚未加载公开同步。</div>
       </div>
 
-      <form id="filterForm" class="mt-6 space-y-3">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <div class="section-caption">常用筛选</div>
-          <div class="text-sm text-[#5f6b80]">支持边输入边筛选，当前条件会自动写入地址栏。</div>
+      <form id="filterForm" class="mt-6 space-y-4">
+        <div class="filters-shell">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="section-caption">常用筛选</div>
+            <div class="text-sm text-[#5f6b80]">先用关键词、状态和分类快速浏览，筛选条件会自动写入地址栏。</div>
+          </div>
+          <div class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            <label class="space-y-2 text-sm font-medium text-[#25314a] md:col-span-2 xl:col-span-1"><span>关键词</span><input id="searchInput" list="publicSearchSuggestions" class="field-shell h-12 w-full rounded-2xl px-4 text-sm" placeholder="搜索内容、摘要或追踪编号"><datalist id="publicSearchSuggestions"></datalist></label>
+            <label class="space-y-2 text-sm font-medium text-[#25314a]"><span>状态</span><select id="statusFilter" class="field-shell h-12 w-full rounded-2xl px-4 text-sm"><option value="">全部状态</option><option value="submitted">已提交</option><option value="in_review">审核中</option><option value="in_progress">处理中</option><option value="resolved">已解决</option><option value="closed">已关闭</option></select></label>
+            <label class="space-y-2 text-sm font-medium text-[#25314a]"><span>分类</span><select id="categoryFilter" class="field-shell h-12 w-full rounded-2xl px-4 text-sm"><option value="">全部分类</option><option value="academic">学业相关</option><option value="facility">设施问题</option><option value="service">服务咨询</option><option value="complaint">投诉建议</option><option value="counseling">心理咨询</option><option value="other">其他</option></select></label>
+          </div>
         </div>
-        <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          <label class="space-y-2 text-sm font-medium text-[#25314a] md:col-span-2 xl:col-span-1"><span>关键词</span><input id="searchInput" list="publicSearchSuggestions" class="field-shell h-12 w-full rounded-2xl px-4 text-sm" placeholder="搜索内容、摘要或追踪编号"><datalist id="publicSearchSuggestions"></datalist></label>
-          <label class="space-y-2 text-sm font-medium text-[#25314a]"><span>状态</span><select id="statusFilter" class="field-shell h-12 w-full rounded-2xl px-4 text-sm"><option value="">全部状态</option><option value="submitted">已提交</option><option value="in_review">审核中</option><option value="in_progress">处理中</option><option value="resolved">已解决</option><option value="closed">已关闭</option></select></label>
-          <label class="space-y-2 text-sm font-medium text-[#25314a]"><span>分类</span><select id="categoryFilter" class="field-shell h-12 w-full rounded-2xl px-4 text-sm"><option value="">全部分类</option><option value="academic">学业相关</option><option value="facility">设施问题</option><option value="service">服务咨询</option><option value="complaint">投诉建议</option><option value="counseling">心理咨询</option><option value="other">其他</option></select></label>
-          <label class="space-y-2 text-sm font-medium text-[#25314a]"><span>开始日期</span><input id="startDateFilter" type="date" class="field-shell h-12 w-full rounded-2xl px-4 text-sm"></label>
-          <label class="space-y-2 text-sm font-medium text-[#25314a]"><span>结束日期</span><input id="endDateFilter" type="date" class="field-shell h-12 w-full rounded-2xl px-4 text-sm"></label>
-          <label class="space-y-2 text-sm font-medium text-[#25314a]"><span>排序字段</span><select id="sortFieldFilter" class="field-shell h-12 w-full rounded-2xl px-4 text-sm"><option value="updatedAt">最近更新</option><option value="createdAt">提交时间</option><option value="status">状态顺序</option></select></label>
-          <label class="space-y-2 text-sm font-medium text-[#25314a]"><span>排序方向</span><select id="sortOrderFilter" class="field-shell h-12 w-full rounded-2xl px-4 text-sm"><option value="desc">降序</option><option value="asc">升序</option></select></label>
-        </div>
+        <details id="advancedPublicFilters" class="filters-advanced">
+          <summary>
+            <div>
+              <div class="filters-advanced__meta">Advanced Filters</div>
+              <div class="filters-advanced__copy">日期范围与排序。</div>
+            </div>
+            <span class="mini-token">日期与排序</span>
+          </summary>
+          <div class="filters-advanced__content grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <label class="space-y-2 text-sm font-medium text-[#25314a]"><span>开始日期</span><input id="startDateFilter" type="date" class="field-shell h-12 w-full rounded-2xl px-4 text-sm"></label>
+            <label class="space-y-2 text-sm font-medium text-[#25314a]"><span>结束日期</span><input id="endDateFilter" type="date" class="field-shell h-12 w-full rounded-2xl px-4 text-sm"></label>
+            <label class="space-y-2 text-sm font-medium text-[#25314a]"><span>排序字段</span><select id="sortFieldFilter" class="field-shell h-12 w-full rounded-2xl px-4 text-sm"><option value="updatedAt">最近更新</option><option value="createdAt">提交时间</option><option value="status">状态顺序</option></select></label>
+            <label class="space-y-2 text-sm font-medium text-[#25314a]"><span>排序方向</span><select id="sortOrderFilter" class="field-shell h-12 w-full rounded-2xl px-4 text-sm"><option value="desc">降序</option><option value="asc">升序</option></select></label>
+          </div>
+        </details>
         <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div id="activeFilterChips" class="flex flex-wrap gap-2"></div>
           <div class="flex gap-2 sm:self-start">

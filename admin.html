@@ -16,18 +16,8 @@
       --mint: #13795b;
       --amber: #d98a17;
       --danger: #b23a32;
-      --paper: #f6f1e7;
       --shadow: 0 24px 70px rgba(18, 26, 44, 0.14);
       --panel-blur: 18px;
-    }
-
-    body {
-      font-family: "Aptos", "Segoe UI", "PingFang SC", sans-serif;
-      color: var(--ink);
-      background:
-        radial-gradient(circle at top left, rgba(36, 87, 214, 0.1), transparent 34%),
-        radial-gradient(circle at bottom right, rgba(217, 138, 23, 0.08), transparent 28%),
-        linear-gradient(180deg, #faf5ec 0%, #efe7d8 100%);
     }
 
     .action-button {
@@ -253,11 +243,12 @@
     }
   </style>
 </head>
-<body class="min-h-screen px-4 py-5 md:px-8 md:py-8">
+<body data-page-role="admin" class="min-h-screen px-4 py-5 md:px-8 md:py-8">
   <header class="mx-auto flex max-w-7xl flex-col gap-4 md:flex-row md:items-center md:justify-between">
     <div>
       <div class="text-xs font-semibold uppercase tracking-[0.35em] text-[#5f6b80]">Admin Operations Desk</div>
       <h1 class="display-font mt-2 text-3xl md:text-4xl">留言后台</h1>
+      <p class="mt-3 max-w-3xl text-sm leading-7 text-[#4c566b]">集中查看统计、问题队列、详情抽屉和导出记录。</p>
     </div>
     <nav class="flex flex-wrap gap-2 text-sm text-[#445069]">
       <a class="ghost-button rounded-full px-4 py-2 transition" href="/">返回首页</a>
@@ -457,67 +448,72 @@
                 <label class="filter-menu__option"><input type="checkbox" value="low">低</label>
               </div>
             </details>
-          </div>
+            </div>
           </div>
 
-          <div class="filter-rail rounded-[1.5rem] p-4 md:p-5">
-            <div class="flex flex-wrap items-center justify-between gap-3">
-              <div class="filter-section-label">补充条件</div>
-              <div class="text-sm text-[#5f6b80]">在核心筛选后，再叠加时间、指派和布尔条件做精细排查。</div>
+          <details id="advancedAdminFilters" class="filters-advanced">
+            <summary>
+              <div>
+                <div class="filters-advanced__meta">Advanced Filters</div>
+                <div class="filters-advanced__copy">指派、备注、回复、更新时间和排序。</div>
+              </div>
+              <span class="mini-token">补充条件</span>
+            </summary>
+            <div class="filters-advanced__content">
+              <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                <label class="space-y-2 text-sm font-medium text-[#25314a]">
+                  <span>指派人</span>
+                  <input id="assignedToFilter" list="assigneeSuggestions" class="field-shell h-11 w-full rounded-2xl px-4 text-sm" placeholder="输入或选择管理员">
+                  <datalist id="assigneeSuggestions"></datalist>
+                </label>
+                <label class="space-y-2 text-sm font-medium text-[#25314a]">
+                  <span>更新晚于</span>
+                  <input id="updatedAfterFilter" type="date" class="field-shell h-11 w-full rounded-2xl px-4 text-sm">
+                </label>
+                <label class="space-y-2 text-sm font-medium text-[#25314a]">
+                  <span>备注</span>
+                  <select id="hasNotesFilter" class="field-shell h-11 w-full rounded-2xl px-4 text-sm">
+                    <option value="">全部</option>
+                    <option value="true">有备注</option>
+                    <option value="false">无备注</option>
+                  </select>
+                </label>
+                <label class="space-y-2 text-sm font-medium text-[#25314a]">
+                  <span>回复</span>
+                  <select id="hasRepliesFilter" class="field-shell h-11 w-full rounded-2xl px-4 text-sm">
+                    <option value="">全部</option>
+                    <option value="true">有回复</option>
+                    <option value="false">无回复</option>
+                  </select>
+                </label>
+                <label class="space-y-2 text-sm font-medium text-[#25314a]">
+                  <span>分配状态</span>
+                  <select id="isAssignedFilter" class="field-shell h-11 w-full rounded-2xl px-4 text-sm">
+                    <option value="">全部</option>
+                    <option value="true">已分配</option>
+                    <option value="false">未分配</option>
+                  </select>
+                </label>
+                <div class="grid gap-3 sm:grid-cols-2">
+                  <label class="space-y-2 text-sm font-medium text-[#25314a]">
+                    <span>排序字段</span>
+                    <select id="sortFieldFilter" class="field-shell h-11 w-full rounded-2xl px-4 text-sm">
+                      <option value="createdAt">提交时间</option>
+                      <option value="updatedAt">更新时间</option>
+                      <option value="priority">优先级</option>
+                    </select>
+                  </label>
+                  <label class="space-y-2 text-sm font-medium text-[#25314a]">
+                    <span>排序方向</span>
+                    <select id="sortOrderFilter" class="field-shell h-11 w-full rounded-2xl px-4 text-sm">
+                      <option value="desc">降序</option>
+                      <option value="asc">升序</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
             </div>
-            <div class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            <label class="space-y-2 text-sm font-medium text-[#25314a]">
-              <span>指派人</span>
-              <input id="assignedToFilter" list="assigneeSuggestions" class="field-shell h-11 w-full rounded-2xl px-4 text-sm" placeholder="输入或选择管理员">
-              <datalist id="assigneeSuggestions"></datalist>
-            </label>
-            <label class="space-y-2 text-sm font-medium text-[#25314a]">
-              <span>更新晚于</span>
-              <input id="updatedAfterFilter" type="date" class="field-shell h-11 w-full rounded-2xl px-4 text-sm">
-            </label>
-            <label class="space-y-2 text-sm font-medium text-[#25314a]">
-              <span>备注</span>
-              <select id="hasNotesFilter" class="field-shell h-11 w-full rounded-2xl px-4 text-sm">
-                <option value="">全部</option>
-                <option value="true">有备注</option>
-                <option value="false">无备注</option>
-              </select>
-            </label>
-            <label class="space-y-2 text-sm font-medium text-[#25314a]">
-              <span>回复</span>
-              <select id="hasRepliesFilter" class="field-shell h-11 w-full rounded-2xl px-4 text-sm">
-                <option value="">全部</option>
-                <option value="true">有回复</option>
-                <option value="false">无回复</option>
-              </select>
-            </label>
-            <label class="space-y-2 text-sm font-medium text-[#25314a]">
-              <span>分配状态</span>
-              <select id="isAssignedFilter" class="field-shell h-11 w-full rounded-2xl px-4 text-sm">
-                <option value="">全部</option>
-                <option value="true">已分配</option>
-                <option value="false">未分配</option>
-              </select>
-            </label>
-            <div class="grid gap-3 sm:grid-cols-2">
-              <label class="space-y-2 text-sm font-medium text-[#25314a]">
-                <span>排序字段</span>
-                <select id="sortFieldFilter" class="field-shell h-11 w-full rounded-2xl px-4 text-sm">
-                  <option value="createdAt">提交时间</option>
-                  <option value="updatedAt">更新时间</option>
-                  <option value="priority">优先级</option>
-                </select>
-              </label>
-              <label class="space-y-2 text-sm font-medium text-[#25314a]">
-                <span>排序方向</span>
-                <select id="sortOrderFilter" class="field-shell h-11 w-full rounded-2xl px-4 text-sm">
-                  <option value="desc">降序</option>
-                  <option value="asc">升序</option>
-                </select>
-              </label>
-            </div>
-          </div>
-          </div>
+          </details>
 
           <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div id="activeFilterChips" class="flex flex-wrap gap-2"></div>
@@ -530,12 +526,12 @@
 
         <div class="mt-4 flex flex-wrap gap-2" id="adminSearchHistory"></div>
 
-        <div class="mt-6 grid gap-6 xl:grid-cols-[1fr_320px]">
+        <div class="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">
           <div>
             <div id="issuesList" class="grid gap-4" aria-live="polite" aria-busy="false"></div>
             <div id="paginationContainer" class="mt-6"></div>
           </div>
-          <aside class="chart-shell rounded-[1.6rem] p-5">
+          <aside class="chart-shell support-panel rounded-[1.6rem] p-5 xl:sticky xl:top-6">
             <div class="text-xs font-semibold uppercase tracking-[0.28em] text-[#72809a]">Export Log</div>
             <h3 class="display-font mt-2 text-2xl">导出历史</h3>
             <div id="exportHistoryList" class="mt-5 space-y-3"></div>

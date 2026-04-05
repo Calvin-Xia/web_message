@@ -285,7 +285,25 @@ function renderPagination(container, pagination, onChange) {
 }
 
 function renderSummary(pagination, filters) {
-  document.getElementById('publicSummary').textContent = `共 ${pagination.total} 条 · 第 ${pagination.page} / ${Math.max(pagination.totalPages, 1)} 页 · ${filters.q ? `关键词 ${filters.q}` : '浏览全部公开问题'}`;
+  const headline = filters.q ? `找到 ${pagination.total} 条公开同步` : `共 ${pagination.total} 条公开同步`;
+  const scope = filters.q ? `关键词 ${filters.q}` : '默认按最近更新浏览';
+  document.getElementById('publicSummary').textContent = `${headline} · 第 ${pagination.page} / ${Math.max(pagination.totalPages, 1)} 页 · ${scope}`;
+}
+
+function syncAdvancedPublicFiltersState() {
+  const details = document.getElementById('advancedPublicFilters');
+  if (!(details instanceof HTMLDetailsElement)) {
+    return;
+  }
+
+  const hasAdvancedFilters = Boolean(
+    document.getElementById('startDateFilter').value
+    || document.getElementById('endDateFilter').value
+    || document.getElementById('sortFieldFilter').value !== 'updatedAt'
+    || document.getElementById('sortOrderFilter').value !== 'desc',
+  );
+
+  details.open = hasAdvancedFilters;
 }
 
 function renderPublicList(items, pagination) {
@@ -309,7 +327,7 @@ function renderPublicList(items, pagination) {
     return `
       <article class="public-card interactive-card rounded-[1.6rem] p-5 md:p-6">
         <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div class="space-y-3">
+          <div class="space-y-4">
             <div class="flex flex-wrap items-center gap-2">
               <span class="status-token" data-status="${escapeHtml(item.status)}">${escapeHtml(statusLabels[item.status] || item.status)}</span>
               <span class="category-token">${escapeHtml(categoryLabels[item.category] || item.category)}</span>
@@ -317,12 +335,19 @@ function renderPublicList(items, pagination) {
             </div>
             <div>
               <div class="text-xs font-semibold uppercase tracking-[0.28em] text-[#72809a]">${escapeHtml(item.trackingCode)}</div>
-              <p class="mt-2 text-base leading-7 text-[#172033]">${highlightText(summary, filters.q)}</p>
+              <p class="mt-2 text-lg leading-8 text-[#172033]">${highlightText(summary, filters.q)}</p>
+              <p class="mt-2 text-sm leading-6 text-[#5f6b80]">这条问题已经进入公开同步区，更多处理回执和公开回复可以通过追踪页继续查看。</p>
+            </div>
+            <div class="flex flex-wrap gap-x-5 gap-y-2 text-sm leading-6 text-[#4c566b]">
+              <span><strong class="text-[#172033]">提交：</strong>${escapeHtml(formatDate(item.createdAt))}</span>
+              <span><strong class="text-[#172033]">更新：</strong>${escapeHtml(formatDate(item.updatedAt))}</span>
+              <span><strong class="text-[#172033]">查看：</strong>进入追踪页继续查看处理记录</span>
             </div>
           </div>
-          <div class="min-w-[180px] rounded-[1.4rem] border border-[rgba(23,32,51,0.08)] bg-white/75 px-4 py-3 text-sm text-[#4c566b]">
-            <div><strong class="text-[#172033]">提交：</strong>${escapeHtml(formatDate(item.createdAt))}</div>
-            <div class="mt-2"><strong class="text-[#172033]">更新：</strong>${escapeHtml(formatDate(item.updatedAt))}</div>
+          <div class="result-meta-card text-sm text-[#4c566b]">
+            <div class="text-xs font-semibold uppercase tracking-[0.3em] text-[#72809a]">Tracking Code</div>
+            <div class="mt-2 text-2xl font-black tracking-[0.18em] text-[#172033]">${escapeHtml(item.trackingCode)}</div>
+            <div class="mt-3 text-sm leading-6 text-[#5f6b80]">输入编号可查看完整状态时间线。</div>
             <a class="ghost-button mt-4 w-full rounded-full px-4 py-2 text-sm font-semibold text-[#172033] transition" href="${trackingHref}" aria-label="查看问题 ${escapeHtml(item.trackingCode)} 的处理进度">查看处理进度</a>
             <div class="mt-2 text-xs leading-5 text-[#72809a]">将自动带入追踪编号并查询公开处理记录。</div>
           </div>
@@ -461,6 +486,10 @@ function bindEvents() {
   });
   document.getElementById('resetFilters').addEventListener('click', () => {
     document.getElementById('filterForm').reset();
+    const advancedFilters = document.getElementById('advancedPublicFilters');
+    if (advancedFilters instanceof HTMLDetailsElement) {
+      advancedFilters.open = false;
+    }
     syncUrl(1);
     loadPublicList(1);
   });
@@ -471,9 +500,14 @@ function bindEvents() {
     const eventName = id === 'searchInput' ? 'input' : 'change';
     element.addEventListener(eventName, schedulePublicReload);
   });
+
+  ['startDateFilter', 'endDateFilter', 'sortFieldFilter', 'sortOrderFilter'].forEach((id) => {
+    document.getElementById(id).addEventListener('change', syncAdvancedPublicFiltersState);
+  });
 }
 
 restoreFiltersFromUrl();
+syncAdvancedPublicFiltersState();
 renderSearchHistory();
 bindEvents();
 syncNotificationPreference();

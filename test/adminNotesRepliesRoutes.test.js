@@ -48,6 +48,17 @@ function createAdminRequest(url, body) {
   });
 }
 
+function createInvalidJsonRequest(url) {
+  return new Request(url, {
+    method: 'POST',
+    headers: {
+      Authorization: 'Bearer test-secret',
+      'Content-Type': 'application/json',
+    },
+    body: '{"content":',
+  });
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -83,6 +94,81 @@ describe('admin note and reply routes', () => {
     expect(db.issues[0].updated_at).toBe(db.issues[0].first_response_at);
   });
 
+  it('rejects invalid note issue ids', async () => {
+    const response = await onNoteRequest({
+      request: createAdminRequest('http://localhost/api/admin/issues/0/notes', {
+        content: '已联系后勤团队，今天会安排人员到场查看。',
+      }),
+      env: createAdminEnv(createD1Database()),
+      params: {
+        id: '0',
+      },
+    });
+    const payload = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(payload.success).toBe(false);
+  });
+
+  it('returns not found when creating a note for a missing issue', async () => {
+    const response = await onNoteRequest({
+      request: createAdminRequest('http://localhost/api/admin/issues/1/notes', {
+        content: '已联系后勤团队，今天会安排人员到场查看。',
+      }),
+      env: createAdminEnv(createD1Database()),
+      params: {
+        id: '1',
+      },
+    });
+    const payload = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(payload.error).toBe('问题不存在');
+  });
+
+  it('rejects malformed note request bodies', async () => {
+    const db = createD1Database();
+    db.issues.push(createIssue());
+
+    const response = await onNoteRequest({
+      request: createInvalidJsonRequest('http://localhost/api/admin/issues/1/notes'),
+      env: createAdminEnv(db),
+      params: {
+        id: '1',
+      },
+    });
+    const payload = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(payload.error).toBe('请求体不是合法 JSON');
+  });
+
+  it('returns a production-safe note error when the database write fails', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const db = createD1Database();
+    db.issues.push(createIssue());
+    db.batch = async () => {
+      throw new Error('boom');
+    };
+
+    const response = await onNoteRequest({
+      request: createAdminRequest('http://localhost/api/admin/issues/1/notes', {
+        content: '已联系后勤团队，今天会安排人员到场查看。',
+      }),
+      env: createAdminEnv(db, {
+        ENVIRONMENT: 'production',
+      }),
+      params: {
+        id: '1',
+      },
+    });
+    const payload = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(payload.error).toBe('服务器内部错误');
+    expect(errorSpy).toHaveBeenCalledWith('Admin note route failed:', expect.any(Error));
+  });
+
   it('creates a reply without resetting an existing first response timestamp', async () => {
     const db = createD1Database();
     db.issues.push(createIssue({
@@ -115,6 +201,69 @@ describe('admin note and reply routes', () => {
     });
     expect(db.issues[0].first_response_at).toBe('2026-03-11T09:00:00.000Z');
     expect(db.issues[0].updated_at).not.toBe('2026-03-11T08:00:00.000Z');
+  });
+
+  it('rejects reply payloads that fail validation', async () => {
+    const db = createD1Database();
+    db.issues.push(createIssue());
+
+    const response = await onReplyRequest({
+      request: createAdminRequest('http://localhost/api/admin/issues/1/replies', {
+        isPublic: true,
+      }),
+      env: createAdminEnv(db),
+      params: {
+        id: '1',
+      },
+    });
+    const payload = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(payload.success).toBe(false);
+  });
+
+  it('returns not found when creating a reply for a missing issue', async () => {
+    const response = await onReplyRequest({
+      request: createAdminRequest('http://localhost/api/admin/issues/1/replies', {
+        content: '已经安排今天下午检修，处理完成后会同步结果。',
+        isPublic: true,
+      }),
+      env: createAdminEnv(createD1Database()),
+      params: {
+        id: '1',
+      },
+    });
+    const payload = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(payload.error).toBe('问题不存在');
+  });
+
+  it('returns a production-safe reply error when the database write fails', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const db = createD1Database();
+    db.issues.push(createIssue());
+    db.batch = async () => {
+      throw new Error('boom');
+    };
+
+    const response = await onReplyRequest({
+      request: createAdminRequest('http://localhost/api/admin/issues/1/replies', {
+        content: '已经安排今天下午检修，处理完成后会同步结果。',
+        isPublic: false,
+      }),
+      env: createAdminEnv(db, {
+        ENVIRONMENT: 'production',
+      }),
+      params: {
+        id: '1',
+      },
+    });
+    const payload = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(payload.error).toBe('服务器内部错误');
+    expect(errorSpy).toHaveBeenCalledWith('Admin reply route failed:', expect.any(Error));
   });
 
   it('sends a public reply notification when email reminders are enabled', async () => {

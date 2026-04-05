@@ -159,6 +159,7 @@
 ### `GET /api/admin/export`
 
 导出 CSV。当前仅支持 `format=csv`。
+单次导出最多 `50000` 条，超过上限时会返回错误并提示缩小筛选范围。
 
 ### `GET /api/admin/metrics`
 

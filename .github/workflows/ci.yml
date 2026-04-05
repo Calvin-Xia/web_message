@@ -25,6 +25,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Build stylesheet
+        run: npm run build
+
       - name: Run unit and integration tests
         run: npm test
 

@@ -83,6 +83,7 @@ npm run test:coverage
 ## 6. 生产部署
 
 ```bash
+npm run build
 npm run d1:migrate
 npm run deploy
 ```
@@ -104,9 +105,16 @@ npm run d1:migrate:preview
 
 ## 8. 发布检查建议
 
+- 确认本次发布前已经重新生成 `styles.css`。使用 `npm run build`，或直接运行带有自动预编译的 `npm run deploy` / `npm run pages:deploy`
 - 确认 `ADMIN_SECRET_KEY` 已在目标环境配置
 - 确认 `RESEND_API_KEY` 已在目标环境配置，且 `support@calvin-xia.cn` 可作为 Resend 发件人与回复地址
 - 确认 D1 与 KV 绑定存在
 - 访问 `/health.html` 检查 D1 / KV 状态
 - 在后台执行一次导出，确认审计日志与 CSV 正常
 - 检查 CI 最新一次通过后再切换流量
+
+## 9. 样式构建说明
+
+- 页面依赖根目录的 `styles.css`，它由 `src/input.css` 编译生成。
+- 如果修改了 `src/input.css`，或者新增了页面里使用的 Tailwind 类名，发布前必须重新执行 `npm run build`。
+- 如果通过 Cloudflare Pages Dashboard 配置 Git 自动部署，建议将 Build command 设置为 `npm run build`，Build output directory 设置为 `.`

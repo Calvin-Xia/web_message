@@ -1,0 +1,249 @@
+import { describe, expect, it, vi } from 'vitest';
+import { createD1Database } from './helpers/fakeCloudflare.js';
+import { onRequest } from '../functions/api/admin/export.js';
+
+function createIssue(overrides = {}) {
+  return {
+    id: 1,
+    tracking_code: 'ABCD23EF',
+    name: '测试同学',
+    student_id: '2024012345678',
+    email: null,
+    notify_by_email: 0,
+    content: '图书馆空调不制冷，需要尽快安排处理。',
+    is_public: 1,
+    is_reported: 0,
+    category: 'facility',
+    priority: 'high',
+    status: 'in_review',
+    public_summary: '已安排后勤团队处理',
+    assigned_to: 'admin1',
+    first_response_at: '2026-03-11T09:00:00.000Z',
+    resolved_at: null,
+    created_at: '2026-03-11T08:00:00.000Z',
+    updated_at: '2026-03-11T09:30:00.000Z',
+    ...overrides,
+  };
+}
+
+function createExportDbMock({ total = 0, batches = [] } = {}) {
+  const statements = [];
+  const actions = [];
+  let batchIndex = 0;
+
+  return {
+    statements,
+    actions,
+    prepare(sql) {
+      const record = { sql, bindings: [] };
+      statements.push(record);
+
+      if (sql.includes('SELECT COUNT(*) AS total FROM issues')) {
+        return {
+          bind(...bindings) {
+            record.bindings = bindings;
+            return {
+              first: async () => ({ total }),
+            };
+          },
+        };
+      }
+
+      if (sql.includes('SELECT') && sql.includes('FROM issues')) {
+        return {
+          bind(...bindings) {
+            record.bindings = bindings;
+            const results = batches[batchIndex] ?? [];
+            batchIndex += 1;
+            return {
+              all: async () => ({ results }),
+            };
+          },
+        };
+      }
+
+      if (sql.includes('INSERT INTO admin_actions')) {
+        return {
+          bind(...bindings) {
+            record.bindings = bindings;
+            return {
+              run: async () => {
+                actions.push({
+                  action_type: bindings[0],
+                  target_type: bindings[1],
+                  target_id: bindings[2],
+                  details: bindings[3],
+                  performed_by: bindings[4],
+                  performed_at: bindings[5],
+                  ip_address: bindings[6],
+                });
+
+                return {
+                  success: true,
+                  meta: {
+                    last_row_id: actions.length,
+                    changes: 1,
+                  },
+                };
+              },
+            };
+          },
+        };
+      }
+
+      throw new Error(`Unsupported SQL in export test: ${sql}`);
+    },
+  };
+}
+
+function createAdminContext(request, db, overrides = {}) {
+  return {
+    request,
+    env: {
+      ADMIN_SECRET_KEY: 'test-secret',
+      ENVIRONMENT: 'development',
+      RATE_LIMIT_STORE: createD1Database(),
+      DB: db,
+      ...overrides,
+    },
+    params: {},
+  };
+}
+
+describe('admin export route', () => {
+  it('exports filtered issues as csv and records an audit action', async () => {
+    const db = createExportDbMock({
+      total: 2,
+      batches: [[
+        createIssue(),
+        createIssue({
+          id: 2,
+          tracking_code: 'ZXCV56BN',
+          name: '李四',
+          assigned_to: '',
+          status: 'resolved',
+          resolved_at: '2026-03-12T10:00:00.000Z',
+        }),
+      ], []],
+    });
+
+    const response = await onRequest(createAdminContext(
+      new Request('http://localhost/api/admin/export?format=csv', {
+        headers: {
+          Authorization: 'Bearer test-secret',
+          'CF-Connecting-IP': '127.0.0.1',
+        },
+      }),
+      db,
+    ));
+    const csv = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Content-Type')).toContain('text/csv');
+    expect(response.headers.get('Content-Disposition')).toContain('issues_export_');
+    expect(csv).toContain('id,tracking_code,name,student_id');
+    expect(csv).toContain('ABCD23EF');
+    expect(csv).toContain('ZXCV56BN');
+    expect(db.actions).toHaveLength(1);
+    expect(db.actions[0].action_type).toBe('issues_exported');
+    expect(JSON.parse(db.actions[0].details)).toMatchObject({
+      rowCount: 2,
+      filters: {
+        format: 'csv',
+      },
+    });
+  });
+
+  it('rejects exports that exceed the safe row limit', async () => {
+    const db = createExportDbMock({
+      total: 50_001,
+      batches: [],
+    });
+
+    const response = await onRequest(createAdminContext(
+      new Request('http://localhost/api/admin/export?format=csv', {
+        headers: {
+          Authorization: 'Bearer test-secret',
+        },
+      }),
+      db,
+    ));
+    const payload = await response.json();
+
+    expect(response.status).toBe(413);
+    expect(payload.error).toBe('导出结果超过 50000 条，请缩小筛选范围后重试');
+    expect(db.actions).toHaveLength(0);
+    expect(db.statements).toHaveLength(1);
+  });
+
+  it('rejects invalid export query parameters', async () => {
+    const db = createExportDbMock();
+
+    const response = await onRequest(createAdminContext(
+      new Request('http://localhost/api/admin/export?startDate=2026-03-12&endDate=2026-03-01', {
+        headers: {
+          Authorization: 'Bearer test-secret',
+        },
+      }),
+      db,
+    ));
+    const payload = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(payload.success).toBe(false);
+  });
+
+  it('rejects missing admin authorization', async () => {
+    const db = createExportDbMock();
+
+    const response = await onRequest(createAdminContext(
+      new Request('http://localhost/api/admin/export'),
+      db,
+    ));
+    const payload = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(payload.error).toBe('缺少授权信息');
+  });
+
+  it('returns method not allowed for non-GET requests', async () => {
+    const db = createExportDbMock();
+
+    const response = await onRequest(createAdminContext(
+      new Request('http://localhost/api/admin/export', {
+        method: 'POST',
+      }),
+      db,
+    ));
+    const payload = await response.json();
+
+    expect(response.status).toBe(405);
+    expect(payload.error).toBe('Method not allowed');
+  });
+
+  it('returns a production-safe error when export queries fail', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const db = {
+      prepare() {
+        throw new Error('boom');
+      },
+    };
+
+    const response = await onRequest(createAdminContext(
+      new Request('http://localhost/api/admin/export', {
+        headers: {
+          Authorization: 'Bearer test-secret',
+        },
+      }),
+      db,
+      {
+        ENVIRONMENT: 'production',
+      },
+    ));
+    const payload = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(payload.error).toBe('服务器内部错误');
+    expect(errorSpy).toHaveBeenCalledWith('Admin export route failed:', expect.any(Error));
+  });
+});
