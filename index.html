@@ -62,7 +62,7 @@
     <div>
       <div class="text-xs font-semibold uppercase tracking-[0.35em] text-[#5f6b80]">Public Desk</div>
       <h1 class="display-font mt-2 text-3xl text-[#172033] md:text-4xl">留言处理台</h1>
-      <p class="mt-3 max-w-2xl text-sm leading-7 text-[#4c566b]">同一个入口完成问题提交、公开同步和私密追踪，适合需要留痕、回执和后续回看的校园反馈场景。</p>
+      <p class="mt-3 max-w-2xl text-sm leading-7 text-[#4c566b]">在这里提交问题、获取追踪编号，并查看公开进展。</p>
     </div>
     <nav class="flex flex-wrap gap-2 text-sm text-[#445069]">
       <a class="ghost-button rounded-full px-4 py-2 transition-colors" href="/tracking.html">追踪进度</a>
@@ -77,15 +77,15 @@
         <div class="max-w-2xl">
           <div class="inline-flex items-center rounded-full bg-[rgba(36,87,214,0.1)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-[#2147ac]">Public Service Intake</div>
           <h2 class="display-font mt-5 text-4xl leading-tight md:text-5xl">让每一条留言都有编号、有状态、有回音。</h2>
-          <p class="mt-4 max-w-xl text-base leading-7 text-[#4c566b] md:text-lg">提交后系统会立即生成追踪编号。你可以选择公开同步，让其他人看到处理摘要；也可以只保留私人编号，在追踪页查看状态和公开回复。</p>
+          <p class="mt-4 max-w-xl text-base leading-7 text-[#4c566b] md:text-lg">提交后会立即生成追踪编号。公开问题会显示在首页；未公开的问题可在追踪页查看。</p>
           <div class="hero-actions mt-6">
             <a class="primary-button rounded-full px-5 py-3 text-sm font-semibold transition" href="#newSubmission">开始提交</a>
             <a class="ghost-button rounded-full px-5 py-3 text-sm font-semibold transition" href="/tracking.html">已有编号，直接查询</a>
           </div>
           <div class="mt-6 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-[#72809a]">
-            <span class="rounded-full bg-white/65 px-3 py-2">公开可选</span>
-            <span class="rounded-full bg-white/65 px-3 py-2">默认私密追踪</span>
-            <span class="rounded-full bg-white/65 px-3 py-2">提交即生成编号</span>
+            <span class="rounded-full bg-white/65 px-3 py-2">提交后生成编号</span>
+            <span class="rounded-full bg-white/65 px-3 py-2">公开问题首页可见</span>
+            <span class="rounded-full bg-white/65 px-3 py-2">未公开仅凭编号查看</span>
           </div>
         </div>
       </div>
@@ -148,7 +148,7 @@
           <div class="text-xs font-semibold uppercase tracking-[0.3em] text-[#72809a]">Receipt</div>
           <h3 class="display-font mt-2 text-2xl">追踪编号已生成</h3>
           <p class="mt-2 text-sm leading-6 text-[#4c566b]">请保存这个编号。未公开的问题只有通过追踪页和该编号才能查看处理状态。</p>
-          <p class="mt-3 rounded-[1.2rem] border border-[rgba(23,32,51,0.08)] bg-white/65 px-4 py-3 text-sm leading-6 text-[#445069]">建议现在就复制编号，或直接跳转到追踪页继续查看。若本次未勾选公开，首页公开列表不会展示这条留言。</p>
+          <p class="mt-3 rounded-[1.2rem] border border-[rgba(23,32,51,0.08)] bg-white/65 px-4 py-3 text-sm leading-6 text-[#445069]">可立即复制编号，或直接前往追踪页查看。未公开的问题不会显示在首页列表。</p>
         </div>
         <div class="rounded-[1.5rem] border border-[rgba(23,32,51,0.08)] bg-white/80 px-5 py-4 text-right">
           <div class="text-xs uppercase tracking-[0.3em] text-[#72809a]">Tracking Code</div>
@@ -166,7 +166,7 @@
         <div>
           <div class="text-xs font-semibold uppercase tracking-[0.3em] text-[#72809a]">Public Feed</div>
           <h3 class="display-font mt-2 text-3xl">公开同步区</h3>
-          <p class="mt-2 max-w-2xl text-sm leading-6 text-[#4c566b]">这里只展示主动选择公开的问题和处理摘要。关键词、状态、分类常驻，日期和排序放在高级筛选里。</p>
+          <p class="mt-2 max-w-2xl text-sm leading-6 text-[#4c566b]">这里展示已公开的问题和最新处理摘要。可按关键词、状态或分类筛选。</p>
         </div>
         <div id="publicSummary" class="support-panel rounded-[1.5rem] px-4 py-3 text-sm text-[#4c566b]" aria-live="polite" aria-atomic="true">尚未加载公开同步。</div>
       </div>
@@ -175,7 +175,7 @@
         <div class="filters-shell">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <div class="section-caption">常用筛选</div>
-            <div class="text-sm text-[#5f6b80]">先用关键词、状态和分类快速浏览，筛选条件会自动写入地址栏。</div>
+            <div class="text-sm text-[#5f6b80]">筛选后可直接复制当前页面地址。</div>
           </div>
           <div class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             <label class="space-y-2 text-sm font-medium text-[#25314a] md:col-span-2 xl:col-span-1"><span>关键词</span><input id="searchInput" list="publicSearchSuggestions" class="field-shell h-12 w-full rounded-2xl px-4 text-sm" placeholder="搜索内容、摘要或追踪编号"><datalist id="publicSearchSuggestions"></datalist></label>

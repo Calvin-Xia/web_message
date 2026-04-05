@@ -61,7 +61,7 @@
     <div>
       <div class="text-xs font-semibold uppercase tracking-[0.35em] text-[#5f6b80]">Tracking Desk</div>
       <h1 class="display-font mt-2 text-3xl md:text-4xl">追踪进度</h1>
-      <p class="mt-3 max-w-2xl text-sm leading-7 text-[#4c566b]">保留追踪编号后，可回看状态、摘要和公开回复。</p>
+      <p class="mt-3 max-w-2xl text-sm leading-7 text-[#4c566b]">保留追踪编号后，可随时查看状态、摘要和公开回复。</p>
     </div>
     <nav class="flex flex-wrap gap-2 text-sm text-[#445069]">
       <a class="ghost-button rounded-full px-4 py-2 transition" href="/">返回首页</a>
@@ -77,9 +77,9 @@
           <h2 class="display-font mt-4 text-3xl leading-tight md:text-4xl">凭追踪编号，查看当前状态与公开回执。</h2>
           <p class="mt-4 text-sm leading-7 text-[#4c566b] md:text-base">输入编号后，会显示当前状态、公开摘要和时间线。</p>
           <div class="mt-5 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-[#72809a]">
-            <span class="rounded-full bg-white/65 px-3 py-2">只认编号</span>
-            <span class="rounded-full bg-white/65 px-3 py-2">结果分层展示</span>
-            <span class="rounded-full bg-white/65 px-3 py-2">适合私密追踪</span>
+            <span class="rounded-full bg-white/65 px-3 py-2">输入编号查询</span>
+            <span class="rounded-full bg-white/65 px-3 py-2">查看当前状态</span>
+            <span class="rounded-full bg-white/65 px-3 py-2">查看公开回复</span>
           </div>
         </div>
         <form id="trackingForm" class="surface-panel space-y-4 rounded-[1.8rem] p-5">
@@ -90,7 +90,7 @@
           <button id="queryButton" type="submit" class="primary-button inline-flex h-12 w-full items-center justify-center rounded-full px-5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60">查询处理进度</button>
           <div id="trackingNotification" aria-live="polite" aria-atomic="true"></div>
           <div class="rounded-[1.2rem] border border-dashed border-[rgba(23,32,51,0.16)] bg-white/60 px-4 py-3 text-xs leading-6 text-[#5f6b80]">
-            编号通常由 8 位不易混淆的大写字符组成。你也可以从首页提交成功回执里直接跳转到本页。
+            追踪编号通常为 8 位大写字符，也可从提交成功页直接进入本页。
           </div>
         </form>
       </div>

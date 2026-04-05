@@ -336,12 +336,12 @@ function renderPublicList(items, pagination) {
             <div>
               <div class="text-xs font-semibold uppercase tracking-[0.28em] text-[#72809a]">${escapeHtml(item.trackingCode)}</div>
               <p class="mt-2 text-lg leading-8 text-[#172033]">${highlightText(summary, filters.q)}</p>
-              <p class="mt-2 text-sm leading-6 text-[#5f6b80]">这条问题已经进入公开同步区，更多处理回执和公开回复可以通过追踪页继续查看。</p>
+              <p class="mt-2 text-sm leading-6 text-[#5f6b80]">可先查看公开摘要；如需完整进度，请前往追踪页。</p>
             </div>
             <div class="flex flex-wrap gap-x-5 gap-y-2 text-sm leading-6 text-[#4c566b]">
               <span><strong class="text-[#172033]">提交：</strong>${escapeHtml(formatDate(item.createdAt))}</span>
               <span><strong class="text-[#172033]">更新：</strong>${escapeHtml(formatDate(item.updatedAt))}</span>
-              <span><strong class="text-[#172033]">查看：</strong>进入追踪页继续查看处理记录</span>
+              <span><strong class="text-[#172033]">查看：</strong>追踪页查看完整进度</span>
             </div>
           </div>
           <div class="result-meta-card text-sm text-[#4c566b]">
@@ -349,7 +349,7 @@ function renderPublicList(items, pagination) {
             <div class="mt-2 text-2xl font-black tracking-[0.18em] text-[#172033]">${escapeHtml(item.trackingCode)}</div>
             <div class="mt-3 text-sm leading-6 text-[#5f6b80]">输入编号可查看完整状态时间线。</div>
             <a class="ghost-button mt-4 w-full rounded-full px-4 py-2 text-sm font-semibold text-[#172033] transition" href="${trackingHref}" aria-label="查看问题 ${escapeHtml(item.trackingCode)} 的处理进度">查看处理进度</a>
-            <div class="mt-2 text-xs leading-5 text-[#72809a]">将自动带入追踪编号并查询公开处理记录。</div>
+            <div class="mt-2 text-xs leading-5 text-[#72809a]">点击后会自动带入追踪编号。</div>
           </div>
         </div>
       </article>
