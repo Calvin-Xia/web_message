@@ -2,6 +2,8 @@ const API_BASE = '/api';
 const REQUEST_TIMEOUT = 12000;
 const SEARCH_HISTORY_KEY = 'public-search-history';
 const MAX_HISTORY_ITEMS = 8;
+const EMAIL_INVALID_MESSAGE = '请输入格式正确的邮箱地址。';
+const EMAIL_SUBMIT_BLOCK_MESSAGE = '请先填写格式正确的邮箱地址，或清空邮箱后再提交。';
 const statusLabels = {
   submitted: '已提交',
   in_review: '审核中',
@@ -146,6 +148,58 @@ function showNotification(message, type = 'error') {
 
 function clearNotification() {
   document.getElementById('submitNotification').innerHTML = '';
+}
+
+function getNormalizedEmailValue() {
+  return document.getElementById('email').value.trim();
+}
+
+function isValidEmailAddress(value) {
+  const validator = document.createElement('input');
+  validator.type = 'email';
+  validator.value = value;
+  return validator.checkValidity();
+}
+
+function getEmailFieldState() {
+  const value = getNormalizedEmailValue();
+  if (!value) {
+    return {
+      status: 'empty',
+      value: '',
+      message: '',
+    };
+  }
+
+  if (!isValidEmailAddress(value)) {
+    return {
+      status: 'invalid',
+      value,
+      message: EMAIL_INVALID_MESSAGE,
+    };
+  }
+
+  return {
+    status: 'valid',
+    value,
+    message: '',
+  };
+}
+
+function syncEmailValidationMessage(emailState) {
+  const emailInput = document.getElementById('email');
+  const validationMessage = document.getElementById('emailValidationMessage');
+
+  if (emailState.status === 'invalid') {
+    emailInput.setAttribute('aria-invalid', 'true');
+    validationMessage.textContent = emailState.message;
+    validationMessage.hidden = false;
+    return;
+  }
+
+  emailInput.removeAttribute('aria-invalid');
+  validationMessage.textContent = '';
+  validationMessage.hidden = true;
 }
 
 function getFilters() {
@@ -398,28 +452,55 @@ function schedulePublicReload() {
 }
 
 function syncNotificationPreference() {
-  const emailInput = document.getElementById('email');
   const notifyCheckbox = document.getElementById('notifyByEmail');
-  const hasEmail = emailInput.value.trim() !== '';
+  const emailState = getEmailFieldState();
+  const canNotify = emailState.status === 'valid';
 
-  notifyCheckbox.disabled = !hasEmail;
-  notifyCheckbox.setAttribute('aria-disabled', String(!hasEmail));
-  if (!hasEmail) {
+  syncEmailValidationMessage(emailState);
+  notifyCheckbox.disabled = !canNotify;
+  notifyCheckbox.setAttribute('aria-disabled', String(!canNotify));
+  if (!canNotify) {
     notifyCheckbox.checked = false;
   }
+
+  return emailState;
+}
+
+function handleEmailBlur() {
+  const emailInput = document.getElementById('email');
+  const trimmed = emailInput.value.trim();
+
+  if (emailInput.value !== trimmed) {
+    emailInput.value = trimmed;
+  }
+
+  syncNotificationPreference();
 }
 
 async function handleSubmit(event) {
   event.preventDefault();
   clearNotification();
 
+  const emailInput = document.getElementById('email');
+  const notifyCheckbox = document.getElementById('notifyByEmail');
+  const trimmedEmail = emailInput.value.trim();
+  if (emailInput.value !== trimmedEmail) {
+    emailInput.value = trimmedEmail;
+  }
+
+  const emailState = syncNotificationPreference();
+  if (emailState.status === 'invalid') {
+    showNotification(EMAIL_SUBMIT_BLOCK_MESSAGE, 'error');
+    emailInput.focus();
+    return;
+  }
+
   const button = document.getElementById('submitButton');
-  const email = document.getElementById('email').value.trim();
   const payload = {
     name: document.getElementById('name').value.trim(),
     studentId: document.getElementById('studentId').value.trim(),
-    email,
-    notifyByEmail: Boolean(email) && document.getElementById('notifyByEmail').checked,
+    email: emailState.value,
+    notifyByEmail: emailState.status === 'valid' && notifyCheckbox.checked,
     category: document.getElementById('category').value,
     content: document.getElementById('content').value.trim(),
     isPublic: document.getElementById('isPublic').checked,
@@ -480,6 +561,7 @@ async function copyTrackingCode() {
 function bindEvents() {
   document.getElementById('issueForm').addEventListener('submit', handleSubmit);
   document.getElementById('email').addEventListener('input', syncNotificationPreference);
+  document.getElementById('email').addEventListener('blur', handleEmailBlur);
   document.getElementById('filterForm').addEventListener('submit', (event) => {
     event.preventDefault();
     loadPublicList(1);

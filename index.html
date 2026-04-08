@@ -109,8 +109,9 @@
 
           <label class="space-y-2 text-sm font-medium text-[#25314a]">
             <span>邮箱（选填）</span>
-            <input id="email" name="email" type="email" class="field-shell h-12 w-full rounded-2xl px-4 text-[15px]" maxlength="254" placeholder="用于接收关键处理进展提醒">
-            <span class="block text-xs leading-6 text-[#72809a]">邮箱仅用于接收通知，不作为登录方式或公开展示字段。</span>
+            <input id="email" name="email" type="email" class="field-shell h-12 w-full rounded-2xl px-4 text-[15px]" maxlength="254" placeholder="用于接收关键处理进展提醒" aria-describedby="emailHelpText emailValidationMessage">
+            <span id="emailHelpText" class="block text-xs leading-6 text-[#72809a]">邮箱仅用于接收通知，不作为登录方式或公开展示字段。</span>
+            <span id="emailValidationMessage" class="block text-xs leading-6" style="color: #b42318;" hidden aria-live="polite"></span>
           </label>
 
           <label class="space-y-2 text-sm font-medium text-[#25314a]">
