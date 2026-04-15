@@ -214,11 +214,12 @@
   </style>
 </head>
 <body data-page-role="health" data-health-status="healthy" class="min-h-screen px-4 py-5 md:px-8 md:py-8">
+  <a class="skip-link" href="#mainContent">跳到主要内容</a>
   <header class="mx-auto flex max-w-7xl flex-col gap-4 md:flex-row md:items-center md:justify-between">
     <div>
       <div class="text-xs font-semibold uppercase tracking-[0.35em] text-[#5f6b80]">Operations Console</div>
       <h1 class="display-font mt-2 text-3xl md:text-4xl">健康检查面板</h1>
-      <p class="mt-3 max-w-2xl text-sm leading-7 text-[#4c566b]">集中查看 D1 / KV 状态、最近请求指标、限流命中、错误日志和告警。该页面默认只展示已脱敏的诊断信息。</p>
+      <p class="mt-3 max-w-2xl text-sm leading-7 text-[#4c566b]">查看依赖、请求指标、限流、错误日志和告警。</p>
     </div>
     <nav class="flex flex-wrap gap-2 text-sm text-[#445069]">
       <a class="ghost-button rounded-full px-4 py-2" href="/">返回首页</a>
@@ -227,7 +228,7 @@
     </nav>
   </header>
 
-  <main class="mx-auto mt-6 max-w-7xl space-y-6 md:mt-8">
+  <main id="mainContent" class="mx-auto mt-6 max-w-7xl space-y-6 md:mt-8">
     <section class="status-spotlight rounded-[2rem] p-6 md:p-8">
       <div class="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
         <div>
@@ -236,7 +237,7 @@
           <p id="heroSummary" class="mt-3 max-w-3xl text-sm leading-7 text-[#4c566b]">正在从 `/api/health` 拉取最新状态。</p>
         </div>
       <div class="flex flex-wrap items-center gap-3">
-          <button id="toggleAutoRefresh" class="toggle-button rounded-full px-4 py-2 text-sm font-semibold" data-active="false" type="button">自动刷新关闭</button>
+          <button id="toggleAutoRefresh" class="toggle-button rounded-full px-4 py-2 text-sm font-semibold" data-active="false" type="button" aria-pressed="false">自动刷新关闭</button>
           <button id="refreshButton" class="primary-button rounded-full px-5 py-2.5 text-sm font-semibold" type="button">立即刷新</button>
         </div>
       </div>

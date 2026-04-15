@@ -159,7 +159,7 @@
 所有后台接口需要：
 
 - 请求头 `Authorization: Bearer <ADMIN_SECRET_KEY>`
-- 受信任 `Origin`（生产仅允许配置域名与 Pages 预览子域）
+- 受信任 `Origin`（生产允许 `https://issue.calvin-xia.cn`、`https://demo.calvin-xia.cn`、`https://web-message-board.pages.dev` 与单层 Pages 预览子域；允许来源在 `src/shared/corsConfig.js` 统一维护）
 
 ### `GET /api/admin/issues`
 

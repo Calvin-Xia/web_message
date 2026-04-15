@@ -1,4 +1,5 @@
-import { getAdminCorsPolicy, createForbiddenOriginResponse, authorizeAdminRequest } from '../../../../../src/shared/auth.js';
+import { createForbiddenOriginResponse, authorizeAdminRequest } from '../../../../../src/shared/auth.js';
+import { getAdminCorsPolicy } from '../../../../../src/shared/corsConfig.js';
 import { createAdminActionStatement, getIssueById, mapInternalNote } from '../../../../../src/shared/issueData.js';
 import { successResponse, errorResponse, createOptionsResponse, methodNotAllowedResponse, notFoundResponse } from '../../../../../src/shared/response.js';
 import { formatZodError, issueIdSchema, noteSchema } from '../../../../../src/shared/validation.js';

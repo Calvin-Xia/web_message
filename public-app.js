@@ -7,6 +7,10 @@ const MAX_HISTORY_ITEMS = 8;
 const PUBLIC_LIST_PAGE_SIZE = 5;
 const EMAIL_INVALID_MESSAGE = '请输入格式正确的邮箱地址。';
 const EMAIL_SUBMIT_BLOCK_MESSAGE = '请先填写格式正确的邮箱地址，或清空邮箱后再提交。';
+const STUDENT_ID_PATTERN = /^\d{4}$|^\d{5}$|^\d{13}$/;
+const CONTENT_MIN_LENGTH = 10;
+const CONTENT_MAX_LENGTH = 2000;
+const CLEARABLE_FILTER_KEYS = new Set(['q', 'status', 'category', 'startDate', 'endDate', 'sort']);
 const statusLabels = {
   submitted: '已提交',
   in_review: '审核中',
@@ -170,6 +174,35 @@ function clearNotification() {
   document.getElementById('submitNotification').innerHTML = '';
 }
 
+function setFieldError(fieldId, message = '') {
+  const field = document.getElementById(fieldId);
+  const messageNode = document.getElementById(`${fieldId}ValidationMessage`);
+  if (!field || !messageNode) {
+    return;
+  }
+
+  if (message) {
+    field.setAttribute('aria-invalid', 'true');
+    messageNode.textContent = message;
+    messageNode.hidden = false;
+    return;
+  }
+
+  field.removeAttribute('aria-invalid');
+  messageNode.textContent = '';
+  messageNode.hidden = true;
+}
+
+function clearIssueFieldErrors() {
+  ['name', 'studentId', 'category', 'content'].forEach((fieldId) => setFieldError(fieldId));
+}
+
+function getFieldValue(fieldId, { trim = false } = {}) {
+  const field = document.getElementById(fieldId);
+  const value = field && 'value' in field ? String(field.value) : '';
+  return trim ? value.trim() : value;
+}
+
 function getNormalizedEmailValue() {
   return document.getElementById('email').value.trim();
 }
@@ -239,6 +272,53 @@ function syncEmailValidationMessage(emailState) {
   emailInput.removeAttribute('aria-invalid');
   validationMessage.textContent = '';
   validationMessage.hidden = true;
+}
+
+function syncContentCounter() {
+  const content = document.getElementById('content');
+  const counter = document.getElementById('contentCounter');
+  if (!content || !counter) {
+    return;
+  }
+
+  counter.textContent = `${content.value.trim().length} / ${CONTENT_MAX_LENGTH}`;
+}
+
+function validateIssueForm() {
+  clearIssueFieldErrors();
+  const firstInvalidFields = [];
+  const name = getFieldValue('name', { trim: true });
+  const studentId = getFieldValue('studentId', { trim: true });
+  const category = getFieldValue('category');
+  const content = getFieldValue('content', { trim: true });
+
+  if (!name) {
+    setFieldError('name', '请输入姓名。');
+    firstInvalidFields.push('name');
+  }
+
+  if (!STUDENT_ID_PATTERN.test(studentId)) {
+    setFieldError('studentId', '学号必须为4位、5位或13位数字。');
+    firstInvalidFields.push('studentId');
+  }
+
+  if (!category) {
+    setFieldError('category', '请选择分类。');
+    firstInvalidFields.push('category');
+  }
+
+  if (content.length < CONTENT_MIN_LENGTH) {
+    setFieldError('content', '问题内容至少需要10个字符。');
+    firstInvalidFields.push('content');
+  } else if (content.length > CONTENT_MAX_LENGTH) {
+    setFieldError('content', '问题内容不能超过2000个字符。');
+    firstInvalidFields.push('content');
+  }
+
+  return {
+    valid: firstInvalidFields.length === 0,
+    firstInvalidFieldId: firstInvalidFields[0] || '',
+  };
 }
 
 function getFilters() {
@@ -340,14 +420,49 @@ function renderSearchHistory() {
 
 function renderActiveFilterChips(filters) {
   const chips = [];
-  if (filters.q) chips.push(`关键词: ${filters.q}`);
-  if (filters.status) chips.push(`状态: ${statusLabels[filters.status] || filters.status}`);
-  if (filters.category) chips.push(`分类: ${categoryLabels[filters.category] || filters.category}`);
-  if (filters.startDate) chips.push(`开始: ${filters.startDate}`);
-  if (filters.endDate) chips.push(`结束: ${filters.endDate}`);
-  chips.push(`排序: ${filters.sortField === 'status' ? '状态顺序' : filters.sortField === 'createdAt' ? '提交时间' : '最近更新'} ${filters.sortOrder === 'asc' ? '升序' : '降序'}`);
-  document.getElementById('activeFilterChips').innerHTML = chips.map((chip) => `<span class="filter-chip">${escapeHtml(chip)}</span>`).join('');
+  if (filters.q) chips.push({ key: 'q', label: `关键词: ${filters.q}` });
+  if (filters.status) chips.push({ key: 'status', label: `状态: ${statusLabels[filters.status] || filters.status}` });
+  if (filters.category) chips.push({ key: 'category', label: `分类: ${categoryLabels[filters.category] || filters.category}` });
+  if (filters.startDate) chips.push({ key: 'startDate', label: `开始: ${filters.startDate}` });
+  if (filters.endDate) chips.push({ key: 'endDate', label: `结束: ${filters.endDate}` });
+  if (filters.sortField !== 'updatedAt' || filters.sortOrder !== 'desc') {
+    chips.push({
+      key: 'sort',
+      label: `排序: ${filters.sortField === 'status' ? '状态顺序' : filters.sortField === 'createdAt' ? '提交时间' : '最近更新'} ${filters.sortOrder === 'asc' ? '升序' : '降序'}`,
+    });
+  }
+
+  const container = document.getElementById('activeFilterChips');
+  container.innerHTML = chips.map((chip) => `
+    <span class="filter-chip">
+      ${escapeHtml(chip.label)}
+      <button class="filter-chip__remove" type="button" data-clear-filter="${escapeHtml(chip.key)}" aria-label="移除筛选 ${escapeHtml(chip.label)}">×</button>
+    </span>
+  `).join('');
+
 }
+
+function clearFilter(key) {
+  if (!CLEARABLE_FILTER_KEYS.has(key)) {
+    return;
+  }
+
+  const resetMap = {
+    q: () => { document.getElementById('searchInput').value = ''; },
+    status: () => { document.getElementById('statusFilter').value = ''; },
+    category: () => { document.getElementById('categoryFilter').value = ''; },
+    startDate: () => { document.getElementById('startDateFilter').value = ''; },
+    endDate: () => { document.getElementById('endDateFilter').value = ''; },
+    sort: () => {
+      document.getElementById('sortFieldFilter').value = 'updatedAt';
+      document.getElementById('sortOrderFilter').value = 'desc';
+    },
+  };
+
+  resetMap[key]?.();
+  syncAdvancedPublicFiltersState();
+}
+
 function renderPagination(container, pagination, onChange) {
   if (!pagination || pagination.totalPages <= 1) {
     container.innerHTML = '';
@@ -359,13 +474,13 @@ function renderPagination(container, pagination, onChange) {
   const start = Math.max(1, page - 2);
   const end = Math.min(totalPages, start + 4);
 
-  buttons.push(`<button class="ghost-button rounded-full px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-40" data-page="${page - 1}" ${page === 1 ? 'disabled' : ''}>上一页</button>`);
+  buttons.push(`<button class="ghost-button rounded-full px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-40" data-page="${page - 1}" aria-label="上一页" ${page === 1 ? 'disabled' : ''}>上一页</button>`);
   for (let current = start; current <= end; current += 1) {
     const active = current === page;
-    buttons.push(`<button class="rounded-full px-4 py-2 text-sm font-semibold ${active ? 'bg-[#172033] text-white' : 'ghost-button text-[#172033]'}" data-page="${current}" ${active ? 'disabled' : ''}>${current}</button>`);
+    buttons.push(`<button class="rounded-full px-4 py-2 text-sm font-semibold ${active ? 'bg-[#172033] text-white' : 'ghost-button text-[#172033]'}" data-page="${current}" aria-label="第 ${current} 页" ${active ? 'aria-current="page" disabled' : ''}>${current}</button>`);
   }
-  buttons.push(`<button class="ghost-button rounded-full px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-40" data-page="${page + 1}" ${page === totalPages ? 'disabled' : ''}>下一页</button>`);
-  container.innerHTML = `<div class="flex flex-wrap items-center justify-center gap-2">${buttons.join('')}</div>`;
+  buttons.push(`<button class="ghost-button rounded-full px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-40" data-page="${page + 1}" aria-label="下一页" ${page === totalPages ? 'disabled' : ''}>下一页</button>`);
+  container.innerHTML = `<nav class="flex flex-wrap items-center justify-center gap-2" aria-label="公开列表分页">${buttons.join('')}</nav>`;
 
   container.querySelectorAll('button[data-page]').forEach((button) => {
     button.addEventListener('click', () => {
@@ -409,7 +524,17 @@ function renderPublicList(items, pagination) {
   renderSummary(pagination, filters);
 
   if (!items || items.length === 0) {
-    list.innerHTML = '<div class="empty-state text-center">当前筛选条件下没有公开问题。你可以清空日期、关键词或排序条件后再试。</div>';
+    list.innerHTML = `
+      <div class="empty-state text-center">
+        <div>当前筛选条件下没有公开问题。</div>
+        <button class="ghost-button mt-4 px-4 py-2 text-sm font-semibold" type="button" data-empty-reset>清空筛选</button>
+      </div>
+    `;
+    list.querySelector('[data-empty-reset]')?.addEventListener('click', () => {
+      document.getElementById('filterForm').reset();
+      syncAdvancedPublicFiltersState();
+      loadPublicList(1);
+    });
     paginationContainer.innerHTML = '';
     return;
   }
@@ -431,7 +556,6 @@ function renderPublicList(items, pagination) {
             <div>
               <div class="text-xs font-semibold uppercase tracking-[0.28em] text-[#72809a]">${escapeHtml(item.trackingCode)}</div>
               <p class="mt-2 text-lg leading-8 text-[#172033]">${highlightText(summary, filters.q)}</p>
-              <p class="mt-2 text-sm leading-6 text-[#5f6b80]">可先查看公开摘要；如需完整进度，请前往追踪页。</p>
             </div>
             <div class="flex flex-wrap gap-x-5 gap-y-2 text-sm leading-6 text-[#4c566b]">
               <span><strong class="text-[#172033]">提交：</strong>${escapeHtml(formatDate(item.createdAt))}</span>
@@ -442,9 +566,7 @@ function renderPublicList(items, pagination) {
           <div class="result-meta-card text-sm text-[#4c566b]">
             <div class="text-xs font-semibold uppercase tracking-[0.3em] text-[#72809a]">Tracking Code</div>
             <div class="mt-2 text-2xl font-black tracking-[0.18em] text-[#172033]">${escapeHtml(item.trackingCode)}</div>
-            <div class="mt-3 text-sm leading-6 text-[#5f6b80]">输入编号可查看完整状态时间线。</div>
             <a class="ghost-button mt-4 w-full rounded-full px-4 py-2 text-sm font-semibold text-[#172033] transition" href="${trackingHref}" aria-label="查看问题 ${escapeHtml(item.trackingCode)} 的处理进度">查看处理进度</a>
-            <div class="mt-2 text-xs leading-5 text-[#72809a]">点击后会自动带入追踪编号。</div>
           </div>
         </div>
       </article>
@@ -590,6 +712,7 @@ function handleEmailBlur() {
 async function handleSubmit(event) {
   event.preventDefault();
   clearNotification();
+  clearIssueFieldErrors();
 
   const emailInput = document.getElementById('email');
   const notifyCheckbox = document.getElementById('notifyByEmail');
@@ -602,6 +725,13 @@ async function handleSubmit(event) {
   if (emailState.status === 'invalid') {
     showNotification(EMAIL_SUBMIT_BLOCK_MESSAGE, 'error');
     emailInput.focus();
+    return;
+  }
+
+  const validation = validateIssueForm();
+  if (!validation.valid) {
+    showNotification('请先修正标记的字段。', 'error');
+    document.getElementById(validation.firstInvalidFieldId)?.focus();
     return;
   }
 
@@ -649,11 +779,15 @@ async function handleSubmit(event) {
     document.getElementById('trackingCodeValue').textContent = data.trackingCode;
     document.getElementById('trackingLink').href = trackingLink;
     document.getElementById('trackingReceipt').hidden = false;
+    document.getElementById('trackingReceipt').setAttribute('tabindex', '-1');
     document.getElementById('trackingReceipt').scrollIntoView({
       behavior: prefersReducedMotion() ? 'auto' : 'smooth',
       block: 'start',
     });
+    document.getElementById('trackingReceipt').focus({ preventScroll: true });
     document.getElementById('issueForm').reset();
+    clearIssueFieldErrors();
+    syncContentCounter();
     syncNotificationPreference();
     syncCounselingFields();
     showNotification('提交成功，追踪编号已生成。', 'success');
@@ -685,6 +819,14 @@ function bindEvents() {
   document.getElementById('category').addEventListener('change', syncCounselingFields);
   document.getElementById('email').addEventListener('input', syncNotificationPreference);
   document.getElementById('email').addEventListener('blur', handleEmailBlur);
+  document.getElementById('content').addEventListener('input', () => {
+    syncContentCounter();
+    setFieldError('content');
+  });
+  ['name', 'studentId', 'category'].forEach((id) => {
+    document.getElementById(id).addEventListener('input', () => setFieldError(id));
+    document.getElementById(id).addEventListener('change', () => setFieldError(id));
+  });
   document.getElementById('filterForm').addEventListener('submit', (event) => {
     event.preventDefault();
     loadPublicList(1);
@@ -696,6 +838,20 @@ function bindEvents() {
       advancedFilters.open = false;
     }
     syncUrl(1);
+    loadPublicList(1);
+  });
+  document.getElementById('activeFilterChips').addEventListener('click', (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) {
+      return;
+    }
+
+    const button = target.closest('[data-clear-filter]');
+    if (!(button instanceof HTMLElement)) {
+      return;
+    }
+
+    clearFilter(button.dataset.clearFilter || '');
     loadPublicList(1);
   });
   document.getElementById('copyTrackingCode').addEventListener('click', copyTrackingCode);
@@ -718,6 +874,7 @@ renderKnowledgeBase();
 bindEvents();
 syncNotificationPreference();
 syncCounselingFields();
+syncContentCounter();
 
 
 loadPublicList(state.page);

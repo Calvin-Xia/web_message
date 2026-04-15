@@ -23,6 +23,30 @@ const statusColors = {
   resolved: '#13795b',
   closed: '#64748b',
 };
+const CLEARABLE_FILTER_KEYS = new Set([
+  'q',
+  'status',
+  'category',
+  'priority',
+  'distressType',
+  'sceneTag',
+  'assignedTo',
+  'startDate',
+  'endDate',
+  'updatedAfter',
+  'hasNotes',
+  'hasReplies',
+  'isAssigned',
+  'sort',
+]);
+const DRAWER_FOCUS_SELECTOR = [
+  'a[href]',
+  'button:not([disabled])',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',');
 const state = {
   token: null,
   page: 1,
@@ -250,6 +274,14 @@ function updateMultiFilterSummary(key) {
   summaryNode.textContent = selected.length === 0 ? '全部' : `已选 ${selected.length}`;
 }
 
+function updatePeriodButtons() {
+  document.querySelectorAll('[data-period-button]').forEach((button) => {
+    const active = button.dataset.periodButton === state.metricsPeriod;
+    button.dataset.active = active ? 'true' : 'false';
+    button.setAttribute('aria-pressed', String(active));
+  });
+}
+
 function getTriStateFilterValue(id) {
   const value = document.getElementById(id).value;
   return value === '' ? '' : value;
@@ -386,9 +418,7 @@ function restoreFiltersFromUrl() {
   setMultiFilterValues('priority', (params.get('priority') || '').split(',').filter(Boolean));
   setMultiFilterValues('distressType', (params.get('distressType') || '').split(',').filter(Boolean));
   setMultiFilterValues('sceneTag', (params.get('sceneTag') || '').split(',').filter(Boolean));
-  document.querySelectorAll('[data-period-button]').forEach((button) => {
-    button.dataset.active = button.dataset.periodButton === state.metricsPeriod ? 'true' : 'false';
-  });
+  updatePeriodButtons();
 }
 
 function syncAdvancedAdminFiltersState() {
@@ -476,22 +506,66 @@ function renderExportHistory() {
 
 function renderActiveFilterChips(filters) {
   const chips = [];
-  if (filters.q) chips.push(`关键词: ${filters.q}`);
-  filters.status.forEach((value) => chips.push(`状态: ${statusLabels[value] || value}`));
-  filters.category.forEach((value) => chips.push(`分类: ${categoryLabels[value] || value}`));
-  filters.priority.forEach((value) => chips.push(`优先级: ${priorityLabels[value] || value}`));
-  filters.distressType.forEach((value) => chips.push(`困扰: ${distressTypeLabels[value] || value}`));
-  filters.sceneTag.forEach((value) => chips.push(`场景: ${sceneTagLabels[value] || value}`));
-  if (filters.assignedTo) chips.push(`指派: ${filters.assignedTo}`);
-  if (filters.startDate) chips.push(`开始: ${filters.startDate}`);
-  if (filters.endDate) chips.push(`结束: ${filters.endDate}`);
-  if (filters.updatedAfter) chips.push(`更新晚于: ${filters.updatedAfter}`);
-  if (filters.hasNotes) chips.push(filters.hasNotes === 'true' ? '有备注' : '无备注');
-  if (filters.hasReplies) chips.push(filters.hasReplies === 'true' ? '有回复' : '无回复');
-  if (filters.isAssigned) chips.push(filters.isAssigned === 'true' ? '已分配' : '未分配');
-  chips.push(`排序: ${filters.sortField === 'updatedAt' ? '更新时间' : filters.sortField === 'priority' ? '优先级' : '提交时间'} ${filters.sortOrder === 'asc' ? '升序' : '降序'}`);
+  if (filters.q) chips.push({ key: 'q', label: `关键词: ${filters.q}` });
+  filters.status.forEach((value) => chips.push({ key: 'status', value, label: `状态: ${statusLabels[value] || value}` }));
+  filters.category.forEach((value) => chips.push({ key: 'category', value, label: `分类: ${categoryLabels[value] || value}` }));
+  filters.priority.forEach((value) => chips.push({ key: 'priority', value, label: `优先级: ${priorityLabels[value] || value}` }));
+  filters.distressType.forEach((value) => chips.push({ key: 'distressType', value, label: `困扰: ${distressTypeLabels[value] || value}` }));
+  filters.sceneTag.forEach((value) => chips.push({ key: 'sceneTag', value, label: `场景: ${sceneTagLabels[value] || value}` }));
+  if (filters.assignedTo) chips.push({ key: 'assignedTo', label: `指派: ${filters.assignedTo}` });
+  if (filters.startDate) chips.push({ key: 'startDate', label: `开始: ${filters.startDate}` });
+  if (filters.endDate) chips.push({ key: 'endDate', label: `结束: ${filters.endDate}` });
+  if (filters.updatedAfter) chips.push({ key: 'updatedAfter', label: `更新晚于: ${filters.updatedAfter}` });
+  if (filters.hasNotes) chips.push({ key: 'hasNotes', label: filters.hasNotes === 'true' ? '有备注' : '无备注' });
+  if (filters.hasReplies) chips.push({ key: 'hasReplies', label: filters.hasReplies === 'true' ? '有回复' : '无回复' });
+  if (filters.isAssigned) chips.push({ key: 'isAssigned', label: filters.isAssigned === 'true' ? '已分配' : '未分配' });
+  if (filters.sortField !== 'createdAt' || filters.sortOrder !== 'desc') {
+    chips.push({
+      key: 'sort',
+      label: `排序: ${filters.sortField === 'updatedAt' ? '更新时间' : filters.sortField === 'priority' ? '优先级' : '提交时间'} ${filters.sortOrder === 'asc' ? '升序' : '降序'}`,
+    });
+  }
   const container = document.getElementById('activeFilterChips');
-  container.innerHTML = chips.map((chip) => `<span class="filter-chip">${escapeHtml(chip)}</span>`).join('');
+  container.innerHTML = chips.map((chip) => `
+    <span class="filter-chip">
+      ${escapeHtml(chip.label)}
+      <button class="filter-chip__remove" type="button" data-clear-filter="${escapeHtml(chip.key)}" data-clear-value="${escapeHtml(chip.value || '')}" aria-label="移除筛选 ${escapeHtml(chip.label)}">×</button>
+    </span>
+  `).join('');
+
+}
+
+function clearFilter(key, value = '') {
+  if (!CLEARABLE_FILTER_KEYS.has(key)) {
+    return;
+  }
+
+  const multiKeys = ['status', 'category', 'priority', 'distressType', 'sceneTag'];
+  if (multiKeys.includes(key)) {
+    setMultiFilterValues(key, getMultiFilterValues(key).filter((item) => item !== value));
+    if (key === 'distressType' || key === 'sceneTag') {
+      syncAdvancedAdminFiltersState();
+    }
+    return;
+  }
+
+  const resetMap = {
+    q: () => { document.getElementById('searchInput').value = ''; },
+    assignedTo: () => { document.getElementById('assignedToFilter').value = ''; },
+    startDate: () => { document.getElementById('startDateFilter').value = ''; },
+    endDate: () => { document.getElementById('endDateFilter').value = ''; },
+    updatedAfter: () => { document.getElementById('updatedAfterFilter').value = ''; },
+    hasNotes: () => { document.getElementById('hasNotesFilter').value = ''; },
+    hasReplies: () => { document.getElementById('hasRepliesFilter').value = ''; },
+    isAssigned: () => { document.getElementById('isAssignedFilter').value = ''; },
+    sort: () => {
+      document.getElementById('sortFieldFilter').value = 'createdAt';
+      document.getElementById('sortOrderFilter').value = 'desc';
+    },
+  };
+
+  resetMap[key]?.();
+  syncAdvancedAdminFiltersState();
 }
 
 function renderQueueSummary(pagination, filters) {
@@ -507,13 +581,13 @@ function renderPagination(container, pagination, onChange) {
   const { page, totalPages } = pagination;
   const start = Math.max(1, page - 2);
   const end = Math.min(totalPages, start + 4);
-  const buttons = [`<button class="ghost-button rounded-full px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-40" data-page="${page - 1}" ${page === 1 ? 'disabled' : ''}>上一页</button>`];
+  const buttons = [`<button class="ghost-button rounded-full px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-40" data-page="${page - 1}" aria-label="上一页" ${page === 1 ? 'disabled' : ''}>上一页</button>`];
   for (let current = start; current <= end; current += 1) {
     const active = current === page;
-    buttons.push(`<button class="rounded-full px-4 py-2 text-sm font-semibold ${active ? 'bg-[#172033] text-white' : 'ghost-button text-[#172033]'}" data-page="${current}" ${active ? 'disabled' : ''}>${current}</button>`);
+    buttons.push(`<button class="rounded-full px-4 py-2 text-sm font-semibold ${active ? 'bg-[#172033] text-white' : 'ghost-button text-[#172033]'}" data-page="${current}" aria-label="第 ${current} 页" ${active ? 'aria-current="page" disabled' : ''}>${current}</button>`);
   }
-  buttons.push(`<button class="ghost-button rounded-full px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-40" data-page="${page + 1}" ${page === totalPages ? 'disabled' : ''}>下一页</button>`);
-  container.innerHTML = `<div class="flex flex-wrap items-center justify-center gap-2">${buttons.join('')}</div>`;
+  buttons.push(`<button class="ghost-button rounded-full px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-40" data-page="${page + 1}" aria-label="下一页" ${page === totalPages ? 'disabled' : ''}>下一页</button>`);
+  container.innerHTML = `<nav class="flex flex-wrap items-center justify-center gap-2" aria-label="后台问题分页">${buttons.join('')}</nav>`;
   container.querySelectorAll('button[data-page]').forEach((button) => {
     button.addEventListener('click', () => {
       const nextPage = Number(button.dataset.page);
@@ -563,6 +637,11 @@ function renderStatusDonut(byStatus, total) {
     offset += ratio;
   }
   donut.style.background = total > 0 ? `conic-gradient(${segments.join(', ')})` : 'conic-gradient(rgba(23,32,51,0.08) 0deg 360deg)';
+  const topStatus = Object.keys(statusLabels)
+    .map((status) => ({ status, count: Number(byStatus[status] || 0) }))
+    .sort((left, right) => right.count - left.count)[0];
+  donut.setAttribute('role', 'img');
+  donut.setAttribute('aria-label', total > 0 ? `状态分布，总计 ${total} 条，最多为 ${statusLabels[topStatus.status]} ${topStatus.count} 条。` : '状态分布暂无数据。');
   center.innerHTML = `<div class="text-xs uppercase tracking-[0.24em] text-[#72809a]">样本量</div><div class="mt-1 text-2xl font-black text-[#172033]">${total}</div>`;
   legend.innerHTML = Object.keys(statusLabels).map((status) => `
     <div class="flex items-center justify-between gap-4 rounded-[1.2rem] border border-[rgba(23,32,51,0.08)] bg-white/68 px-4 py-3">
@@ -677,8 +756,13 @@ function renderTrendChart(trends) {
     return `<circle cx="${x}" cy="${y}" r="4" fill="#13795b" stroke="rgba(255,255,255,0.92)" stroke-width="2"></circle>`;
   }).join('');
   const labels = data.filter((_, index) => index === 0 || index === data.length - 1 || index % Math.max(1, Math.floor(data.length / 4)) === 0).map((item) => item[labelKey]);
+  const totalCreated = data.reduce((sum, item) => sum + (Number(item.created) || 0), 0);
+  const totalResolved = data.reduce((sum, item) => sum + (Number(item.resolved) || 0), 0);
+  const summary = `${state.metricsPeriod === 'day' ? '日' : state.metricsPeriod === 'month' ? '月' : '周'}趋势：新增 ${totalCreated} 条，解决 ${totalResolved} 条。`;
   container.innerHTML = `
-    <svg viewBox="0 0 ${width} ${height}" class="h-[260px] w-full" aria-label="处理趋势图表">
+    <svg viewBox="0 0 ${width} ${height}" class="h-[260px] w-full" role="img" aria-labelledby="adminTrendTitle adminTrendDesc">
+      <title id="adminTrendTitle">处理趋势图表</title>
+      <desc id="adminTrendDesc">${escapeHtml(summary)}</desc>
       ${grid}
       ${markerGuides}
       <polyline fill="none" stroke="#2457d6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" points="${createdPoints}"></polyline>
@@ -689,6 +773,7 @@ function renderTrendChart(trends) {
     <div class="mt-4 flex flex-wrap gap-2 text-xs uppercase tracking-[0.18em] text-[#72809a]">
       ${labels.map((label) => `<span class="rounded-full bg-[rgba(23,32,51,0.06)] px-3 py-1">${escapeHtml(label)}</span>`).join('')}
     </div>
+    <div class="chart-summary">${escapeHtml(summary)}</div>
   `;
 }
 function renderIssueList(items, pagination) {
@@ -700,7 +785,15 @@ function renderIssueList(items, pagination) {
   renderQueueSummary(pagination, filters);
 
   if (!items.length) {
-    container.innerHTML = '<div class="empty-state text-center">当前筛选条件下没有问题，尝试放宽日期或布尔筛选。</div>';
+    container.innerHTML = `
+      <div class="empty-state text-center">
+        <div>当前筛选条件下没有问题。</div>
+        <button class="ghost-button mt-4 px-4 py-2 text-sm font-semibold" type="button" data-empty-reset>清空筛选</button>
+      </div>
+    `;
+    container.querySelector('[data-empty-reset]')?.addEventListener('click', () => {
+      document.getElementById('resetFilters').click();
+    });
     document.getElementById('paginationContainer').innerHTML = '';
     return;
   }
@@ -723,8 +816,8 @@ function renderIssueList(items, pagination) {
             <div class="mt-2 text-base leading-7 text-[#172033]">${highlightText(item.content, filters.q)}</div>
           </div>
           <div class="grid gap-2 text-sm text-[#4c566b] sm:grid-cols-2 lg:grid-cols-3">
-            <div><strong class="text-[#172033]">姓名：</strong>${highlightText(item.name, filters.q)}</div>
-            <div><strong class="text-[#172033]">学号：</strong>${highlightText(item.studentId, filters.q)}</div>
+            <div><strong class="text-[#172033]">姓名：</strong>${escapeHtml(item.name)}</div>
+            <div><strong class="text-[#172033]">学号：</strong>${escapeHtml(item.studentId)}</div>
             <div><strong class="text-[#172033]">指派：</strong>${highlightText(item.assignedTo || '未指派', filters.q)}</div>
             <div><strong class="text-[#172033]">公开：</strong>${item.isPublic ? '是' : '否'}</div>
             <div><strong class="text-[#172033]">上报：</strong>${item.isReported ? '是' : '否'}</div>
@@ -800,6 +893,59 @@ function openDrawerShell(trigger) {
   drawer.setAttribute('aria-hidden', 'false');
   document.body.classList.add('overflow-hidden');
   document.getElementById('drawerTitle').focus();
+}
+
+function getDrawerFocusableElements() {
+  const drawer = document.getElementById('issueDrawer');
+  if (drawer.hidden) {
+    return [];
+  }
+
+  return Array.from(drawer.querySelectorAll(DRAWER_FOCUS_SELECTOR))
+    .filter((element) => element instanceof HTMLElement && isVisibleElement(element));
+}
+
+function isVisibleElement(element) {
+  if (element.hidden) {
+    return false;
+  }
+
+  const style = window.getComputedStyle(element);
+  return style.display !== 'none'
+    && style.visibility !== 'hidden'
+    && (element.offsetWidth > 0 || element.offsetHeight > 0 || element.getClientRects().length > 0);
+}
+
+function trapDrawerFocus(event) {
+  if (event.key !== 'Tab' || document.getElementById('issueDrawer').hidden) {
+    return;
+  }
+
+  const focusable = getDrawerFocusableElements();
+  if (focusable.length === 0) {
+    event.preventDefault();
+    document.getElementById('drawerTitle').focus();
+    return;
+  }
+
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (!focusable.includes(document.activeElement)) {
+    event.preventDefault();
+    (event.shiftKey ? last : first).focus();
+    return;
+  }
+
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+    return;
+  }
+
+  if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
 }
 
 function closeDrawer() {
@@ -1225,10 +1371,22 @@ function bindEvents() {
       advancedFilters.open = false;
     }
     state.metricsPeriod = 'week';
-    document.querySelectorAll('[data-period-button]').forEach((button) => {
-      button.dataset.active = button.dataset.periodButton === 'week' ? 'true' : 'false';
-    });
+    updatePeriodButtons();
     loadDashboard(1, { refreshMetrics: true }).catch((error) => setNotification('adminNotification', error.message, 'error'));
+  });
+  document.getElementById('activeFilterChips').addEventListener('click', (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) {
+      return;
+    }
+
+    const button = target.closest('[data-clear-filter]');
+    if (!(button instanceof HTMLElement)) {
+      return;
+    }
+
+    clearFilter(button.dataset.clearFilter || '', button.dataset.clearValue || '');
+    loadDashboard(1, { refreshMetrics: false }).catch((error) => setNotification('adminNotification', error.message, 'error'));
   });
 
   document.getElementById('refreshButton').addEventListener('click', async () => {
@@ -1251,7 +1409,9 @@ function bindEvents() {
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && !document.getElementById('issueDrawer').hidden) {
       closeDrawer();
+      return;
     }
+    trapDrawerFocus(event);
   });
 
   document.querySelectorAll('[data-multi-filter]').forEach((wrapper) => {
@@ -1264,9 +1424,7 @@ function bindEvents() {
   document.querySelectorAll('[data-period-button]').forEach((button) => {
     button.addEventListener('click', () => {
       state.metricsPeriod = button.dataset.periodButton;
-      document.querySelectorAll('[data-period-button]').forEach((target) => {
-        target.dataset.active = target.dataset.periodButton === state.metricsPeriod ? 'true' : 'false';
-      });
+      updatePeriodButtons();
       loadMetrics(true).then(() => syncUrl(state.page)).catch((error) => setNotification('metricsNotification', error.message, 'error'));
     });
   });

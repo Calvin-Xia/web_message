@@ -1,5 +1,6 @@
 import { canTransitionStatus } from '../../../../src/shared/constants.js';
-import { getAdminCorsPolicy, createForbiddenOriginResponse, authorizeAdminRequest } from '../../../../src/shared/auth.js';
+import { createForbiddenOriginResponse, authorizeAdminRequest } from '../../../../src/shared/auth.js';
+import { getAdminCorsPolicy } from '../../../../src/shared/corsConfig.js';
 import {
   createNotificationIdempotencyKey,
   isNotifiableStatus,

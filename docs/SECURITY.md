@@ -6,6 +6,7 @@
 - D1 查询全部使用参数绑定，避免 SQL 注入。
 - 前端展示统一使用 HTML 转义，避免 XSS 注入。
 - 后台接口通过受控 CORS + Bearer Token 组合降低 CSRF 风险。
+- 后台生产 CORS 允许来源集中维护在 `src/shared/corsConfig.js`，当前不再允许旧的 `issue-origin.calvin-xia.cn`。
 
 ## 传输安全
 

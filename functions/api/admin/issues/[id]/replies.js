@@ -1,4 +1,5 @@
-import { getAdminCorsPolicy, createForbiddenOriginResponse, authorizeAdminRequest } from '../../../../../src/shared/auth.js';
+import { createForbiddenOriginResponse, authorizeAdminRequest } from '../../../../../src/shared/auth.js';
+import { getAdminCorsPolicy } from '../../../../../src/shared/corsConfig.js';
 import { createAdminActionStatement, getIssueById, mapIssueUpdate } from '../../../../../src/shared/issueData.js';
 import {
   createNotificationIdempotencyKey,

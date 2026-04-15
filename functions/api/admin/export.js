@@ -1,4 +1,5 @@
-import { getAdminCorsPolicy, createForbiddenOriginResponse, authorizeAdminRequest } from '../../../src/shared/auth.js';
+import { createForbiddenOriginResponse, authorizeAdminRequest } from '../../../src/shared/auth.js';
+import { getAdminCorsPolicy } from '../../../src/shared/corsConfig.js';
 import { createCsvContent } from '../../../src/shared/csv.js';
 import { createAdminActionStatement } from '../../../src/shared/issueData.js';
 import { successResponse, errorResponse, createOptionsResponse, methodNotAllowedResponse } from '../../../src/shared/response.js';

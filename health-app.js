@@ -173,16 +173,22 @@ function renderChecks(checks) {
 
   dom.serviceChecks.innerHTML = Object.entries(labels).map(([key, label]) => {
     const value = checks[key] || 'warn';
+    const statusText = value === 'pass' ? '正常' : value === 'fail' ? '异常' : '预警';
     const palette = value === 'pass'
       ? 'bg-[rgba(19,121,91,0.12)] text-[#13795b]'
       : value === 'fail'
         ? 'bg-[rgba(178,58,50,0.12)] text-[#b23a32]'
         : 'bg-[rgba(217,138,23,0.12)] text-[#966015]';
-    return `<span class="rounded-full px-3 py-1 text-xs font-semibold ${palette}">${label} ${escapeHtml(value)}</span>`;
+    return `<span class="rounded-full px-3 py-1 text-xs font-semibold ${palette}">${label} ${escapeHtml(statusText)}</span>`;
   }).join('');
 }
 
 function renderServices(services, checks) {
+  const checkLabels = {
+    pass: '正常',
+    fail: '异常',
+    warn: '预警',
+  };
   const entries = [
     {
       title: 'D1 数据库',
@@ -213,7 +219,7 @@ function renderServices(services, checks) {
               <div class="service-meta mt-1 text-xs uppercase tracking-[0.24em]">${escapeHtml(data.status || 'unknown')}</div>
             </div>
           </div>
-          <div class="rounded-full bg-[rgba(23,32,51,0.06)] px-3 py-1 text-xs font-semibold text-[#4c566b]">${escapeHtml(entry.detail)}</div>
+          <div class="rounded-full bg-[rgba(23,32,51,0.06)] px-3 py-1 text-xs font-semibold text-[#4c566b]">${escapeHtml(checkLabels[entry.detail] || entry.detail || '未知')}</div>
         </div>
         <div class="mt-4 grid gap-3 text-sm text-[#4c566b] sm:grid-cols-2">
           <div class="rounded-[1.2rem] border border-[rgba(23,32,51,0.08)] bg-white/72 px-4 py-3">
@@ -265,9 +271,13 @@ function renderTrendChart(target, trends, mode) {
   const requestMax = Math.max(...trends.map((item) => item.requestCount || 0), 1);
   const secondaryKey = mode === 'latency' ? 'avgResponseTime' : 'rateLimitHits';
   const secondaryMax = Math.max(...trends.map((item) => Number(item[secondaryKey]) || 0), 1);
+  const latest = trends[trends.length - 1] || {};
+  const summary = mode === 'latency'
+    ? `最近采样请求量 ${latest.requestCount || 0}，平均响应时间 ${latest.avgResponseTime || 0} ms。`
+    : `最近采样请求量 ${latest.requestCount || 0}，限流命中 ${latest.rateLimitHits || 0} 次。`;
 
   target.innerHTML = `
-    <div class="chart-grid">
+    <div class="chart-grid" role="img" aria-label="${escapeHtml(summary)}">
       ${trends.map((item) => {
         const requestHeight = Math.max(8, Math.round(((item.requestCount || 0) / requestMax) * 120));
         const secondaryValue = Number(item[secondaryKey]) || 0;
@@ -285,9 +295,10 @@ function renderTrendChart(target, trends, mode) {
       }).join('')}
     </div>
     <div class="mt-4 grid gap-2 text-sm text-[#4c566b] sm:grid-cols-2">
-      <div class="rounded-[1.2rem] border border-[rgba(23,32,51,0.08)] bg-white/65 px-4 py-3">最新请求量：<strong class="text-[#172033]">${escapeHtml(String(trends[trends.length - 1].requestCount || 0))}</strong></div>
-      <div class="rounded-[1.2rem] border border-[rgba(23,32,51,0.08)] bg-white/65 px-4 py-3">最新${mode === 'latency' ? '响应时间' : '限流命中'}：<strong class="text-[#172033]">${mode === 'latency' ? `${escapeHtml(String(trends[trends.length - 1].avgResponseTime || 0))} ms` : escapeHtml(String(trends[trends.length - 1].rateLimitHits || 0))}</strong></div>
+      <div class="rounded-[1.2rem] border border-[rgba(23,32,51,0.08)] bg-white/65 px-4 py-3">最新请求量：<strong class="text-[#172033]">${escapeHtml(String(latest.requestCount || 0))}</strong></div>
+      <div class="rounded-[1.2rem] border border-[rgba(23,32,51,0.08)] bg-white/65 px-4 py-3">最新${mode === 'latency' ? '响应时间' : '限流命中'}：<strong class="text-[#172033]">${mode === 'latency' ? `${escapeHtml(String(latest.avgResponseTime || 0))} ms` : escapeHtml(String(latest.rateLimitHits || 0))}</strong></div>
     </div>
+    <div class="chart-summary">${escapeHtml(summary)}</div>
   `;
 }
 
@@ -376,6 +387,7 @@ async function loadHealth() {
 function syncAutoRefreshButton() {
   const active = Boolean(autoRefreshTimer);
   dom.toggleAutoRefresh.dataset.active = active ? 'true' : 'false';
+  dom.toggleAutoRefresh.setAttribute('aria-pressed', String(active));
   dom.toggleAutoRefresh.textContent = active ? '自动刷新开启' : '自动刷新关闭';
 }
 

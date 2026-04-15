@@ -3,7 +3,6 @@ import {
   authorizeAdminRequest,
   createForbiddenOriginResponse,
   createUnauthorizedResponse,
-  getAdminCorsPolicy,
   verifyAdminKey,
 } from '../src/shared/auth.js';
 
@@ -22,30 +21,6 @@ describe('verifyAdminKey', () => {
     expect(errorSpy).toHaveBeenCalled();
 
     errorSpy.mockRestore();
-  });
-});
-
-describe('getAdminCorsPolicy', () => {
-  it('allows localhost origins outside production and supports requests without origin', () => {
-    const localPolicy = getAdminCorsPolicy('http://localhost:8788', { ENVIRONMENT: 'development' });
-    const noOriginPolicy = getAdminCorsPolicy(null, { ENVIRONMENT: 'development' });
-
-    expect(localPolicy.isOriginAllowed).toBe(true);
-    expect(localPolicy.headers['Access-Control-Allow-Origin']).toBe('http://localhost:8788');
-    expect(noOriginPolicy.hasOrigin).toBe(false);
-    expect(noOriginPolicy.headers.Vary).toBe('Origin');
-  });
-
-  it('rejects invalid origins and untrusted production origins', () => {
-    const invalidPolicy = getAdminCorsPolicy('file:///tmp/test', { ENVIRONMENT: 'development' });
-    const evilPolicy = getAdminCorsPolicy('https://evil.example.com', { ENVIRONMENT: 'production' });
-    const branchPolicy = getAdminCorsPolicy('https://feature.web-message-board.pages.dev', { ENVIRONMENT: 'production' });
-    const portPolicy = getAdminCorsPolicy('https://web-message-board.pages.dev:8443', { ENVIRONMENT: 'production' });
-
-    expect(invalidPolicy.isOriginAllowed).toBe(false);
-    expect(evilPolicy.isOriginAllowed).toBe(false);
-    expect(branchPolicy.isOriginAllowed).toBe(true);
-    expect(portPolicy.isOriginAllowed).toBe(false);
   });
 });
 

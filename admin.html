@@ -244,11 +244,12 @@
   </style>
 </head>
 <body data-page-role="admin" class="min-h-screen px-4 py-5 md:px-8 md:py-8">
+  <a class="skip-link" href="#mainContent">跳到主要内容</a>
   <header class="mx-auto flex max-w-7xl flex-col gap-4 md:flex-row md:items-center md:justify-between">
     <div>
       <div class="text-xs font-semibold uppercase tracking-[0.35em] text-[#5f6b80]">Admin Operations Desk</div>
       <h1 class="display-font mt-2 text-3xl md:text-4xl">留言后台</h1>
-      <p class="mt-3 max-w-3xl text-sm leading-7 text-[#4c566b]">集中查看统计、问题队列、详情抽屉和导出记录。</p>
+      <p class="mt-3 max-w-3xl text-sm leading-7 text-[#4c566b]">查看统计、筛选队列、处理留言。</p>
     </div>
     <nav class="flex flex-wrap gap-2 text-sm text-[#445069]">
       <a class="ghost-button rounded-full px-4 py-2 transition" href="/">返回首页</a>
@@ -256,11 +257,11 @@
     </nav>
   </header>
 
-  <main class="mx-auto mt-6 max-w-7xl space-y-6 md:mt-8">
+  <main id="mainContent" class="mx-auto mt-6 max-w-7xl space-y-6 md:mt-8">
     <section id="loginSection" class="surface-panel mx-auto max-w-lg rounded-[2rem] p-6 md:p-8">
       <div class="text-xs font-semibold uppercase tracking-[0.3em] text-[#72809a]">Secure Entry</div>
       <h2 class="display-font mt-3 text-3xl">管理员登录</h2>
-      <p class="mt-3 text-sm leading-7 text-[#4c566b]">输入共享密钥后即可查看统计面板、问题队列、导出数据并处理状态流转。</p>
+      <p class="mt-3 text-sm leading-7 text-[#4c566b]">输入共享密钥后进入后台。</p>
       <div id="loginNotification" class="mt-4" aria-live="polite" aria-atomic="true"></div>
       <form id="loginForm" class="mt-5 space-y-4">
         <label class="space-y-2 text-sm font-medium text-[#25314a]">
@@ -277,7 +278,7 @@
           <div class="max-w-2xl">
             <div class="text-xs font-semibold uppercase tracking-[0.3em] text-[#72809a]">Metrics Cockpit</div>
             <h2 class="display-font mt-2 text-3xl">运营面板</h2>
-            <p class="mt-3 text-sm leading-7 text-[#4c566b]">同一组时间条件会同时影响统计面板、问题列表和导出。你可以直接复制当前 URL，把筛选结果发给其他管理员。</p>
+            <p class="mt-3 text-sm leading-7 text-[#4c566b]">时间条件会同步影响统计、列表和导出。</p>
           </div>
           <div class="flex flex-wrap gap-2">
             <div class="relative isolate">
@@ -306,9 +307,9 @@
           <div>
             <div class="mb-2 text-sm font-medium text-[#25314a]">趋势粒度</div>
             <div class="segment-bar">
-              <button class="segment-button" data-period-button="day" type="button">按日</button>
-              <button class="segment-button" data-period-button="week" type="button">按周</button>
-              <button class="segment-button" data-period-button="month" type="button">按月</button>
+              <button class="segment-button" data-period-button="day" type="button" aria-pressed="false">按日</button>
+              <button class="segment-button" data-period-button="week" type="button" aria-pressed="true">按周</button>
+              <button class="segment-button" data-period-button="month" type="button" aria-pressed="false">按月</button>
             </div>
           </div>
           <div class="rounded-[1.5rem] border border-[rgba(23,32,51,0.08)] bg-white/74 px-4 py-3 text-sm text-[#4c566b]">
@@ -411,7 +412,7 @@
           <div>
             <div class="text-xs font-semibold uppercase tracking-[0.3em] text-[#72809a]">Issue Queue</div>
             <h2 class="display-font mt-2 text-3xl">后台问题列表</h2>
-            <p class="mt-2 text-sm leading-7 text-[#4c566b]">支持多条件组合筛选、URL 持久化、搜索高亮和导出同条件数据。</p>
+            <p class="mt-2 text-sm leading-7 text-[#4c566b]">筛选、查看详情、导出同条件数据。</p>
           </div>
           <div id="queueSummary" class="rounded-[1.5rem] border border-[rgba(23,32,51,0.08)] bg-white/72 px-4 py-3 text-sm text-[#4c566b]" aria-live="polite" aria-atomic="true">尚未加载问题列表。</div>
         </div>
@@ -594,7 +595,7 @@
           <h2 id="drawerTitle" tabindex="-1" class="display-font mt-2 text-3xl">选择一条问题查看详情</h2>
           <div id="drawerMeta" class="mt-2 text-sm text-[#5f6b80]"></div>
         </div>
-        <button id="closeDrawer" class="ghost-button inline-flex h-11 w-11 items-center justify-center rounded-full text-lg font-semibold text-[#172033] transition" type="button">×</button>
+        <button id="closeDrawer" class="ghost-button inline-flex h-11 w-11 items-center justify-center rounded-full text-lg font-semibold text-[#172033] transition" type="button" aria-label="关闭问题详情">×</button>
       </div>
     </div>
 

@@ -8,7 +8,7 @@
   --color-fb-gray-light: #E4E6EB;
 }
 
-:root {
+body[data-page-role] {
   --ui-ink: #172033;
   --ui-ink-soft: #4c566b;
   --ui-line: rgba(23, 32, 51, 0.12);
@@ -654,5 +654,255 @@ textarea:focus-visible,
   body[data-page-role]::before,
   body[data-page-role]::after {
     display: none;
+  }
+}
+
+/* UI refinement layer: page-scoped tokens using --ui-{category}-{variant}.
+   Groups: bg, surface, ink, line, accent, status, shadow, radius, blur. */
+body[data-page-role] {
+  --ui-bg: #f6f8fb;
+  --ui-bg-soft: #edf4f7;
+  --ui-surface: #ffffff;
+  --ui-surface-muted: #f8fafc;
+  --ui-ink: #18202c;
+  --ui-ink-soft: #4b5565;
+  --ui-ink-muted: #667085;
+  --ui-line: rgba(24, 32, 44, 0.14);
+  --ui-line-soft: rgba(24, 32, 44, 0.08);
+  --ui-accent: #2457d6;
+  --ui-accent-strong: #1d47b5;
+  --ui-accent-soft: rgba(36, 87, 214, 0.1);
+  --ui-mint: #13795b;
+  --ui-warn: #b86b0d;
+  --ui-danger: #b42318;
+  --ui-shadow: 0 12px 28px rgba(24, 32, 44, 0.08);
+  --ui-shadow-raised: 0 18px 36px rgba(24, 32, 44, 0.12);
+  --ui-radius-sm: 0.375rem;
+  --ui-radius: 0.5rem;
+  --ui-radius-lg: 0.5rem;
+  --ui-panel-blur: 0px;
+}
+
+body[data-page-role] {
+  color: var(--ui-ink);
+  background:
+    linear-gradient(180deg, var(--ui-bg) 0%, var(--ui-bg-soft) 100%);
+}
+
+body[data-page-role]::before,
+body[data-page-role]::after,
+.hero-slab::before,
+.hero-slab::after,
+.status-spotlight::before,
+.status-spotlight::after,
+.hero-rail::after {
+  display: none;
+}
+
+body[data-page-role] main {
+  position: relative;
+  z-index: 1;
+}
+
+body[data-page-role] :is(.surface-panel, .hero-slab, .status-spotlight, .public-card, .metric-card, .chart-shell, .issue-card, .tracking-card, .service-card, .log-shell, .alert-shell, .filters-shell, .filters-advanced, .filter-rail, .filter-menu, .result-banner, .result-panel-card, .result-meta-card, .support-panel, .hero-note, .empty-state, .feedback-box) {
+  border-radius: var(--ui-radius-lg);
+  border-color: var(--ui-line-soft);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow);
+  backdrop-filter: none;
+}
+
+body[data-page-role] :is(.filters-shell, .filters-advanced, .filter-rail, .support-panel, .hero-note, .empty-state, .feedback-box--loading) {
+  background: var(--ui-surface-muted);
+  box-shadow: none;
+}
+
+body[data-page-role] :is(.field-shell, input:not([type='checkbox']):not([type='radio']), select, textarea) {
+  min-height: 2.75rem;
+  border-radius: var(--ui-radius);
+}
+
+body[data-page-role] .field-shell {
+  background: var(--ui-surface);
+  border-color: var(--ui-line);
+}
+
+body[data-page-role] .field-shell:hover {
+  border-color: rgba(36, 87, 214, 0.28);
+}
+
+body[data-page-role] .field-shell[aria-invalid='true'] {
+  border-color: rgba(180, 35, 24, 0.5);
+  box-shadow: 0 0 0 4px rgba(180, 35, 24, 0.1);
+}
+
+body[data-page-role] :is(button, .ghost-button, .primary-button, .dark-button, .toggle-button, .action-button) {
+  border-radius: var(--ui-radius);
+  min-height: 2.75rem;
+  touch-action: manipulation;
+}
+
+body[data-page-role] :is(.ghost-button, .primary-button, .dark-button, .toggle-button, .action-button):hover {
+  transform: translateY(-1px);
+}
+
+body[data-page-role] :is(.ghost-button, .primary-button, .dark-button, .toggle-button, .action-button):active {
+  transform: translateY(0);
+}
+
+body[data-page-role] .primary-button {
+  background: var(--ui-accent);
+  box-shadow: 0 10px 22px rgba(36, 87, 214, 0.22);
+}
+
+body[data-page-role] .dark-button {
+  background: var(--ui-ink);
+  box-shadow: 0 10px 22px rgba(24, 32, 44, 0.18);
+}
+
+body[data-page-role] .ghost-button {
+  background: var(--ui-surface);
+  box-shadow: none;
+}
+
+body[data-page-role] :is(.interactive-card, .issue-card):hover {
+  transform: translateY(-1px);
+  box-shadow: var(--ui-shadow-raised);
+}
+
+.required-mark {
+  color: var(--ui-danger);
+  font-weight: 700;
+}
+
+.field-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  color: var(--ui-ink-muted);
+  font-size: 0.75rem;
+  line-height: 1.6;
+}
+
+.field-error {
+  color: var(--ui-danger);
+  font-size: 0.75rem;
+  line-height: 1.6;
+}
+
+.form-section {
+  border: 1px solid var(--ui-line-soft);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface-muted);
+  padding: 1rem;
+}
+
+.form-section__title {
+  width: auto;
+  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface-muted);
+  color: var(--ui-ink);
+  font-size: 0.95rem;
+  font-weight: 700;
+  padding: 0 0.45rem;
+  transform: translateX(-0.2rem);
+}
+
+.form-section__hint {
+  margin-top: 0.25rem;
+  color: var(--ui-ink-muted);
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+
+.filter-chip {
+  border: 1px solid rgba(36, 87, 214, 0.16);
+}
+
+.filter-chip__remove {
+  min-height: 1.5rem;
+  width: 1.5rem;
+  border-radius: var(--ui-radius-sm);
+  color: inherit;
+  font-weight: 800;
+  line-height: 1;
+}
+
+body[data-page-role] .filter-chip__remove {
+  min-height: 1.5rem;
+  width: 1.5rem;
+}
+
+.filter-chip__remove:hover {
+  background: rgba(36, 87, 214, 0.12);
+}
+
+.chart-summary {
+  margin-top: 0.75rem;
+  border: 1px solid var(--ui-line-soft);
+  border-radius: var(--ui-radius);
+  background: var(--ui-surface-muted);
+  padding: 0.75rem 0.9rem;
+  color: var(--ui-ink-soft);
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+.skip-link {
+  position: absolute;
+  left: 1rem;
+  top: 1rem;
+  z-index: 1000;
+  transform: translateY(-140%);
+  border-radius: var(--ui-radius);
+  background: var(--ui-ink);
+  color: #fff;
+  padding: 0.75rem 1rem;
+  font-weight: 700;
+  transition: transform var(--ui-duration-fast) ease;
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+body[data-page-role] [aria-current='page'] {
+  background: var(--ui-ink);
+  color: #fff;
+}
+
+body[data-page-role] :disabled,
+body[data-page-role] [aria-disabled='true'] {
+  cursor: not-allowed;
+}
+
+@media (max-width: 767px) {
+  body[data-page-role] {
+    padding-left: 0.875rem;
+    padding-right: 0.875rem;
+  }
+
+  body[data-page-role] .display-font {
+    line-height: 1.15;
+  }
+
+  .hero-actions {
+    flex-direction: column;
+  }
+
+  .hero-actions > * {
+    width: 100%;
   }
 }

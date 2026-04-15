@@ -1,4 +1,5 @@
-import { getAdminCorsPolicy, createForbiddenOriginResponse, authorizeAdminRequest } from '../../../src/shared/auth.js';
+import { createForbiddenOriginResponse, authorizeAdminRequest } from '../../../src/shared/auth.js';
+import { getAdminCorsPolicy } from '../../../src/shared/corsConfig.js';
 import { successResponse, errorResponse, createOptionsResponse, methodNotAllowedResponse } from '../../../src/shared/response.js';
 import { checkAdminRateLimit } from '../../../src/shared/rateLimit.js';
 import { adminMetricsQuerySchema, formatZodError } from '../../../src/shared/validation.js';
