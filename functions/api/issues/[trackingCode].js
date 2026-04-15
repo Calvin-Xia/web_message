@@ -66,6 +66,8 @@ export async function onRequest(context) {
       trackingCode: issue.tracking_code,
       content: issue.content,
       category: issue.category,
+      distressType: issue.distress_type ?? null,
+      sceneTag: issue.scene_tag ?? null,
       status: issue.status,
       priority: issue.priority,
       publicSummary: issue.public_summary,

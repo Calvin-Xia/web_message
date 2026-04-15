@@ -69,7 +69,7 @@ export async function onRequest(context) {
       const total = Number(totalRow?.total) || 0;
 
       const rows = await env.DB.prepare(`
-        SELECT tracking_code, content, category, status, priority, public_summary, created_at, updated_at
+        SELECT tracking_code, content, category, distress_type, scene_tag, status, priority, public_summary, created_at, updated_at
         FROM issues
         ${whereSql}
         ORDER BY ${orderBy}
@@ -112,8 +112,8 @@ export async function onRequest(context) {
         env.DB.prepare(`
           INSERT INTO issues (
             tracking_code, name, student_id, email, notify_by_email, content,
-            is_public, is_reported, category, priority, status, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            is_public, is_reported, category, distress_type, scene_tag, priority, status, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `)
           .bind(
             nextTrackingCode,
@@ -125,6 +125,8 @@ export async function onRequest(context) {
             payload.isPublic ? 1 : 0,
             payload.isReported ? 1 : 0,
             payload.category,
+            payload.distressType,
+            payload.sceneTag,
             'normal',
             'submitted',
             now,

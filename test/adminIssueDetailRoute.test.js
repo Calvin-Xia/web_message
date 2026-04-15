@@ -282,5 +282,193 @@ describe('admin issue detail route', () => {
     expect(response.status).toBe(200);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
+
+  it('allows counseling insight fields for counseling issues', async () => {
+    const env = createAppEnv();
+    env.DB.issues.push({
+      id: 1,
+      tracking_code: 'ABCD23EF',
+      name: '测试同学',
+      student_id: '2024012345678',
+      email: null,
+      notify_by_email: 0,
+      content: '最近心理压力比较明显，希望获得进一步支持。',
+      is_public: 0,
+      is_reported: 0,
+      category: 'counseling',
+      distress_type: null,
+      scene_tag: null,
+      priority: 'normal',
+      status: 'submitted',
+      public_summary: null,
+      assigned_to: null,
+      first_response_at: null,
+      resolved_at: null,
+      created_at: '2026-03-11T08:00:00.000Z',
+      updated_at: '2026-03-11T08:00:00.000Z',
+    });
+
+    const response = await onRequest({
+      request: new Request('http://localhost/api/admin/issues/1', {
+        method: 'PATCH',
+        headers: {
+          Authorization: 'Bearer test-secret',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          distressType: 'sleep',
+          sceneTag: 'dormitory',
+          updatedAt: '2026-03-11T08:00:00.000Z',
+        }),
+      }),
+      env,
+      params: { id: '1' },
+    });
+
+    expect(response.status).toBe(200);
+    expect(env.DB.issues[0].distress_type).toBe('sleep');
+    expect(env.DB.issues[0].scene_tag).toBe('dormitory');
+  });
+
+  it('keeps counseling insight fields when updating other fields without category', async () => {
+    const env = createAppEnv();
+    env.DB.issues.push({
+      id: 1,
+      tracking_code: 'ABCD23EF',
+      name: '测试同学',
+      student_id: '2024012345678',
+      email: null,
+      notify_by_email: 0,
+      content: '最近心理压力比较明显，希望获得进一步支持。',
+      is_public: 0,
+      is_reported: 0,
+      category: 'counseling',
+      distress_type: 'academic_pressure',
+      scene_tag: 'library',
+      priority: 'normal',
+      status: 'submitted',
+      public_summary: null,
+      assigned_to: null,
+      first_response_at: null,
+      resolved_at: null,
+      created_at: '2026-03-11T08:00:00.000Z',
+      updated_at: '2026-03-11T08:00:00.000Z',
+    });
+
+    const response = await onRequest({
+      request: new Request('http://localhost/api/admin/issues/1', {
+        method: 'PATCH',
+        headers: {
+          Authorization: 'Bearer test-secret',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          priority: 'high',
+          updatedAt: '2026-03-11T08:00:00.000Z',
+        }),
+      }),
+      env,
+      params: { id: '1' },
+    });
+
+    expect(response.status).toBe(200);
+    expect(env.DB.issues[0].priority).toBe('high');
+    expect(env.DB.issues[0].category).toBe('counseling');
+    expect(env.DB.issues[0].distress_type).toBe('academic_pressure');
+    expect(env.DB.issues[0].scene_tag).toBe('library');
+  });
+
+  it('rejects counseling insight fields for non-counseling issues', async () => {
+    const env = createAppEnv();
+    env.DB.issues.push({
+      id: 1,
+      tracking_code: 'ABCD23EF',
+      name: '测试同学',
+      student_id: '2024012345678',
+      email: null,
+      notify_by_email: 0,
+      content: '图书馆空调不制冷，需要尽快安排处理。',
+      is_public: 0,
+      is_reported: 0,
+      category: 'facility',
+      distress_type: null,
+      scene_tag: null,
+      priority: 'normal',
+      status: 'submitted',
+      public_summary: null,
+      assigned_to: null,
+      first_response_at: null,
+      resolved_at: null,
+      created_at: '2026-03-11T08:00:00.000Z',
+      updated_at: '2026-03-11T08:00:00.000Z',
+    });
+
+    const response = await onRequest({
+      request: new Request('http://localhost/api/admin/issues/1', {
+        method: 'PATCH',
+        headers: {
+          Authorization: 'Bearer test-secret',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          distressType: 'sleep',
+          updatedAt: '2026-03-11T08:00:00.000Z',
+        }),
+      }),
+      env,
+      params: { id: '1' },
+    });
+    const payload = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(payload.error).toBe('仅心理咨询分类可选择困扰类别');
+  });
+
+  it('clears counseling insight fields when category changes away from counseling', async () => {
+    const env = createAppEnv();
+    env.DB.issues.push({
+      id: 1,
+      tracking_code: 'ABCD23EF',
+      name: '测试同学',
+      student_id: '2024012345678',
+      email: null,
+      notify_by_email: 0,
+      content: '最近心理压力比较明显，希望获得进一步支持。',
+      is_public: 0,
+      is_reported: 0,
+      category: 'counseling',
+      distress_type: 'academic_pressure',
+      scene_tag: 'library',
+      priority: 'normal',
+      status: 'submitted',
+      public_summary: null,
+      assigned_to: null,
+      first_response_at: null,
+      resolved_at: null,
+      created_at: '2026-03-11T08:00:00.000Z',
+      updated_at: '2026-03-11T08:00:00.000Z',
+    });
+
+    const response = await onRequest({
+      request: new Request('http://localhost/api/admin/issues/1', {
+        method: 'PATCH',
+        headers: {
+          Authorization: 'Bearer test-secret',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          category: 'other',
+          updatedAt: '2026-03-11T08:00:00.000Z',
+        }),
+      }),
+      env,
+      params: { id: '1' },
+    });
+
+    expect(response.status).toBe(200);
+    expect(env.DB.issues[0].category).toBe('other');
+    expect(env.DB.issues[0].distress_type).toBeNull();
+    expect(env.DB.issues[0].scene_tag).toBeNull();
+  });
 });
 

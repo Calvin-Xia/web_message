@@ -1,3 +1,5 @@
+import { distressTypeLabels, sceneTagLabels } from './src/shared/labels.js';
+
 const API_BASE = '/api';
 const REQUEST_TIMEOUT = 15000;
 const STORAGE_KEY = 'issue-admin-secret';
@@ -158,6 +160,8 @@ function summarizeFilters(filters) {
   if (filters.status.length) summary.push(`状态 ${filters.status.length} 项`);
   if (filters.category.length) summary.push(`分类 ${filters.category.length} 项`);
   if (filters.priority.length) summary.push(`优先级 ${filters.priority.length} 项`);
+  if (filters.distressType.length) summary.push(`困扰 ${filters.distressType.length} 项`);
+  if (filters.sceneTag.length) summary.push(`场景 ${filters.sceneTag.length} 项`);
   if (filters.startDate || filters.endDate) summary.push(`时间 ${filters.startDate || '最早'} - ${filters.endDate || '最新'}`);
   if (filters.assignedTo) summary.push(`指派 ${filters.assignedTo}`);
   return summary.length ? summary.join(' · ') : '全部数据';
@@ -257,6 +261,8 @@ function getFilters() {
     status: getMultiFilterValues('status'),
     category: getMultiFilterValues('category'),
     priority: getMultiFilterValues('priority'),
+    distressType: getMultiFilterValues('distressType'),
+    sceneTag: getMultiFilterValues('sceneTag'),
     assignedTo: document.getElementById('assignedToFilter').value.trim(),
     startDate: document.getElementById('startDateFilter').value,
     endDate: document.getElementById('endDateFilter').value,
@@ -291,6 +297,8 @@ function buildListQuery(page = 1) {
   appendFilterValue(params, 'status', filters.status);
   appendFilterValue(params, 'category', filters.category);
   appendFilterValue(params, 'priority', filters.priority);
+  appendFilterValue(params, 'distressType', filters.distressType);
+  appendFilterValue(params, 'sceneTag', filters.sceneTag);
   appendFilterValue(params, 'assignedTo', filters.assignedTo);
   appendFilterValue(params, 'startDate', filters.startDate);
   appendFilterValue(params, 'endDate', filters.endDate);
@@ -323,6 +331,8 @@ function buildExportQuery() {
   appendFilterValue(params, 'status', filters.status);
   appendFilterValue(params, 'category', filters.category);
   appendFilterValue(params, 'priority', filters.priority);
+  appendFilterValue(params, 'distressType', filters.distressType);
+  appendFilterValue(params, 'sceneTag', filters.sceneTag);
   appendFilterValue(params, 'assignedTo', filters.assignedTo);
   appendFilterValue(params, 'startDate', filters.startDate);
   appendFilterValue(params, 'endDate', filters.endDate);
@@ -342,6 +352,8 @@ function syncUrl(page = state.page) {
   appendFilterValue(params, 'status', filters.status);
   appendFilterValue(params, 'category', filters.category);
   appendFilterValue(params, 'priority', filters.priority);
+  appendFilterValue(params, 'distressType', filters.distressType);
+  appendFilterValue(params, 'sceneTag', filters.sceneTag);
   appendFilterValue(params, 'assignedTo', filters.assignedTo);
   appendFilterValue(params, 'startDate', filters.startDate);
   appendFilterValue(params, 'endDate', filters.endDate);
@@ -372,6 +384,8 @@ function restoreFiltersFromUrl() {
   setMultiFilterValues('status', (params.get('status') || '').split(',').filter(Boolean));
   setMultiFilterValues('category', (params.get('category') || '').split(',').filter(Boolean));
   setMultiFilterValues('priority', (params.get('priority') || '').split(',').filter(Boolean));
+  setMultiFilterValues('distressType', (params.get('distressType') || '').split(',').filter(Boolean));
+  setMultiFilterValues('sceneTag', (params.get('sceneTag') || '').split(',').filter(Boolean));
   document.querySelectorAll('[data-period-button]').forEach((button) => {
     button.dataset.active = button.dataset.periodButton === state.metricsPeriod ? 'true' : 'false';
   });
@@ -389,6 +403,8 @@ function syncAdvancedAdminFiltersState() {
     || document.getElementById('hasNotesFilter').value
     || document.getElementById('hasRepliesFilter').value
     || document.getElementById('isAssignedFilter').value
+    || getMultiFilterValues('distressType').length > 0
+    || getMultiFilterValues('sceneTag').length > 0
     || document.getElementById('sortFieldFilter').value !== 'createdAt'
     || document.getElementById('sortOrderFilter').value !== 'desc',
   );
@@ -464,6 +480,8 @@ function renderActiveFilterChips(filters) {
   filters.status.forEach((value) => chips.push(`状态: ${statusLabels[value] || value}`));
   filters.category.forEach((value) => chips.push(`分类: ${categoryLabels[value] || value}`));
   filters.priority.forEach((value) => chips.push(`优先级: ${priorityLabels[value] || value}`));
+  filters.distressType.forEach((value) => chips.push(`困扰: ${distressTypeLabels[value] || value}`));
+  filters.sceneTag.forEach((value) => chips.push(`场景: ${sceneTagLabels[value] || value}`));
   if (filters.assignedTo) chips.push(`指派: ${filters.assignedTo}`);
   if (filters.startDate) chips.push(`开始: ${filters.startDate}`);
   if (filters.endDate) chips.push(`结束: ${filters.endDate}`);
@@ -523,6 +541,8 @@ function renderMetrics(metrics) {
   document.getElementById('metricsRangeLabel').textContent = rangeText;
   renderStatusDonut(metrics.byStatus || {}, overview.totalIssues || 0);
   renderCategoryBars(metrics.byCategory || {});
+  renderDistressBars(metrics.byDistressType || {});
+  renderSceneBars(metrics.bySceneTag || {});
   renderPriorityBars(metrics.byPriority || {});
   renderPerformance(metrics.performance || {});
   renderTrendChart(metrics.trends || {});
@@ -572,6 +592,22 @@ function renderLinearBars(targetId, entries, toneResolver) {
 
 function renderCategoryBars(byCategory) {
   renderLinearBars('categoryBars', Object.entries(categoryLabels).map(([value, label]) => [label, byCategory[value] || 0]), () => 'warm');
+}
+
+function renderDistressBars(byDistressType) {
+  const rows = Object.entries(distressTypeLabels).map(([value, label]) => [
+    label,
+    byDistressType[value] || 0,
+  ]);
+  renderLinearBars('distressBars', rows, () => 'ink');
+}
+
+function renderSceneBars(bySceneTag) {
+  const rows = Object.entries(sceneTagLabels).map(([value, label]) => [
+    label,
+    bySceneTag[value] || 0,
+  ]);
+  renderLinearBars('sceneBars', rows, () => 'mint');
 }
 
 function renderPriorityBars(byPriority) {
@@ -677,6 +713,8 @@ function renderIssueList(items, pagination) {
             <span class="status-token" data-status="${escapeHtml(item.status)}">${escapeHtml(statusLabels[item.status] || item.status)}</span>
             <span class="priority-token" data-priority="${escapeHtml(item.priority)}">${escapeHtml(priorityLabels[item.priority] || item.priority)}</span>
             <span class="category-token">${escapeHtml(categoryLabels[item.category] || item.category)}</span>
+            ${item.category === 'counseling' && item.distressType ? `<span class="mini-token">${escapeHtml(distressTypeLabels[item.distressType] || item.distressType)}</span>` : ''}
+            ${item.category === 'counseling' && item.sceneTag ? `<span class="mini-token">${escapeHtml(sceneTagLabels[item.sceneTag] || item.sceneTag)}</span>` : ''}
             ${item.hasNotes ? `<span class="mini-token">备注 ${item.noteCount}</span>` : ''}
             ${item.hasReplies ? `<span class="mini-token">回复 ${item.replyCount}</span>` : ''}
           </div>
@@ -690,6 +728,8 @@ function renderIssueList(items, pagination) {
             <div><strong class="text-[#172033]">指派：</strong>${highlightText(item.assignedTo || '未指派', filters.q)}</div>
             <div><strong class="text-[#172033]">公开：</strong>${item.isPublic ? '是' : '否'}</div>
             <div><strong class="text-[#172033]">上报：</strong>${item.isReported ? '是' : '否'}</div>
+            <div><strong class="text-[#172033]">困扰：</strong>${item.category === 'counseling' && item.distressType ? escapeHtml(distressTypeLabels[item.distressType] || item.distressType) : '无'}</div>
+            <div><strong class="text-[#172033]">场景：</strong>${item.category === 'counseling' && item.sceneTag ? escapeHtml(sceneTagLabels[item.sceneTag] || item.sceneTag) : '无'}</div>
             <div><strong class="text-[#172033]">更新：</strong>${escapeHtml(formatDate(item.updatedAt))}</div>
           </div>
         </div>
@@ -829,7 +869,41 @@ function renderHistory(items) {
     return;
   }
 
-  container.innerHTML = items.map((item) => `<article class="rounded-[1.2rem] border border-[rgba(23,32,51,0.08)] bg-white/70 p-4"><div class="flex flex-wrap items-center gap-2"><strong class="text-[#172033]">${escapeHtml(item.actionType)}</strong><span class="text-xs uppercase tracking-[0.26em] text-[#72809a]">${escapeHtml(item.performedBy)} · ${escapeHtml(formatDate(item.performedAt))}</span></div><div class="mt-2 text-sm leading-7 text-[#4c566b]">${escapeHtml(JSON.stringify(item.details || {}, null, 0))}</div></article>`).join('');
+  container.innerHTML = items.map((item) => `
+    <article class="audit-card rounded-[1.2rem] border border-[rgba(23,32,51,0.08)] bg-white/70 p-4">
+      <div class="flex min-w-0 flex-wrap items-center gap-2">
+        <strong class="break-anywhere text-[#172033]">${escapeHtml(item.actionType)}</strong>
+        <span class="break-anywhere text-xs uppercase tracking-[0.26em] text-[#72809a]">${escapeHtml(item.performedBy)} · ${escapeHtml(formatDate(item.performedAt))}</span>
+      </div>
+      <pre class="audit-detail mt-3 rounded-[1rem] border border-[rgba(23,32,51,0.08)] bg-[rgba(23,32,51,0.03)] p-3 text-xs leading-6 text-[#4c566b]"><code>${escapeHtml(JSON.stringify(item.details || {}, null, 2))}</code></pre>
+    </article>
+  `).join('');
+}
+
+function buildNullableOptions(labels, current) {
+  return [
+    `<option value="" ${!current ? 'selected' : ''}>暂不选择</option>`,
+    ...Object.entries(labels).map(([value, label]) => `<option value="${value}" ${current === value ? 'selected' : ''}>${escapeHtml(label)}</option>`),
+  ].join('');
+}
+
+function syncDetailCounselingFields() {
+  const category = document.getElementById('detailCategory')?.value;
+  const wrapper = document.getElementById('detailCounselingFields');
+  const distressType = document.getElementById('detailDistressType');
+  const sceneTag = document.getElementById('detailSceneTag');
+  if (!wrapper || !distressType || !sceneTag) {
+    return;
+  }
+
+  const enabled = category === 'counseling';
+  wrapper.hidden = !enabled;
+  distressType.disabled = !enabled;
+  sceneTag.disabled = !enabled;
+  if (!enabled) {
+    distressType.value = '';
+    sceneTag.value = '';
+  }
 }
 
 function renderDrawer(detail) {
@@ -842,10 +916,14 @@ function renderDrawer(detail) {
         <span class="status-token" data-status="${escapeHtml(detail.status)}">${escapeHtml(statusLabels[detail.status] || detail.status)}</span>
         <span class="priority-token" data-priority="${escapeHtml(detail.priority)}">${escapeHtml(priorityLabels[detail.priority] || detail.priority)}</span>
         <span class="category-token">${escapeHtml(categoryLabels[detail.category] || detail.category)}</span>
+        ${detail.category === 'counseling' && detail.distressType ? `<span class="mini-token">${escapeHtml(distressTypeLabels[detail.distressType] || detail.distressType)}</span>` : ''}
+        ${detail.category === 'counseling' && detail.sceneTag ? `<span class="mini-token">${escapeHtml(sceneTagLabels[detail.sceneTag] || detail.sceneTag)}</span>` : ''}
       </div>
       <div class="grid gap-3 text-sm text-[#4c566b] md:grid-cols-2">
         <div><strong class="text-[#172033]">姓名：</strong>${escapeHtml(detail.name)}</div>
         <div><strong class="text-[#172033]">学号：</strong>${escapeHtml(detail.studentId)}</div>
+        <div><strong class="text-[#172033]">困扰类别：</strong>${detail.category === 'counseling' && detail.distressType ? escapeHtml(distressTypeLabels[detail.distressType] || detail.distressType) : '无'}</div>
+        <div><strong class="text-[#172033]">主要场景：</strong>${detail.category === 'counseling' && detail.sceneTag ? escapeHtml(sceneTagLabels[detail.sceneTag] || detail.sceneTag) : '无'}</div>
         <div><strong class="text-[#172033]">提交时间：</strong>${escapeHtml(formatDate(detail.createdAt))}</div>
         <div><strong class="text-[#172033]">首次响应：</strong>${escapeHtml(formatDate(detail.firstResponseAt))}</div>
         <div><strong class="text-[#172033]">解决时间：</strong>${escapeHtml(formatDate(detail.resolvedAt))}</div>
@@ -866,6 +944,10 @@ function renderDrawer(detail) {
         <label class="space-y-2 text-sm font-medium text-[#25314a]"><span>优先级</span><select id="detailPriority" class="field-shell h-11 w-full rounded-2xl px-4 text-sm">${Object.entries(priorityLabels).map(([value, label]) => `<option value="${value}" ${detail.priority === value ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
         <label class="space-y-2 text-sm font-medium text-[#25314a]"><span>指派人</span><input id="detailAssignedTo" list="assigneeSuggestions" class="field-shell h-11 w-full rounded-2xl px-4 text-sm" value="${escapeHtml(detail.assignedTo || '')}" placeholder="可留空清除"></label>
       </div>
+      <div id="detailCounselingFields" class="grid gap-4 md:grid-cols-2" ${detail.category === 'counseling' ? '' : 'hidden'}>
+        <label class="space-y-2 text-sm font-medium text-[#25314a]"><span>困扰类别</span><select id="detailDistressType" class="field-shell h-11 w-full rounded-2xl px-4 text-sm">${buildNullableOptions(distressTypeLabels, detail.distressType)}</select></label>
+        <label class="space-y-2 text-sm font-medium text-[#25314a]"><span>主要场景</span><select id="detailSceneTag" class="field-shell h-11 w-full rounded-2xl px-4 text-sm">${buildNullableOptions(sceneTagLabels, detail.sceneTag)}</select></label>
+      </div>
       <label class="space-y-2 text-sm font-medium text-[#25314a]"><span>公开摘要</span><textarea id="detailPublicSummary" class="field-shell min-h-[120px] w-full rounded-[1.4rem] px-4 py-3 text-sm leading-7" maxlength="500" placeholder="可留空清除">${escapeHtml(detail.publicSummary || '')}</textarea></label>
       <div class="rounded-[1.4rem] border border-[rgba(23,32,51,0.08)] bg-white/70 px-4 py-3">
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
@@ -883,6 +965,8 @@ function renderDrawer(detail) {
   `;
 
   document.getElementById('detailStatus').value = detail.status;
+  document.getElementById('detailCategory').addEventListener('change', syncDetailCounselingFields);
+  syncDetailCounselingFields();
   document.getElementById('saveIssueButton').addEventListener('click', saveIssueChanges);
   document.getElementById('noteForm').addEventListener('submit', submitNote);
   document.getElementById('replyForm').addEventListener('submit', submitReply);
@@ -931,9 +1015,13 @@ async function saveIssueChanges() {
   const assignedTo = document.getElementById('detailAssignedTo').value.trim() || null;
   const publicSummary = document.getElementById('detailPublicSummary').value.trim() || null;
   const isPublic = document.getElementById('detailIsPublic').checked;
+  const distressType = category === 'counseling' ? document.getElementById('detailDistressType').value || null : null;
+  const sceneTag = category === 'counseling' ? document.getElementById('detailSceneTag').value || null : null;
   if (status !== state.activeIssue.status) patch.status = status;
   if (category !== state.activeIssue.category) patch.category = category;
   if (priority !== state.activeIssue.priority) patch.priority = priority;
+  if (category === 'counseling' && distressType !== (state.activeIssue.distressType || null)) patch.distressType = distressType;
+  if (category === 'counseling' && sceneTag !== (state.activeIssue.sceneTag || null)) patch.sceneTag = sceneTag;
   if (assignedTo !== (state.activeIssue.assignedTo || null)) patch.assignedTo = assignedTo;
   if (publicSummary !== (state.activeIssue.publicSummary || null)) patch.publicSummary = publicSummary;
   if (isPublic !== state.activeIssue.isPublic) patch.isPublic = isPublic;
@@ -1130,6 +1218,8 @@ function bindEvents() {
     setMultiFilterValues('status', []);
     setMultiFilterValues('category', []);
     setMultiFilterValues('priority', []);
+    setMultiFilterValues('distressType', []);
+    setMultiFilterValues('sceneTag', []);
     const advancedFilters = document.getElementById('advancedAdminFilters');
     if (advancedFilters instanceof HTMLDetailsElement) {
       advancedFilters.open = false;
@@ -1183,6 +1273,12 @@ function bindEvents() {
 
   ['assignedToFilter', 'updatedAfterFilter', 'hasNotesFilter', 'hasRepliesFilter', 'isAssignedFilter', 'sortFieldFilter', 'sortOrderFilter'].forEach((id) => {
     document.getElementById(id).addEventListener('change', syncAdvancedAdminFiltersState);
+  });
+
+  ['distressType', 'sceneTag'].forEach((key) => {
+    document.querySelectorAll(`[data-multi-filter="${key}"] input`).forEach((input) => {
+      input.addEventListener('change', syncAdvancedAdminFiltersState);
+    });
   });
 }
 

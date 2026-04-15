@@ -1,7 +1,10 @@
+import { distressTypeLabels, sceneTagLabels } from './src/shared/labels.js';
+
 const API_BASE = '/api';
 const REQUEST_TIMEOUT = 12000;
 const SEARCH_HISTORY_KEY = 'public-search-history';
 const MAX_HISTORY_ITEMS = 8;
+const PUBLIC_LIST_PAGE_SIZE = 5;
 const EMAIL_INVALID_MESSAGE = '请输入格式正确的邮箱地址。';
 const EMAIL_SUBMIT_BLOCK_MESSAGE = '请先填写格式正确的邮箱地址，或清空邮箱后再提交。';
 const statusLabels = {
@@ -25,9 +28,26 @@ const priorityLabels = {
   high: '高',
   urgent: '紧急',
 };
+const knowledgeBaseItems = [
+  {
+    title: '学业压力',
+    tag: 'academic_pressure',
+    content: '先把任务拆成今天能完成的一小步，给自己留出固定休息段。压力持续影响睡眠或饮食时，建议尽早联系辅导员或心理中心。',
+  },
+  {
+    title: '人际关系',
+    tag: 'relationship',
+    content: '先记录让你不舒服的具体事件和边界需求，再选择合适时机沟通。冲突升级或感到孤立时，可以请可信任的老师陪同梳理。',
+  },
+  {
+    title: '睡眠问题',
+    tag: 'sleep',
+    content: '睡前减少刷屏和高强度学习，尝试固定起床时间。连续多日明显失眠、早醒或白天难以学习时，请寻求专业支持。',
+  },
+];
 const state = {
   page: 1,
-  pageSize: 20,
+  pageSize: PUBLIC_LIST_PAGE_SIZE,
   searchHistory: loadStorageArray(SEARCH_HISTORY_KEY),
   items: [],
 };
@@ -152,6 +172,25 @@ function clearNotification() {
 
 function getNormalizedEmailValue() {
   return document.getElementById('email').value.trim();
+}
+
+function isCounselingSelected() {
+  return document.getElementById('category').value === 'counseling';
+}
+
+function syncCounselingFields() {
+  const enabled = isCounselingSelected();
+  const wrapper = document.getElementById('counselingFields');
+  const distressType = document.getElementById('distressType');
+  const sceneTag = document.getElementById('sceneTag');
+  wrapper.hidden = !enabled;
+  distressType.disabled = !enabled;
+  sceneTag.disabled = !enabled;
+
+  if (!enabled) {
+    distressType.value = '';
+    sceneTag.value = '';
+  }
 }
 
 function isValidEmailAddress(value) {
@@ -385,6 +424,8 @@ function renderPublicList(items, pagination) {
             <div class="flex flex-wrap items-center gap-2">
               <span class="status-token" data-status="${escapeHtml(item.status)}">${escapeHtml(statusLabels[item.status] || item.status)}</span>
               <span class="category-token">${escapeHtml(categoryLabels[item.category] || item.category)}</span>
+              ${item.category === 'counseling' && item.distressType ? `<span class="mini-token">${escapeHtml(distressTypeLabels[item.distressType] || item.distressType)}</span>` : ''}
+              ${item.category === 'counseling' && item.sceneTag ? `<span class="mini-token">${escapeHtml(sceneTagLabels[item.sceneTag] || item.sceneTag)}</span>` : ''}
               <span class="priority-token" data-priority="${escapeHtml(item.priority)}">${escapeHtml(priorityLabels[item.priority] || item.priority)}</span>
             </div>
             <div>
@@ -413,6 +454,75 @@ function renderPublicList(items, pagination) {
   renderPagination(paginationContainer, pagination, (nextPage) => {
     loadPublicList(nextPage);
   });
+}
+
+function renderKnowledgeBase() {
+  const container = document.getElementById('knowledgeBase');
+  container.innerHTML = knowledgeBaseItems.map((item) => `
+    <article class="interactive-card rounded-[1.4rem] border border-[rgba(23,32,51,0.08)] bg-white/72 p-5">
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="mini-token">${escapeHtml(distressTypeLabels[item.tag] || item.title)}</span>
+      </div>
+      <h4 class="display-font mt-4 text-2xl text-[#172033]">${escapeHtml(item.title)}</h4>
+      <p class="mt-3 text-sm leading-7 text-[#4c566b]">${escapeHtml(item.content)}</p>
+    </article>
+  `).join('');
+}
+
+function renderSceneHotspots(data) {
+  const container = document.getElementById('sceneHotspots');
+  const summary = document.getElementById('insightsSummary');
+  const hotspots = data.sceneHotspots || [];
+  const publicCounselingIssues = Number(data.overview?.publicCounselingIssues) || 0;
+  const rangeLabel = data.range?.days ? `近 ${data.range.days} 天` : '公开';
+  summary.textContent = `${rangeLabel}心理反馈 ${publicCounselingIssues} 条 · 场景热区 ${hotspots.length} 个`;
+
+  if (!hotspots.length) {
+    container.innerHTML = '<div class="empty-state rounded-[1.4rem] px-5 py-8 text-center text-sm leading-7 text-[#5f6b80] md:col-span-2 xl:col-span-3">还没有可公开展示的心理咨询场景数据。</div>';
+    return;
+  }
+
+  const maxValue = Math.max(1, ...hotspots.map((item) => Number(item.total) || 0));
+  container.innerHTML = hotspots.map((item, index) => {
+    const total = Number(item.total) || 0;
+    const pending = Number(item.pending) || 0;
+    const percentage = Math.max(8, Math.round((total / maxValue) * 100));
+    return `
+      <article class="interactive-card rounded-[1.5rem] border border-[rgba(23,32,51,0.08)] bg-white/76 p-5">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <div class="text-xs font-semibold uppercase tracking-[0.24em] text-[#72809a]">Hotspot ${index + 1}</div>
+            <h4 class="display-font mt-2 text-2xl text-[#172033]">${escapeHtml(sceneTagLabels[item.scene] || item.scene)}</h4>
+          </div>
+          <strong class="text-3xl text-[#172033]">${total}</strong>
+        </div>
+        <div class="mt-4 bar-track"><div class="bar-fill" data-tone="${pending > 0 ? 'warm' : 'mint'}" style="width:${percentage}%"></div></div>
+        <div class="mt-3 flex flex-wrap gap-2 text-xs leading-5 text-[#5f6b80]">
+          <span class="mini-token">待跟进 ${pending}</span>
+          <span class="mini-token">公开聚合</span>
+        </div>
+      </article>
+    `;
+  }).join('');
+}
+
+async function loadInsights() {
+  const container = document.getElementById('sceneHotspots');
+  const summary = document.getElementById('insightsSummary');
+  container.innerHTML = renderFeedbackBox('正在加载热区', 'loading');
+
+  try {
+    const response = await fetchWithTimeout(`${API_BASE}/insights`, { cache: 'no-store' });
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.error || '热区加载失败');
+    }
+
+    renderSceneHotspots(result.data || {});
+  } catch (error) {
+    summary.textContent = '热区暂不可用';
+    container.innerHTML = renderFeedbackBox(error.name === 'AbortError' ? '热区加载超时' : error.message, 'error');
+  }
 }
 
 async function loadPublicList(page = 1) {
@@ -496,16 +606,27 @@ async function handleSubmit(event) {
   }
 
   const button = document.getElementById('submitButton');
+  const category = document.getElementById('category').value;
   const payload = {
     name: document.getElementById('name').value.trim(),
     studentId: document.getElementById('studentId').value.trim(),
     email: emailState.value,
     notifyByEmail: emailState.status === 'valid' && notifyCheckbox.checked,
-    category: document.getElementById('category').value,
+    category,
     content: document.getElementById('content').value.trim(),
     isPublic: document.getElementById('isPublic').checked,
     isReported: document.getElementById('isReported').checked,
   };
+  if (category === 'counseling') {
+    const distressType = document.getElementById('distressType').value;
+    const sceneTag = document.getElementById('sceneTag').value;
+    if (distressType) {
+      payload.distressType = distressType;
+    }
+    if (sceneTag) {
+      payload.sceneTag = sceneTag;
+    }
+  }
 
   setButtonBusy(button, true, '提交中...');
 
@@ -534,8 +655,9 @@ async function handleSubmit(event) {
     });
     document.getElementById('issueForm').reset();
     syncNotificationPreference();
+    syncCounselingFields();
     showNotification('提交成功，追踪编号已生成。', 'success');
-    await loadPublicList(1);
+    await Promise.all([loadPublicList(1), loadInsights()]);
   } catch (error) {
     const message = error.name === 'AbortError' ? '请求超时，请重试' : error.message;
     showNotification(message, 'error');
@@ -560,6 +682,7 @@ async function copyTrackingCode() {
 
 function bindEvents() {
   document.getElementById('issueForm').addEventListener('submit', handleSubmit);
+  document.getElementById('category').addEventListener('change', syncCounselingFields);
   document.getElementById('email').addEventListener('input', syncNotificationPreference);
   document.getElementById('email').addEventListener('blur', handleEmailBlur);
   document.getElementById('filterForm').addEventListener('submit', (event) => {
@@ -591,9 +714,12 @@ function bindEvents() {
 restoreFiltersFromUrl();
 syncAdvancedPublicFiltersState();
 renderSearchHistory();
+renderKnowledgeBase();
 bindEvents();
 syncNotificationPreference();
+syncCounselingFields();
 
 
 loadPublicList(state.page);
+loadInsights();
 

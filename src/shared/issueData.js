@@ -9,6 +9,8 @@ export function mapPublicIssue(row) {
     trackingCode: row.tracking_code,
     content: row.content,
     category: row.category,
+    distressType: row.distress_type ?? null,
+    sceneTag: row.scene_tag ?? null,
     status: row.status,
     priority: row.priority,
     publicSummary: row.public_summary,

@@ -14,6 +14,8 @@ function createIssue(overrides = {}) {
     is_public: 1,
     is_reported: 0,
     category: 'facility',
+    distress_type: null,
+    scene_tag: null,
     priority: 'high',
     status: 'in_review',
     public_summary: '已安排后勤团队处理',
@@ -115,7 +117,11 @@ describe('admin export route', () => {
     const db = createExportDbMock({
       total: 2,
       batches: [[
-        createIssue(),
+        createIssue({
+          category: 'counseling',
+          distress_type: 'sleep',
+          scene_tag: 'dormitory',
+        }),
         createIssue({
           id: 2,
           tracking_code: 'ZXCV56BN',
@@ -142,6 +148,8 @@ describe('admin export route', () => {
     expect(response.headers.get('Content-Type')).toContain('text/csv');
     expect(response.headers.get('Content-Disposition')).toContain('issues_export_');
     expect(csv).toContain('id,tracking_code,name,student_id');
+    expect(csv).toContain('distress_type,scene_tag');
+    expect(csv).toContain('sleep,dormitory');
     expect(csv).toContain('ABCD23EF');
     expect(csv).toContain('ZXCV56BN');
     expect(db.actions).toHaveLength(1);

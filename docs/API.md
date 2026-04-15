@@ -71,6 +71,8 @@
 ### `GET /api/issues`
 
 公开问题列表，仅返回白名单字段。
+心理咨询类问题会额外返回 `distressType` 与 `sceneTag`；其他分类返回 `null`。
+首页公开同步区为了移动端阅读节奏，默认以 `pageSize=5` 请求；API 仍允许调用方通过 `pageSize` 指定 `1` 到 `100` 条。
 
 查询参数：
 
@@ -103,10 +105,54 @@
 
 - `email`：可选，仅用于接收关键进展邮件提醒
 - `notifyByEmail`：可选，默认 `false`；未填写邮箱时即使传 `true` 也不会启用提醒
+- `distressType`：仅 `category` 为 `counseling` 时可选，取值为 `academic_pressure` / `relationship` / `adaptation` / `mood` / `sleep` / `other`
+- `sceneTag`：仅 `category` 为 `counseling` 时可选，取值为 `dormitory` / `classroom` / `library` / `self_study` / `cafeteria` / `playground` / `other`
+- 非心理咨询分类提交非空 `distressType` 或 `sceneTag` 会返回 `400`
 
 ### `GET /api/issues/:trackingCode`
 
 根据追踪编号返回公开可见的问题详情与时间线。
+
+### `GET /api/insights`
+
+返回公开心理咨询反馈的脱敏聚合数据，用于校园心理压力热区与困扰类别展示。
+默认统计最近 `90` 天，只统计 `isPublic = true` 且 `category = counseling` 的问题；未填写 `sceneTag` 的记录不进入场景热区。
+当前公开知识库使用前端固定脱敏支持模板，作为 MVP 内容；如需运营人员免部署维护，后续可迁移到 API/KV 配置源。
+
+查询参数：
+
+- `days`：统计最近多少天，默认 `90`，范围 `1` 到 `365`；未提供 `startDate` 时用于计算起始日期。
+- `startDate` / `endDate`：`YYYY-MM-DD`。显式日期范围最长 `365` 天；只提供 `endDate` 时会按 `days` 回推起始日期；只提供 `startDate` 时结束日期默认为当天。
+
+限流与缓存：
+
+- 使用公开读接口限流策略，与公开列表读取共用轻量读请求保护。
+- 成功响应包含 `Cache-Control: public, max-age=300`，缓存命中外的查询仍受默认 90 天窗口和最大 365 天范围限制。
+- 参数校验失败返回 `400`，方法不支持返回 `405`。
+
+示例响应：
+
+```json
+{
+  "success": true,
+  "data": {
+    "overview": {
+      "publicCounselingIssues": 2
+    },
+    "range": {
+      "startDate": "2026-01-16",
+      "endDate": "2026-04-15",
+      "days": 90
+    },
+    "sceneHotspots": [
+      { "scene": "dormitory", "total": 1, "pending": 1 }
+    ],
+    "distressTypes": [
+      { "distressType": "sleep", "total": 1 }
+    ]
+  }
+}
+```
 
 ## 后台接口
 
@@ -123,6 +169,7 @@
 
 - `page` / `pageSize`
 - `status` / `category` / `priority`
+- `distressType` / `sceneTag`（仅命中心理咨询扩展字段）
 - `assignedTo`
 - `q`
 - `startDate` / `endDate` / `updatedAfter`
@@ -142,7 +189,11 @@
 - `priority`
 - `assignedTo`
 - `publicSummary`
+- `distressType`
+- `sceneTag`
 - `isPublic`
+
+`distressType` 与 `sceneTag` 只能在最终分类为 `counseling` 时设置；当分类改为非心理咨询时，后台会自动清空这两个字段。
 
 ### `POST /api/admin/issues/:id/notes`
 
@@ -160,10 +211,12 @@
 
 导出 CSV。当前仅支持 `format=csv`。
 单次导出最多 `50000` 条，超过上限时会返回错误并提示缩小筛选范围。
+CSV 包含 `distress_type` 与 `scene_tag` 两列。
 
 ### `GET /api/admin/metrics`
 
 返回后台运营统计、分布、趋势与分位数指标。
+心理困扰类别分布、场景分布和场景热区仅统计 `category = counseling` 且对应字段非空的数据。
 
 查询参数：
 

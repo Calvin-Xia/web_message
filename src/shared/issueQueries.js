@@ -88,6 +88,8 @@ export function buildAdminIssueWhere(filters, { tableAlias = 'issues' } = {}) {
   pushInClause(clauses, bindings, getColumnName(tableAlias, 'status'), filters.status);
   pushInClause(clauses, bindings, getColumnName(tableAlias, 'category'), filters.category);
   pushInClause(clauses, bindings, getColumnName(tableAlias, 'priority'), filters.priority);
+  pushInClause(clauses, bindings, getColumnName(tableAlias, 'distress_type'), filters.distressType);
+  pushInClause(clauses, bindings, getColumnName(tableAlias, 'scene_tag'), filters.sceneTag);
 
   if (filters.assignedTo) {
     clauses.push(`${getColumnName(tableAlias, 'assigned_to')} = ?`);

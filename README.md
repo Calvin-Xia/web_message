@@ -7,7 +7,7 @@
 - `/api/health` 已扩展为结构化健康检查接口，覆盖 D1、KV、延迟、趋势、告警规则与脱敏错误日志。
 - `/health.html` 已升级为健康检查面板，支持服务状态、关键指标、限流命中率与响应时间趋势展示。
 - API 层新增统一安全头与 HTTPS 强制跳转保护，后台接口继续使用受控 CORS 与 Bearer 鉴权。
-- Vitest 已补齐到 20 个测试文件 / 63 个测试用例，并可生成覆盖率报告。
+- Vitest 已补齐到 26 个测试文件 / 161 个测试用例，并可生成覆盖率报告。
 - GitHub Actions CI 已配置，提交或 PR 会自动执行测试与覆盖率产物生成。
 
 ## 核心能力
@@ -46,6 +46,7 @@ flowchart LR
 - `GET /api/issues`
 - `POST /api/issues`
 - `GET /api/issues/:trackingCode`
+- `GET /api/insights`
 - `GET /api/admin/issues`
 - `GET/PATCH /api/admin/issues/:id`
 - `POST /api/admin/issues/:id/notes`
@@ -79,7 +80,7 @@ npm run d1:migrate:local
 
 - `npm test`：执行全部 Vitest 用例
 - `npm run test:coverage`：输出 `output/coverage/` 覆盖率报告
-- 当前后端核心覆盖率：`85.30%`
+- 当前覆盖率：`91.81%`
 - 鉴权模块覆盖率：`97.18%`
 
 ## 部署

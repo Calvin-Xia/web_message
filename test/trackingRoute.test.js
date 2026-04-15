@@ -107,7 +107,9 @@ describe('tracking route', () => {
           id: 1,
           tracking_code: 'ABCD23EF',
           content: '图书馆空调不制冷，需要尽快处理。',
-          category: 'facility',
+          category: 'counseling',
+          distress_type: 'mood',
+          scene_tag: 'library',
           status: 'submitted',
           priority: 'high',
           public_summary: '排查中',
@@ -147,6 +149,8 @@ describe('tracking route', () => {
     expect(response.headers.get('Cache-Control')).toBe('private, no-store');
     expect(payload.success).toBe(true);
     expect(payload.data.updates[0].isPublic).toBe(false);
+    expect(payload.data.distressType).toBe('mood');
+    expect(payload.data.sceneTag).toBe('library');
   });
 });
 

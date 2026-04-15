@@ -16,7 +16,7 @@ import {
   toBoolean,
 } from '../../../../src/shared/issueData.js';
 import { successResponse, errorResponse, createOptionsResponse, methodNotAllowedResponse, notFoundResponse } from '../../../../src/shared/response.js';
-import { adminIssuePatchSchema, formatZodError, issueIdSchema } from '../../../../src/shared/validation.js';
+import { createAdminIssuePatchSchema, formatZodError, issueIdSchema } from '../../../../src/shared/validation.js';
 import { checkAdminRateLimit, getClientIP } from '../../../../src/shared/rateLimit.js';
 import { parseJsonBody } from '../../../../src/shared/request.js';
 
@@ -175,7 +175,7 @@ export async function onRequest(context) {
       return parsedBody.response;
     }
 
-    const validationResult = adminIssuePatchSchema.safeParse(parsedBody.data);
+    const validationResult = createAdminIssuePatchSchema(existingIssue.category).safeParse(parsedBody.data);
     if (!validationResult.success) {
       return errorResponse(formatZodError(validationResult.error), { status: 400, headers: authResult.corsHeaders });
     }
@@ -184,6 +184,10 @@ export async function onRequest(context) {
     const now = new Date().toISOString();
     const ipAddress = getClientIP(request);
     const expectedUpdatedAt = payload.updatedAt;
+    const categoryWasProvided = payload.category !== undefined;
+    const effectiveCategory = categoryWasProvided ? payload.category : existingIssue.category;
+    const isCounselingCategory = effectiveCategory === 'counseling';
+    const shouldClearCounselingFields = categoryWasProvided && !isCounselingCategory;
 
     if (payload.status && !canTransitionStatus(existingIssue.status, payload.status)) {
       try {
@@ -241,6 +245,12 @@ export async function onRequest(context) {
     };
 
     trackFieldChange('category', 'category', existingIssue.category, payload.category);
+    trackFieldChange('distressType', 'distress_type', existingIssue.distress_type ?? null, isCounselingCategory
+      ? payload.distressType
+      : shouldClearCounselingFields ? null : payload.distressType);
+    trackFieldChange('sceneTag', 'scene_tag', existingIssue.scene_tag ?? null, isCounselingCategory
+      ? payload.sceneTag
+      : shouldClearCounselingFields ? null : payload.sceneTag);
     trackFieldChange('priority', 'priority', existingIssue.priority, payload.priority);
     trackFieldChange('assignedTo', 'assigned_to', existingIssue.assigned_to ?? null, payload.assignedTo);
     trackFieldChange('publicSummary', 'public_summary', existingIssue.public_summary ?? null, payload.publicSummary);

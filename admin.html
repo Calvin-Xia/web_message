@@ -386,6 +386,18 @@
           </section>
 
           <section class="chart-shell rounded-[1.7rem] p-5">
+            <div class="text-xs font-semibold uppercase tracking-[0.28em] text-[#72809a]">Counseling Signals</div>
+            <h3 class="display-font mt-2 text-2xl">心理困扰类别</h3>
+            <div id="distressBars" class="mt-5 space-y-4"></div>
+          </section>
+
+          <section class="chart-shell rounded-[1.7rem] p-5">
+            <div class="text-xs font-semibold uppercase tracking-[0.28em] text-[#72809a]">Campus Hotspots</div>
+            <h3 class="display-font mt-2 text-2xl">场景热区</h3>
+            <div id="sceneBars" class="mt-5 space-y-4"></div>
+          </section>
+
+          <section class="chart-shell rounded-[1.7rem] p-5">
             <div class="text-xs font-semibold uppercase tracking-[0.28em] text-[#72809a]">Priority & Performance</div>
             <h3 class="display-font mt-2 text-2xl">优先级与时效分位</h3>
             <div id="priorityBars" class="mt-5 space-y-4"></div>
@@ -470,6 +482,29 @@
                   <span>更新晚于</span>
                   <input id="updatedAfterFilter" type="date" class="field-shell h-11 w-full rounded-2xl px-4 text-sm">
                 </label>
+                <details class="filter-menu" data-multi-filter="distressType">
+                  <summary><span>困扰类别</span><span data-filter-summary="distressType">全部</span></summary>
+                  <div class="filter-menu__content space-y-2">
+                    <label class="filter-menu__option"><input type="checkbox" value="academic_pressure">学业压力</label>
+                    <label class="filter-menu__option"><input type="checkbox" value="relationship">人际关系</label>
+                    <label class="filter-menu__option"><input type="checkbox" value="adaptation">适应困难</label>
+                    <label class="filter-menu__option"><input type="checkbox" value="mood">情绪波动</label>
+                    <label class="filter-menu__option"><input type="checkbox" value="sleep">睡眠问题</label>
+                    <label class="filter-menu__option"><input type="checkbox" value="other">其他</label>
+                  </div>
+                </details>
+                <details class="filter-menu" data-multi-filter="sceneTag">
+                  <summary><span>场景标签</span><span data-filter-summary="sceneTag">全部</span></summary>
+                  <div class="filter-menu__content space-y-2">
+                    <label class="filter-menu__option"><input type="checkbox" value="dormitory">宿舍</label>
+                    <label class="filter-menu__option"><input type="checkbox" value="classroom">教室</label>
+                    <label class="filter-menu__option"><input type="checkbox" value="library">图书馆</label>
+                    <label class="filter-menu__option"><input type="checkbox" value="self_study">自习区</label>
+                    <label class="filter-menu__option"><input type="checkbox" value="cafeteria">食堂</label>
+                    <label class="filter-menu__option"><input type="checkbox" value="playground">操场</label>
+                    <label class="filter-menu__option"><input type="checkbox" value="other">其他</label>
+                  </div>
+                </details>
                 <label class="space-y-2 text-sm font-medium text-[#25314a]">
                   <span>备注</span>
                   <select id="hasNotesFilter" class="field-shell h-11 w-full rounded-2xl px-4 text-sm">

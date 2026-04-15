@@ -304,6 +304,24 @@ body[data-page-role='health'][data-health-status='unhealthy'] {
   letter-spacing: 0;
 }
 
+.break-anywhere,
+.audit-detail,
+.audit-detail code {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.audit-card {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.audit-detail {
+  max-width: 100%;
+  overflow-x: hidden;
+  white-space: pre-wrap;
+}
+
 .highlight-mark {
   background: rgba(255, 219, 95, 0.5);
   color: inherit;

@@ -11,6 +11,8 @@ CREATE TABLE IF NOT EXISTS issues (
   is_public INTEGER NOT NULL DEFAULT 0,
   is_reported INTEGER NOT NULL DEFAULT 0,
   category TEXT NOT NULL DEFAULT 'other' CHECK (category IN ('academic', 'facility', 'service', 'complaint', 'counseling', 'other')),
+  distress_type TEXT CHECK (distress_type IS NULL OR distress_type IN ('academic_pressure', 'relationship', 'adaptation', 'mood', 'sleep', 'other')),
+  scene_tag TEXT CHECK (scene_tag IS NULL OR scene_tag IN ('dormitory', 'classroom', 'library', 'self_study', 'cafeteria', 'playground', 'other')),
   priority TEXT NOT NULL DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
   status TEXT NOT NULL DEFAULT 'submitted' CHECK (status IN ('submitted', 'in_review', 'in_progress', 'resolved', 'closed')),
   public_summary TEXT,
@@ -24,9 +26,17 @@ CREATE TABLE IF NOT EXISTS issues (
 CREATE INDEX IF NOT EXISTS idx_issues_tracking_code ON issues(tracking_code);
 CREATE INDEX IF NOT EXISTS idx_issues_status ON issues(status);
 CREATE INDEX IF NOT EXISTS idx_issues_category ON issues(category);
+CREATE INDEX IF NOT EXISTS idx_issues_category_distress_type ON issues(category, distress_type);
+CREATE INDEX IF NOT EXISTS idx_issues_category_scene_tag ON issues(category, scene_tag);
 CREATE INDEX IF NOT EXISTS idx_issues_created_at ON issues(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_issues_updated_at ON issues(updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_issues_is_public ON issues(is_public);
+CREATE INDEX IF NOT EXISTS idx_issues_public_counseling_created_at ON issues(created_at DESC)
+  WHERE is_public = 1 AND category = 'counseling';
+CREATE INDEX IF NOT EXISTS idx_issues_public_counseling_scene_created_at ON issues(scene_tag, created_at DESC)
+  WHERE is_public = 1 AND category = 'counseling' AND scene_tag IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_issues_public_counseling_distress_created_at ON issues(distress_type, created_at DESC)
+  WHERE is_public = 1 AND category = 'counseling' AND distress_type IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS issue_updates (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

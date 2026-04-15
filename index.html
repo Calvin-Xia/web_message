@@ -126,6 +126,36 @@
             </select>
           </label>
 
+          <div id="counselingFields" class="grid gap-4 sm:grid-cols-2" hidden>
+            <label class="space-y-2 text-sm font-medium text-[#25314a]">
+              <span>困扰类别（选填）</span>
+              <select id="distressType" name="distressType" class="field-shell h-12 w-full rounded-2xl px-4 text-[15px]" disabled>
+                <option value="">暂不选择</option>
+                <option value="academic_pressure">学业压力</option>
+                <option value="relationship">人际关系</option>
+                <option value="adaptation">适应困难</option>
+                <option value="mood">情绪波动</option>
+                <option value="sleep">睡眠问题</option>
+                <option value="other">其他</option>
+              </select>
+              <span class="block text-xs leading-6 text-[#72809a]">仅用于心理咨询类反馈的脱敏统计。</span>
+            </label>
+            <label class="space-y-2 text-sm font-medium text-[#25314a]">
+              <span>主要发生场景（选填）</span>
+              <select id="sceneTag" name="sceneTag" class="field-shell h-12 w-full rounded-2xl px-4 text-[15px]" disabled>
+                <option value="">暂不选择</option>
+                <option value="dormitory">宿舍</option>
+                <option value="classroom">教室</option>
+                <option value="library">图书馆</option>
+                <option value="self_study">自习区</option>
+                <option value="cafeteria">食堂</option>
+                <option value="playground">操场</option>
+                <option value="other">其他</option>
+              </select>
+              <span class="block text-xs leading-6 text-[#72809a]">不采集精确定位，只记录场景类型。</span>
+            </label>
+          </div>
+
           <label class="space-y-2 text-sm font-medium text-[#25314a]">
             <span>问题内容</span>
             <textarea id="content" name="content" class="field-shell min-h-[180px] w-full rounded-[1.5rem] px-4 py-4 text-[15px] leading-7" maxlength="2000" placeholder="请尽量写清楚发生了什么、发生时间、希望如何处理。" required></textarea>
@@ -211,6 +241,29 @@
       <div id="searchHistory" class="mt-4 flex flex-wrap gap-2"></div>
       <div id="publicList" class="mt-6 grid gap-4" aria-live="polite" aria-busy="false"></div>
       <div id="publicPagination" class="mt-6"></div>
+    </section>
+
+    <section id="insightsPanel" class="surface-panel rounded-[2rem] p-6 md:p-7">
+      <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div>
+          <div class="text-xs font-semibold uppercase tracking-[0.3em] text-[#72809a]">Campus Care Map</div>
+          <h3 class="display-font mt-2 text-3xl">校园心理压力热区</h3>
+          <p class="mt-2 max-w-2xl text-sm leading-6 text-[#4c566b]">按公开的心理咨询反馈聚合场景类型，不展示个人身份或精确位置。</p>
+        </div>
+        <div id="insightsSummary" class="support-panel rounded-[1.5rem] px-4 py-3 text-sm text-[#4c566b]" aria-live="polite" aria-atomic="true">正在加载热区。</div>
+      </div>
+      <div id="sceneHotspots" class="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3" aria-live="polite"></div>
+    </section>
+
+    <section class="surface-panel rounded-[2rem] p-6 md:p-7">
+      <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+          <div class="text-xs font-semibold uppercase tracking-[0.3em] text-[#72809a]">Support Notes</div>
+          <h3 class="display-font mt-2 text-3xl">公开知识库</h3>
+          <p class="mt-2 max-w-2xl text-sm leading-6 text-[#4c566b]">高频困扰的通用支持建议，适合先做一次温和自助。</p>
+        </div>
+      </div>
+      <div id="knowledgeBase" class="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3"></div>
     </section>
   </main>
 

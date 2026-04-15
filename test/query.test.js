@@ -40,6 +40,8 @@ describe('buildAdminIssueWhere', () => {
       status: ['submitted', 'in_review'],
       category: ['facility'],
       priority: ['urgent'],
+      distressType: ['sleep'],
+      sceneTag: ['library'],
       q: '空调',
       assignedTo: 'admin1',
       startDate: '2026-03-01',
@@ -51,6 +53,8 @@ describe('buildAdminIssueWhere', () => {
     }, { tableAlias: 'issues' });
 
     expect(result.whereSql).toContain('issues.status IN (?, ?)');
+    expect(result.whereSql).toContain('issues.distress_type IN (?)');
+    expect(result.whereSql).toContain('issues.scene_tag IN (?)');
     expect(result.whereSql).toContain('EXISTS (SELECT 1 FROM issue_internal_notes');
     expect(result.whereSql).toContain('NOT EXISTS (SELECT 1 FROM issue_updates');
     expect(result.bindings).toEqual([
@@ -58,6 +62,8 @@ describe('buildAdminIssueWhere', () => {
       'in_review',
       'facility',
       'urgent',
+      'sleep',
+      'library',
       'admin1',
       '2026-03-01',
       '2026-03-11',

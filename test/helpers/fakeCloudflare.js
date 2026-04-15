@@ -31,6 +31,18 @@ function normalizeSearchPattern(value) {
     .toLowerCase();
 }
 
+function hasColumnEqualsOne(sql, columnName) {
+  return new RegExp(`\\b(?:issues\\.)?${columnName}\\s*=\\s*1(?=\\s|\\)|$)`).test(sql);
+}
+
+function hasColumnEqualsLiteral(sql, columnName, value) {
+  return new RegExp(`\\b(?:issues\\.)?${columnName}\\s*=\\s*'${value}'(?=\\s|\\)|$)`).test(sql);
+}
+
+function hasColumnNotNull(sql, columnName) {
+  return new RegExp(`\\b(?:issues\\.)?${columnName}\\s+IS\\s+NOT\\s+NULL\\b`).test(sql);
+}
+
 export function createRateLimitKv(initial = {}) {
   const store = new Map(Object.entries(initial));
   return {
@@ -159,6 +171,36 @@ class FakeD1Database {
       issues = issues.filter((issue) => values.includes(issue.priority));
     }
 
+    const distressTypeCount = extractPlaceholderCount(sql, /issues\.distress_type IN \(([^)]+)\)/);
+    if (distressTypeCount > 0) {
+      const values = bindings.slice(bindingIndex, bindingIndex + distressTypeCount);
+      bindingIndex += distressTypeCount;
+      issues = issues.filter((issue) => values.includes(issue.distress_type));
+    }
+
+    const sceneTagCount = extractPlaceholderCount(sql, /issues\.scene_tag IN \(([^)]+)\)/);
+    if (sceneTagCount > 0) {
+      const values = bindings.slice(bindingIndex, bindingIndex + sceneTagCount);
+      bindingIndex += sceneTagCount;
+      issues = issues.filter((issue) => values.includes(issue.scene_tag));
+    }
+
+    if (hasColumnEqualsOne(sql, 'is_public')) {
+      issues = issues.filter((issue) => Number(issue.is_public) === 1);
+    }
+
+    if (hasColumnEqualsLiteral(sql, 'category', 'counseling')) {
+      issues = issues.filter((issue) => issue.category === 'counseling');
+    }
+
+    if (hasColumnNotNull(sql, 'distress_type')) {
+      issues = issues.filter((issue) => issue.distress_type != null);
+    }
+
+    if (hasColumnNotNull(sql, 'scene_tag')) {
+      issues = issues.filter((issue) => issue.scene_tag != null);
+    }
+
     if (sql.includes('issues.assigned_to = ?')) {
       const assignedTo = bindings[bindingIndex];
       bindingIndex += 1;
@@ -258,6 +300,8 @@ class FakeD1Database {
         is_public: valuesByColumn.is_public,
         is_reported: valuesByColumn.is_reported,
         category: valuesByColumn.category,
+        distress_type: valuesByColumn.distress_type ?? null,
+        scene_tag: valuesByColumn.scene_tag ?? null,
         priority: valuesByColumn.priority,
         status: valuesByColumn.status,
         public_summary: null,
@@ -458,6 +502,45 @@ class FakeD1Database {
     if (sql.startsWith('SELECT COUNT(*) AS total FROM issues')) {
       return {
         total: this.filterAdminIssues(sql, bindings).length,
+      };
+    }
+
+    if (sql.startsWith('SELECT scene_tag AS scene,')) {
+      const grouped = new Map();
+      for (const issue of this.filterAdminIssues(sql, bindings)) {
+        if (!issue.scene_tag) {
+          continue;
+        }
+
+        const current = grouped.get(issue.scene_tag) || { scene: issue.scene_tag, total: 0, pending: 0 };
+        current.total += 1;
+        if (['submitted', 'in_review', 'in_progress'].includes(issue.status)) {
+          current.pending += 1;
+        }
+        grouped.set(issue.scene_tag, current);
+      }
+
+      return {
+        results: Array.from(grouped.values()).sort((left, right) => right.total - left.total || left.scene.localeCompare(right.scene)),
+      };
+    }
+
+    if (sql.startsWith('SELECT distress_type AS label,') || sql.startsWith('SELECT scene_tag AS label,')) {
+      const column = sql.startsWith('SELECT distress_type AS label,') ? 'distress_type' : 'scene_tag';
+      const grouped = new Map();
+      for (const issue of this.filterAdminIssues(sql, bindings)) {
+        const label = issue[column];
+        if (!label) {
+          continue;
+        }
+
+        grouped.set(label, (grouped.get(label) || 0) + 1);
+      }
+
+      return {
+        results: Array.from(grouped.entries())
+          .map(([label, total]) => ({ label, total }))
+          .sort((left, right) => right.total - left.total || left.label.localeCompare(right.label)),
       };
     }
 

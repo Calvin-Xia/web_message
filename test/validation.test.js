@@ -5,9 +5,11 @@ import {
   adminExportQuerySchema,
   adminIssueListQuerySchema,
   adminMetricsQuerySchema,
+  createAdminIssuePatchSchema,
   formatZodError,
   issueSchema,
   noteSchema,
+  publicInsightsQuerySchema,
   publicIssueListQuerySchema,
   replySchema,
   statusUpdateSchema,
@@ -40,6 +42,65 @@ describe('issueSchema', () => {
     });
 
     expect(result.success).toBe(true);
+  });
+
+  it('allows optional counseling insight fields and normalizes omissions to null', () => {
+    const omittedResult = issueSchema.safeParse({
+      name: '李四',
+      studentId: '12345',
+      content: '最近有持续的心理压力，希望获得进一步咨询支持。',
+      category: 'counseling',
+      isPublic: false,
+      isReported: false,
+    });
+    const selectedResult = issueSchema.safeParse({
+      name: '王五',
+      studentId: '12345',
+      content: '最近在宿舍里压力很明显，希望获得温和的支持建议。',
+      category: 'counseling',
+      distressType: 'academic_pressure',
+      sceneTag: 'dormitory',
+      isPublic: true,
+      isReported: false,
+    });
+
+    expect(omittedResult.success).toBe(true);
+    expect(omittedResult.data.distressType).toBeNull();
+    expect(omittedResult.data.sceneTag).toBeNull();
+    expect(selectedResult.success).toBe(true);
+    expect(selectedResult.data.distressType).toBe('academic_pressure');
+    expect(selectedResult.data.sceneTag).toBe('dormitory');
+  });
+
+  it('rejects invalid counseling insight fields', () => {
+    const result = issueSchema.safeParse({
+      name: '李四',
+      studentId: '12345',
+      content: '最近有持续的心理压力，希望获得进一步咨询支持。',
+      category: 'counseling',
+      distressType: 'invalid',
+      isPublic: false,
+      isReported: false,
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error.issues[0].message).toBe('困扰类别无效');
+  });
+
+  it('rejects counseling insight fields for non-counseling categories', () => {
+    const result = issueSchema.safeParse({
+      name: '张三',
+      studentId: '12345',
+      content: '图书馆空调在下午完全不制冷，需要尽快维修。',
+      category: 'facility',
+      distressType: 'sleep',
+      sceneTag: 'library',
+      isPublic: false,
+      isReported: false,
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error.issues[0].message).toBe('仅心理咨询分类可选择困扰类别');
   });
 
   it('rejects unsupported student id formats', () => {
@@ -139,6 +200,77 @@ describe('statusUpdateSchema', () => {
   });
 });
 
+describe('createAdminIssuePatchSchema', () => {
+  it('rejects non-null counseling fields when the effective category is not counseling', () => {
+    const schema = createAdminIssuePatchSchema('facility');
+    const result = schema.safeParse({
+      updatedAt: '2026-03-11T00:00:00.000Z',
+      distressType: 'sleep',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error.issues[0].message).toBe('仅心理咨询分类可选择困扰类别');
+  });
+
+  it('allows counseling fields for an existing counseling issue when category is omitted', () => {
+    const schema = createAdminIssuePatchSchema('counseling');
+    const result = schema.safeParse({
+      updatedAt: '2026-03-11T00:00:00.000Z',
+      distressType: 'sleep',
+      sceneTag: 'dormitory',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.data.distressType).toBe('sleep');
+    expect(result.data.sceneTag).toBe('dormitory');
+  });
+
+  it('allows null counseling fields when changing away from counseling', () => {
+    const schema = createAdminIssuePatchSchema('counseling');
+    const result = schema.safeParse({
+      updatedAt: '2026-03-11T00:00:00.000Z',
+      category: 'facility',
+      distressType: null,
+      sceneTag: null,
+    });
+
+    expect(result.success).toBe(true);
+  });
+});
+
+describe('publicInsightsQuerySchema', () => {
+  it('defaults to a 90 day window and validates explicit ranges', () => {
+    const defaultResult = publicInsightsQuerySchema.safeParse({});
+    const rangeResult = publicInsightsQuerySchema.safeParse({
+      startDate: '2026-03-01',
+      endDate: '2026-03-31',
+      days: '30',
+    });
+
+    expect(defaultResult.success).toBe(true);
+    expect(defaultResult.data.days).toBe(90);
+    expect(rangeResult.success).toBe(true);
+    expect(rangeResult.data.days).toBe(30);
+  });
+
+  it('rejects invalid or excessive public insight windows', () => {
+    const invalidDays = publicInsightsQuerySchema.safeParse({ days: '366' });
+    const reversedRange = publicInsightsQuerySchema.safeParse({
+      startDate: '2026-03-31',
+      endDate: '2026-03-01',
+    });
+    const excessiveRange = publicInsightsQuerySchema.safeParse({
+      startDate: '2025-01-01',
+      endDate: '2026-04-01',
+    });
+
+    expect(invalidDays.success).toBe(false);
+    expect(reversedRange.success).toBe(false);
+    expect(excessiveRange.success).toBe(false);
+    expect(excessiveRange.error.issues[0].message).toBe('公开热区统计范围不能超过365天');
+  });
+});
+
 describe('noteSchema', () => {
   it('accepts valid note content', () => {
     const result = noteSchema.safeParse({ content: '已经联系后勤，等待明早到场确认设备故障。' });
@@ -200,6 +332,8 @@ describe('adminIssueListQuerySchema', () => {
       status: 'submitted,in_review',
       category: 'facility,service',
       priority: 'high,urgent',
+      distressType: 'academic_pressure,sleep',
+      sceneTag: 'dormitory,library',
       hasNotes: 'true',
       hasReplies: 'false',
       isAssigned: '1',
@@ -214,6 +348,8 @@ describe('adminIssueListQuerySchema', () => {
     expect(result.data.status).toEqual(['submitted', 'in_review']);
     expect(result.data.category).toEqual(['facility', 'service']);
     expect(result.data.priority).toEqual(['high', 'urgent']);
+    expect(result.data.distressType).toEqual(['academic_pressure', 'sleep']);
+    expect(result.data.sceneTag).toEqual(['dormitory', 'library']);
     expect(result.data.hasNotes).toBe(true);
     expect(result.data.hasReplies).toBe(false);
     expect(result.data.isAssigned).toBe(true);

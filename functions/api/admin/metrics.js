@@ -3,7 +3,7 @@ import { successResponse, errorResponse, createOptionsResponse, methodNotAllowed
 import { checkAdminRateLimit } from '../../../src/shared/rateLimit.js';
 import { adminMetricsQuerySchema, formatZodError } from '../../../src/shared/validation.js';
 import { buildDateWhereClause, calculatePercentiles } from '../../../src/shared/issueQueries.js';
-import { CATEGORY_VALUES, PRIORITY_VALUES, STATUS_VALUES } from '../../../src/shared/constants.js';
+import { CATEGORY_VALUES, DISTRESS_TYPE_VALUES, PRIORITY_VALUES, SCENE_TAG_VALUES, STATUS_VALUES } from '../../../src/shared/constants.js';
 
 const ALLOWED_METHODS = 'GET, OPTIONS';
 const METRICS_CACHE_TTL_MS = 300000;
@@ -125,12 +125,19 @@ function getAverage(values) {
   return Math.round(values.reduce((total, value) => total + value, 0) / values.length);
 }
 
+function appendWhereConditions(whereSql, conditions) {
+  const normalizedConditions = conditions.filter(Boolean);
+  if (normalizedConditions.length === 0) {
+    return whereSql;
+  }
+
+  const suffix = normalizedConditions.join(' AND ');
+  return whereSql ? `${whereSql} AND ${suffix}` : `WHERE ${suffix}`;
+}
+
 async function getDurationSamples(db, scope, targetColumn) {
   const { whereSql, bindings } = buildScopedWhere(scope, 'created_at');
-  const extraCondition = `${targetColumn} IS NOT NULL`;
-  const scopedWhere = whereSql
-    ? `${whereSql} AND ${extraCondition}`
-    : `WHERE ${extraCondition}`;
+  const scopedWhere = appendWhereConditions(whereSql, [`${targetColumn} IS NOT NULL`]);
 
   const rows = await db.prepare(`
     SELECT CAST(strftime('%s', ${targetColumn}) AS INTEGER) - CAST(strftime('%s', created_at) AS INTEGER) AS duration
@@ -145,13 +152,14 @@ async function getDurationSamples(db, scope, targetColumn) {
     .filter((value) => Number.isFinite(value) && value >= 0);
 }
 
-async function getDistribution(db, scope, columnName, values) {
+async function getDistribution(db, scope, columnName, values, { extraConditions = [] } = {}) {
   const result = Object.fromEntries(values.map((value) => [value, 0]));
   const { whereSql, bindings } = buildScopedWhere(scope, 'created_at');
+  const scopedWhere = appendWhereConditions(whereSql, extraConditions);
   const rows = await db.prepare(`
     SELECT ${columnName} AS label, COUNT(*) AS total
     FROM issues
-    ${whereSql}
+    ${scopedWhere}
     GROUP BY ${columnName}
   `)
     .bind(...bindings)
@@ -164,6 +172,32 @@ async function getDistribution(db, scope, columnName, values) {
   }
 
   return result;
+}
+
+async function getSceneHotspots(db, scope) {
+  const { whereSql, bindings } = buildScopedWhere(scope, 'created_at');
+  const scopedWhere = appendWhereConditions(whereSql, [
+    "category = 'counseling'",
+    'scene_tag IS NOT NULL',
+  ]);
+  const rows = await db.prepare(`
+    SELECT
+      scene_tag AS scene,
+      COUNT(*) AS total,
+      SUM(CASE WHEN status IN ('submitted', 'in_review', 'in_progress') THEN 1 ELSE 0 END) AS pending
+    FROM issues
+    ${scopedWhere}
+    GROUP BY scene_tag
+    ORDER BY total DESC, scene_tag ASC
+  `)
+    .bind(...bindings)
+    .all();
+
+  return (rows.results || []).map((row) => ({
+    scene: row.scene,
+    total: Number(row.total) || 0,
+    pending: Number(row.pending) || 0,
+  }));
 }
 
 async function getTrendSeries(db, period, scope) {
@@ -239,7 +273,7 @@ async function buildMetrics(db, query) {
   const activityCreatedWhere = buildScopedWhere(activityScope, 'created_at');
   const activityResolvedWhere = buildScopedWhere(activityScope, 'resolved_at', { requireNotNull: true });
 
-  const [overviewRow, createdActivityRow, resolvedActivityRow, byStatus, byCategory, byPriority, firstResponseSamples, resolutionSamples, daily, weekly, monthly] = await Promise.all([
+  const [overviewRow, createdActivityRow, resolvedActivityRow, byStatus, byCategory, byPriority, byDistressType, bySceneTag, sceneHotspots, firstResponseSamples, resolutionSamples, daily, weekly, monthly] = await Promise.all([
     db.prepare(`
       SELECT
         COUNT(*) AS total_issues,
@@ -259,6 +293,13 @@ async function buildMetrics(db, query) {
     getDistribution(db, overallScope, 'status', STATUS_VALUES),
     getDistribution(db, overallScope, 'category', CATEGORY_VALUES),
     getDistribution(db, overallScope, 'priority', PRIORITY_VALUES),
+    getDistribution(db, overallScope, 'distress_type', DISTRESS_TYPE_VALUES, {
+      extraConditions: ["category = 'counseling'", 'distress_type IS NOT NULL'],
+    }),
+    getDistribution(db, overallScope, 'scene_tag', SCENE_TAG_VALUES, {
+      extraConditions: ["category = 'counseling'", 'scene_tag IS NOT NULL'],
+    }),
+    getSceneHotspots(db, overallScope),
     getDurationSamples(db, overallScope, 'first_response_at'),
     getDurationSamples(db, overallScope, 'resolved_at'),
     getTrendSeries(db, 'day', getTrendRange('day', query)),
@@ -283,6 +324,9 @@ async function buildMetrics(db, query) {
     byStatus,
     byCategory,
     byPriority,
+    byDistressType,
+    bySceneTag,
+    sceneHotspots,
     trends: {
       daily,
       weekly,
