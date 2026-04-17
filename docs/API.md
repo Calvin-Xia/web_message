@@ -117,6 +117,7 @@
 
 返回公开心理咨询反馈的脱敏聚合数据，用于校园心理压力热区与困扰类别展示。
 默认统计最近 `90` 天，只统计 `isPublic = true` 且 `category = counseling` 的问题；未填写 `sceneTag` 的记录不进入场景热区。
+首页校园矢量地图不会从该接口获取地点级数据；它只使用 `sceneHotspots` 按场景合并热度，并与静态地图资产 `/storage/campus-care-map.json` 在浏览器端渲染。
 当前公开知识库使用前端固定脱敏支持模板，作为 MVP 内容；如需运营人员免部署维护，后续可迁移到 API/KV 配置源。
 
 查询参数：
@@ -153,6 +154,37 @@
   }
 }
 ```
+
+## 公开静态资产
+
+### `/storage/campus-care-map.json`
+
+校园矢量地图静态资产，由 `npm run build:map -- <geojson>` 从离线 GeoJSON 导出预处理生成，不通过后台 API 动态生成。
+首页默认折叠地图面板，只有用户展开校园地图时才懒加载该文件。
+
+字段契约：
+
+```json
+{
+  "version": 1,
+  "bbox": [114.30, 30.49, 114.39, 30.57],
+  "features": [
+    {
+      "id": "way/1",
+      "geometry": { "type": "Polygon", "coordinates": [] },
+      "scene": "classroom",
+      "kind": "area",
+      "name": "教学楼",
+      "tags": { "building": "university", "name": "教学楼" }
+    }
+  ]
+}
+```
+
+- `scene` 对应心理咨询场景标签：`dormitory` / `classroom` / `library` / `self_study` / `cafeteria` / `playground`。
+- `kind` 用于前端 SVG 渲染，可为 `area` / `line` / `point` / `geometry`。
+- `tags` 仅保留分类所需的公开地图标签，不包含用户提交的问题内容、身份信息或个案位置。
+- 地图悬停信息展示的是 `/api/insights` 的场景级公开聚合数量，不代表该地点发生个案。
 
 ## 后台接口
 

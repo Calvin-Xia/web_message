@@ -7,13 +7,15 @@
 - `/api/health` 已扩展为结构化健康检查接口，覆盖 D1、KV、延迟、趋势、告警规则与脱敏错误日志。
 - `/health.html` 已升级为健康检查面板，支持服务状态、关键指标、限流命中率与响应时间趋势展示。
 - API 层新增统一安全头与 HTTPS 强制跳转保护，后台接口继续使用受控 CORS 与 Bearer 鉴权。
-- Vitest 已补齐到 26 个测试文件 / 161 个测试用例，并可生成覆盖率报告。
+- 公开首页已接入校园心理压力热区与懒加载校园矢量地图，地图使用预处理静态 GeoJSON 资产与 `/api/insights` 聚合数据渲染。
+- Vitest 已补齐到 32 个测试文件 / 182 个测试用例，并可生成覆盖率报告。
 - GitHub Actions CI 已配置，提交或 PR 会自动执行测试与覆盖率产物生成。
 
 ## 核心能力
 
 - 公开用户提交问题并生成追踪编号
 - 公开追踪页查看状态、时间线与公开回复
+- 公开心理咨询热区展示，支持校园矢量地图悬停查看公开聚合数据
 - 后台运营台支持筛选、状态流转、备注、回复、导出与统计
 - 健康检查 API 与可视化健康面板
 - 限流、输入验证、日志脱敏、安全响应头与运维文档
@@ -25,6 +27,7 @@ flowchart LR
     User["公开用户"] --> Static["Pages 静态页面\nindex / tracking / health"]
     Admin["管理员"] --> AdminUI["admin.html + admin-app.js"]
     Static --> API["Pages Functions /api/*"]
+    Static --> MapAsset["/storage/campus-care-map.json\npreprocessed campus vector data"]
     AdminUI --> API
     API --> D1["Cloudflare D1\nissues / updates / notes / admin_actions"]
     API --> KV["Cloudflare KV\nrate limit + observability snapshot"]
@@ -35,7 +38,7 @@ flowchart LR
 
 ### 页面
 
-- `/`：公开提交页与公开问题列表
+- `/`：公开提交页、公开问题列表与校园心理压力热区
 - `/tracking.html`：追踪页
 - `/admin.html`：后台运营台
 - `/health.html`：健康检查面板
@@ -70,6 +73,8 @@ flowchart LR
 
 ```bash
 npm install
+npm run build:css
+npm run build:map -- C:/path/to/export.geojson
 npm run dev
 npm test
 npm run test:coverage
@@ -80,8 +85,7 @@ npm run d1:migrate:local
 
 - `npm test`：执行全部 Vitest 用例
 - `npm run test:coverage`：输出 `output/coverage/` 覆盖率报告
-- 当前覆盖率：`91.81%`
-- 鉴权模块覆盖率：`97.18%`
+- `npm run build:map -- <geojson>`：从校园 GeoJSON 导出生成 `storage/campus-care-map.json`
 
 ## 部署
 

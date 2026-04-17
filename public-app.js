@@ -1,10 +1,19 @@
 import { distressTypeLabels, sceneTagLabels } from './src/shared/labels.js';
+import { normalizeSceneHeat } from './src/shared/campusMapHeat.js';
+import { formatSvgNumber, geometryToPath, geometryToPoint } from './src/shared/campusMapGeometry.js';
+import { CAMPUS_MAP_VIEWBOX, createCampusProjector } from './src/shared/campusMapProjection.js';
+import { CAMPUS_MAP_DATA_ERROR_MESSAGE, readCampusMapResponse } from './src/shared/campusMapResponse.js';
 
 const API_BASE = '/api';
+const CAMPUS_MAP_URL = '/storage/campus-care-map.json';
 const REQUEST_TIMEOUT = 12000;
 const SEARCH_HISTORY_KEY = 'public-search-history';
 const MAX_HISTORY_ITEMS = 8;
 const PUBLIC_LIST_PAGE_SIZE = 5;
+const CAMPUS_MAP_WIDTH = CAMPUS_MAP_VIEWBOX.width;
+const CAMPUS_MAP_HEIGHT = CAMPUS_MAP_VIEWBOX.height;
+const CAMPUS_MAP_PADDING = CAMPUS_MAP_VIEWBOX.padding;
+const CAMPUS_MAP_NOTE = '公开聚合，不代表该地点发生个案。';
 const EMAIL_INVALID_MESSAGE = '请输入格式正确的邮箱地址。';
 const EMAIL_SUBMIT_BLOCK_MESSAGE = '请先填写格式正确的邮箱地址，或清空邮箱后再提交。';
 const STUDENT_ID_PATTERN = /^\d{4}$|^\d{5}$|^\d{13}$/;
@@ -54,6 +63,10 @@ const state = {
   pageSize: PUBLIC_LIST_PAGE_SIZE,
   searchHistory: loadStorageArray(SEARCH_HISTORY_KEY),
   items: [],
+  insights: null,
+  campusHeat: normalizeSceneHeat([]),
+  campusMap: null,
+  campusMapStatus: 'idle',
 };
 let debounceTimer = 0;
 
@@ -591,9 +604,209 @@ function renderKnowledgeBase() {
   `).join('');
 }
 
+function getCampusFeatureStats(scene, heat = state.campusHeat) {
+  return heat.byScene[scene] || {
+    scene,
+    total: 0,
+    pending: 0,
+    heatLevel: 0,
+  };
+}
+
+function buildCampusFeatureLabel(feature, stats) {
+  const sceneLabel = sceneTagLabels[feature.scene] || feature.scene || '校园空间';
+  const placeName = feature.name || sceneLabel;
+  return `${placeName}，${sceneLabel}，公开反馈 ${stats.total} 条，待跟进 ${stats.pending} 条。${CAMPUS_MAP_NOTE}`;
+}
+
+function renderCampusFeatureElement(feature, project, stats) {
+  const label = buildCampusFeatureLabel(feature, stats);
+  const attributes = [
+    `data-campus-feature-id="${escapeHtml(feature.id)}"`,
+    `data-scene="${escapeHtml(feature.scene)}"`,
+    `data-heat="${escapeHtml(String(stats.heatLevel))}"`,
+    `tabindex="0"`,
+    `role="listitem"`,
+    `aria-label="${escapeHtml(label)}"`,
+  ].join(' ');
+
+  if (feature.kind === 'point') {
+    const point = geometryToPoint(feature.geometry, project);
+    if (!point) {
+      return '';
+    }
+
+    return `<circle class="campus-map-point" ${attributes} cx="${formatSvgNumber(point.x)}" cy="${formatSvgNumber(point.y)}" r="6"><title>${escapeHtml(label)}</title></circle>`;
+  }
+
+  const path = geometryToPath(feature.geometry, project);
+  if (!path) {
+    return '';
+  }
+
+  // geometryToPath emits commands from validated numeric coordinates; this escape is a final HTML attribute guard.
+  return `<path class="campus-map-shape campus-map-shape--${escapeHtml(feature.kind || 'geometry')}" ${attributes} d="${escapeHtml(path)}"><title>${escapeHtml(label)}</title></path>`;
+}
+
+function renderCampusDefaultDetail(heat) {
+  const total = Object.values(heat.byScene).reduce((sum, item) => sum + item.total, 0);
+  const pending = Object.values(heat.byScene).reduce((sum, item) => sum + item.pending, 0);
+  return `
+    <div class="campus-map-detail__label">Hover Detail</div>
+    <div class="campus-map-detail__title">悬停地图区域查看聚合热度</div>
+    <div class="campus-map-detail__meta">当前公开心理反馈 ${total} 条，待跟进 ${pending} 条。</div>
+    <div class="campus-map-detail__note">${CAMPUS_MAP_NOTE}</div>
+  `;
+}
+
+function renderCampusFeatureDetail(feature, stats) {
+  const sceneLabel = sceneTagLabels[feature.scene] || feature.scene || '校园空间';
+  return `
+    <div class="campus-map-detail__label">${escapeHtml(sceneLabel)}</div>
+    <div class="campus-map-detail__title">${escapeHtml(feature.name || sceneLabel)}</div>
+    <div class="campus-map-detail__meta">公开反馈 ${stats.total} 条 · 待跟进 ${stats.pending} 条</div>
+    <div class="campus-map-detail__note">${CAMPUS_MAP_NOTE}</div>
+  `;
+}
+
+function setCampusFeatureDetail(feature) {
+  const detail = document.getElementById('campusMapDetail');
+  if (!detail) {
+    return;
+  }
+
+  const heat = state.campusHeat;
+  if (!feature) {
+    detail.innerHTML = renderCampusDefaultDetail(heat);
+    return;
+  }
+
+  detail.innerHTML = renderCampusFeatureDetail(feature, getCampusFeatureStats(feature.scene, heat));
+}
+
+function renderCampusLegend(heat) {
+  return Object.entries(sceneTagLabels).map(([scene, label]) => {
+    const stats = getCampusFeatureStats(scene, heat);
+    return `
+      <div class="campus-map-legend__item" data-scene="${escapeHtml(scene)}">
+        <span class="campus-map-legend__swatch" aria-hidden="true"></span>
+        <span>${escapeHtml(label)}</span>
+        <strong>${stats.total}</strong>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderCampusMapFeedback(message, type = 'info') {
+  const viewport = document.getElementById('campusMapViewport');
+  if (!viewport) {
+    return;
+  }
+
+  viewport.innerHTML = renderFeedbackBox(message, type);
+}
+
+function renderCampusMap() {
+  const viewport = document.getElementById('campusMapViewport');
+  if (!viewport || state.campusMapStatus !== 'loaded' || !state.campusMap) {
+    return;
+  }
+
+  const features = Array.isArray(state.campusMap.features) ? state.campusMap.features : [];
+  if (!features.length) {
+    renderCampusMapFeedback('校园地图暂无可展示的场景要素。');
+    return;
+  }
+
+  const heat = state.campusHeat;
+  const project = createCampusProjector(state.campusMap.bbox, {
+    width: CAMPUS_MAP_WIDTH,
+    height: CAMPUS_MAP_HEIGHT,
+    padding: CAMPUS_MAP_PADDING,
+  });
+  const featureElements = features
+    .map((feature) => renderCampusFeatureElement(feature, project, getCampusFeatureStats(feature.scene, heat)))
+    .filter(Boolean)
+    .join('');
+
+  viewport.innerHTML = `
+    <div class="campus-map-grid">
+      <div class="campus-map-canvas">
+        <svg class="campus-map-svg" viewBox="0 0 ${CAMPUS_MAP_WIDTH} ${CAMPUS_MAP_HEIGHT}" role="img" aria-labelledby="campusMapTitle campusMapDesc">
+          <title id="campusMapTitle">校园心理压力热区地图</title>
+          <desc id="campusMapDesc">按公开心理咨询反馈场景聚合热度，不展示个人身份或精确位置。</desc>
+          <g role="list">
+            ${featureElements}
+          </g>
+        </svg>
+      </div>
+      <aside>
+        <div id="campusMapDetail" class="campus-map-detail" aria-live="polite"></div>
+        <div class="campus-map-legend" aria-label="地图图例">
+          ${renderCampusLegend(heat)}
+        </div>
+      </aside>
+    </div>
+  `;
+  setCampusFeatureDetail(null);
+}
+
+async function loadCampusMap() {
+  if (state.campusMapStatus === 'loaded') {
+    renderCampusMap();
+    return;
+  }
+
+  if (state.campusMapStatus === 'loading') {
+    return;
+  }
+
+  state.campusMapStatus = 'loading';
+  renderCampusMapFeedback('正在加载校园地图', 'loading');
+
+  try {
+    const response = await fetchWithTimeout(CAMPUS_MAP_URL, { cache: 'force-cache' });
+    const campusMap = await readCampusMapResponse(response);
+    state.campusMap = campusMap;
+    state.campusMapStatus = 'loaded';
+    renderCampusMap();
+  } catch (error) {
+    state.campusMapStatus = 'error';
+    const message = error.name === 'AbortError'
+      ? '校园地图加载超时'
+      : error.message === CAMPUS_MAP_DATA_ERROR_MESSAGE ? CAMPUS_MAP_DATA_ERROR_MESSAGE : '校园地图暂不可用';
+    renderCampusMapFeedback(message, 'error');
+  }
+}
+
+function findCampusFeatureFromEvent(event) {
+  const target = event.target;
+  if (!(target instanceof Element)) {
+    return null;
+  }
+
+  const shape = target.closest('[data-campus-feature-id]');
+  if (!(shape instanceof HTMLElement) && !(shape instanceof SVGElement)) {
+    return null;
+  }
+
+  const featureId = shape.getAttribute('data-campus-feature-id');
+  return state.campusMap?.features?.find((feature) => feature.id === featureId) || null;
+}
+
+function handleCampusMapInteraction(event) {
+  const feature = findCampusFeatureFromEvent(event);
+  if (feature) {
+    setCampusFeatureDetail(feature);
+  }
+}
+
 function renderSceneHotspots(data) {
   const container = document.getElementById('sceneHotspots');
   const summary = document.getElementById('insightsSummary');
+  state.insights = data;
+  state.campusHeat = normalizeSceneHeat(data.sceneHotspots || []);
+  renderCampusMap();
   const hotspots = data.sceneHotspots || [];
   const publicCounselingIssues = Number(data.overview?.publicCounselingIssues) || 0;
   const rangeLabel = data.range?.days ? `近 ${data.range.days} 天` : '公开';
@@ -855,6 +1068,24 @@ function bindEvents() {
     loadPublicList(1);
   });
   document.getElementById('copyTrackingCode').addEventListener('click', copyTrackingCode);
+
+  const campusMapPanel = document.getElementById('campusMapPanel');
+  const campusMapViewport = document.getElementById('campusMapViewport');
+  campusMapPanel?.addEventListener('toggle', () => {
+    if (campusMapPanel.open) {
+      loadCampusMap();
+    }
+  });
+  campusMapViewport?.addEventListener('mouseover', handleCampusMapInteraction);
+  campusMapViewport?.addEventListener('focusin', handleCampusMapInteraction);
+  campusMapViewport?.addEventListener('click', handleCampusMapInteraction);
+  // Pointer reset only fires after leaving the viewport; keyboard focus can move within the map subtree.
+  campusMapViewport?.addEventListener('mouseleave', () => setCampusFeatureDetail(null));
+  campusMapViewport?.addEventListener('focusout', (event) => {
+    if (!(event.relatedTarget instanceof Node) || !campusMapViewport.contains(event.relatedTarget)) {
+      setCampusFeatureDetail(null);
+    }
+  });
 
   ['searchInput', 'statusFilter', 'categoryFilter', 'startDateFilter', 'endDateFilter', 'sortFieldFilter', 'sortOrderFilter'].forEach((id) => {
     const element = document.getElementById(id);
