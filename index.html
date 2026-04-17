@@ -270,6 +270,18 @@
         </div>
         <div id="insightsSummary" class="support-panel rounded-[1.5rem] px-4 py-3 text-sm text-[#4c566b]" aria-live="polite" aria-atomic="true">正在加载热区。</div>
       </div>
+      <details id="campusMapPanel" class="campus-map-panel mt-6">
+        <summary>
+          <div>
+            <div class="campus-map-panel__eyebrow">Campus Vector Layer</div>
+            <div class="campus-map-panel__title">展开校园地图</div>
+          </div>
+          <span class="campus-map-panel__toggle">查看空间分布</span>
+        </summary>
+        <div id="campusMapViewport" class="campus-map-panel__body" aria-live="polite">
+          <div class="feedback-box feedback-box--info" role="status">展开后加载校园矢量热区。</div>
+        </div>
+      </details>
       <div id="sceneHotspots" class="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3" aria-live="polite"></div>
     </section>
 

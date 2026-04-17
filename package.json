@@ -2,6 +2,7 @@
   "name": "web-message-board",
   "version": "1.0.0",
   "description": "问题反馈系统 - Cloudflare Pages",
+  "type": "module",
   "scripts": {
     "build": "npm run build:css",
     "build:css": "npx tailwindcss -i ./src/input.css -o ./styles.css --minify",
@@ -10,6 +11,7 @@
     "deploy": "wrangler pages deploy",
     "pages:dev": "wrangler pages dev",
     "pages:deploy": "wrangler pages deploy",
+    "build:map": "node scripts/build-campus-map.mjs",
     "predeploy": "npm run build:css",
     "prepages:deploy": "npm run build:css",
     "d1:create": "wrangler d1 create issue-board-db",

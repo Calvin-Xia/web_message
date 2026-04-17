@@ -38,11 +38,13 @@ Use `npm ci` in clean environments. Use `npm install` only when lockfile changes
 ```bash
 npm ci
 npm run build:css
+npm run build:map -- C:/path/to/export.geojson
 npm run dev:css
 npm run dev
 npm run deploy
 ```
 - `npm run build:css` builds `styles.css` once.
+- `npm run build:map -- <geojson>` builds `storage/campus-care-map.json` from a campus GeoJSON export.
 - `npm run dev:css` watches Tailwind changes.
 - `npm run pages:dev` and `npm run pages:deploy` are aliases for the same Wrangler commands.
 ## Database Commands
