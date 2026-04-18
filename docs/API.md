@@ -171,7 +171,18 @@
   "features": [
     {
       "id": "way/1",
-      "geometry": { "type": "Polygon", "coordinates": [] },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [114.3301, 30.5301],
+            [114.3304, 30.5301],
+            [114.3304, 30.5304],
+            [114.3301, 30.5304],
+            [114.3301, 30.5301]
+          ]
+        ]
+      },
       "scene": "classroom",
       "kind": "area",
       "name": "教学楼",
@@ -214,6 +225,8 @@
 
 ### `PATCH /api/admin/issues/:id`
 
+请求体必须包含 `updatedAt`，用于乐观并发校验；如果提交时记录已被其他操作更新，会返回冲突错误。
+
 允许更新：
 
 - `status`
@@ -231,9 +244,26 @@
 
 添加内部备注。
 
+请求体：
+
+```json
+{
+  "content": "已联系相关老师跟进。"
+}
+```
+
 ### `POST /api/admin/issues/:id/replies`
 
 添加公开或私有回复。
+
+请求体：
+
+```json
+{
+  "content": "该问题已进入处理流程。",
+  "isPublic": true
+}
+```
 
 ### `GET /api/admin/actions`
 

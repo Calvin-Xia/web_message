@@ -8,7 +8,7 @@
 - 已安装并登录 Wrangler
 
 ```bash
-npm install
+npm ci
 npx wrangler login
 ```
 
@@ -32,7 +32,7 @@ npx wrangler kv namespace create RATE_LIMIT_KV
 同一个 KV 同时用于：
 
 - 应用限流计数
-- Phase 3 健康检查观测快照
+- 健康检查观测快照
 
 ## 3. 环境变量
 
@@ -83,13 +83,12 @@ npm run test:coverage
 ## 6. 生产部署
 
 ```bash
-npm run build:map -- C:/path/to/export.geojson
 npm run build
 npm run d1:migrate
 npm run deploy
 ```
 
-`npm run build:map -- <geojson>` 会生成 `storage/campus-care-map.json`，供首页校园地图懒加载使用。只有地图源数据变化时才需要重新执行；若没有新的校园 GeoJSON 导出，可以沿用仓库中已提交的静态资产。
+如果校园 GeoJSON 源数据有变化，先运行 `npm run build:map -- <geojson>` 并提交生成的 `storage/campus-care-map.json`。如果没有新的地图源数据，可以沿用仓库中已提交的静态资产。
 
 当前迁移说明：
 
@@ -109,13 +108,14 @@ npm run d1:migrate:preview
 仓库已提供 `.github/workflows/ci.yml`，包含：
 
 1. `npm ci`
-2. `npm test`
-3. `npm run test:coverage`
-4. 上传 `output/coverage/` 作为 artifact
+2. `npm run build`
+3. `npm test`
+4. `npm run test:coverage`
+5. 上传 `output/coverage/` 作为 artifact
 
 ## 8. 发布检查建议
 
-- 确认本次发布前已经重新生成 `styles.css`。使用 `npm run build`，或直接运行带有自动预编译的 `npm run deploy` / `npm run pages:deploy`
+- 确认本次发布前已经重新生成 `styles.css`。使用 `npm run build`，或直接运行带有自动预编译的 `npm run deploy` / `npm run pages:deploy`。
 - 如果校园 GeoJSON 源数据有变化，确认已经执行 `npm run build:map -- <geojson>` 并提交更新后的 `storage/campus-care-map.json`
 - 确认 `ADMIN_SECRET_KEY` 已在目标环境配置
 - 确认 `RESEND_API_KEY` 已在目标环境配置，且 `support@calvin-xia.cn` 可作为 Resend 发件人与回复地址
@@ -135,4 +135,5 @@ npm run d1:migrate:preview
 - 原始 GeoJSON 不在运行时加载，也不需要部署到公开路径。
 - 预处理脚本会过滤行政边界、异常城市要素和校园范围外要素，并只输出前端需要的几何、场景、名称和少量标签。
 - `storage/campus-care-map.json` 是固定路径静态文件；首页只有在用户展开地图面板后才请求该文件。
+- 该文件会随 Pages 静态资源部署；不要把原始 `export.geojson` 放入公开路径或作为运行时依赖。
 - 如果未来给地图资产配置长缓存，建议先引入带版本或哈希的文件名，避免固定路径缓存导致地图更新滞后。

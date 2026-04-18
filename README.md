@@ -1,15 +1,15 @@
 # 问题反馈系统
 
-一个基于 Cloudflare Pages Functions、D1 与 KV 的校园问题反馈系统。当前仓库已经覆盖 `Phase 1`、`Phase 2` 与 `Phase 3`：公开提交与追踪、后台运营台、健康检查、测试基建与安全加固均已落地。
+一个基于 Cloudflare Pages Functions、D1 与 KV 的校园问题反馈系统。当前仓库已经覆盖公开提交与追踪、后台运营台、心理咨询热区、健康检查、测试基建与安全加固。
 
-## Phase 3 结果
+## 当前状态
 
 - `/api/health` 已扩展为结构化健康检查接口，覆盖 D1、KV、延迟、趋势、告警规则与脱敏错误日志。
 - `/health.html` 已升级为健康检查面板，支持服务状态、关键指标、限流命中率与响应时间趋势展示。
 - API 层新增统一安全头与 HTTPS 强制跳转保护，后台接口继续使用受控 CORS 与 Bearer 鉴权。
 - 公开首页已接入校园心理压力热区与懒加载校园矢量地图，地图使用预处理静态 GeoJSON 资产与 `/api/insights` 聚合数据渲染。
-- Vitest 已补齐到 32 个测试文件 / 182 个测试用例，并可生成覆盖率报告。
-- GitHub Actions CI 已配置，提交或 PR 会自动执行测试与覆盖率产物生成。
+- Vitest 已覆盖核心 API、共享工具、校园地图规则和前端数据处理辅助逻辑，并可生成覆盖率报告。
+- GitHub Actions CI 已配置，提交或 PR 会自动构建样式、执行测试并上传覆盖率产物。
 
 ## 核心能力
 
@@ -66,15 +66,16 @@ flowchart LR
 | --- | --- | --- |
 | `ADMIN_SECRET_KEY` | 是 | 后台 Bearer 鉴权密钥 |
 | `ENVIRONMENT` | 是 | 环境标识：`local` / `preview` / `production` |
+| `RESEND_API_KEY` | 通知功能需要 | 邮件通知投递密钥；未配置时邮件发送会失败并记录错误 |
+| `PUBLIC_BASE_URL` | 否 | 邮件中的追踪链接基准地址；未配置时按请求来源或默认生产域名推断 |
 
 本地示例见 `.dev.vars.example`。
 
 ## 开发命令
 
 ```bash
-npm install
+npm ci
 npm run build:css
-npm run build:map -- C:/path/to/export.geojson
 npm run dev
 npm test
 npm run test:coverage
@@ -85,7 +86,14 @@ npm run d1:migrate:local
 
 - `npm test`：执行全部 Vitest 用例
 - `npm run test:coverage`：输出 `output/coverage/` 覆盖率报告
-- `npm run build:map -- <geojson>`：从校园 GeoJSON 导出生成 `storage/campus-care-map.json`
+- `npm run build:map -- <geojson>`：从校园 GeoJSON 导出生成 `storage/campus-care-map.json`，仅地图源数据变化时需要重新运行
+
+## 文档结构
+
+- `docs/API.md`：当前 API 与公开静态资产契约。
+- `docs/DEPLOYMENT.md`：Cloudflare 资源、迁移、部署与发布检查。
+- `docs/SECURITY.md`：公开/后台数据边界与运行安全约束。
+- `AGENTS.md`：仓库内编码代理使用的命令、约定和代码边界。
 
 ## 部署
 

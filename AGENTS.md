@@ -22,8 +22,10 @@ Repository-specific guide for coding agents working in `web_message/`. It supers
 ```text
 functions/api/              Pages routes
 functions/api/admin/        Admin routes
+scripts/                    Build/preprocessing scripts
 src/shared/                 Shared backend helpers
 src/input.css               Tailwind source
+storage/                    Static assets, including generated campus map JSON
 styles.css                  Generated stylesheet
 test/                       Vitest suite
 test/helpers/               Fake Cloudflare/D1 helpers
@@ -47,6 +49,7 @@ npm run deploy
 - `npm run build:map -- <geojson>` builds `storage/campus-care-map.json` from a campus GeoJSON export.
 - `npm run dev:css` watches Tailwind changes.
 - `npm run pages:dev` and `npm run pages:deploy` are aliases for the same Wrangler commands.
+- `npm run deploy` and `npm run pages:deploy` run `npm run build:css` first through npm pre-scripts.
 ## Database Commands
 ```bash
 npm run d1:create
@@ -77,7 +80,7 @@ npx vitest run test/validation.test.js -t "accepts counseling category"
 - Vitest includes `test/**/*.test.js`.
 - Coverage output goes to `output/coverage/`.
 - Coverage is configured for `functions/api/**/*.js` and `src/shared/**/*.js`.
-- CI runs `npm ci`, `npm test`, and `npm run test:coverage`.
+- CI runs `npm ci`, `npm run build`, `npm test`, and `npm run test:coverage`.
 - In restricted sandboxes, Vitest/Vite may need permission to spawn `esbuild`; do not change repo config just to bypass sandbox policy.
 ## Linting And Formatting
 - Run `npm run lint` to execute the repo ESLint checks.
@@ -153,3 +156,4 @@ npx vitest run test/validation.test.js -t "accepts counseling category"
 - Update `docs/API.md`, `docs/DEPLOYMENT.md`, or `docs/SECURITY.md` when behavior changes in those areas.
 - If you add a command, add it to `package.json` and document it here.
 - If you add linting or formatting tooling, update this file so agents have one current source of truth.
+- Treat `spec/` and `REPO_PRD.md` as planning/history artifacts; keep `README.md` and `docs/` aligned with current deployed behavior.
