@@ -345,9 +345,67 @@
 
 ### `GET /api/admin/export`
 
-导出 CSV。当前仅支持 `format=csv`。
+导出后台问题数据。`format` 支持：
+
+- `csv`：默认格式，返回扁平表格文件。
+- `json`：返回结构化 JSON 文件，适合与其他系统对接。
+
 单次导出最多 `50000` 条，超过上限时会返回错误并提示缩小筛选范围。
 CSV 包含 `distress_type` 与 `scene_tag` 两列。
+JSON 使用 camelCase 字段，并在每条问题下包含关联的 `internalNotes` 与 `replies`：
+
+```json
+{
+  "metadata": {
+    "format": "json",
+    "exportedAt": "2026-04-18T12:00:00.000Z",
+    "rowCount": 1,
+    "filters": { "format": "json", "status": ["in_review"] }
+  },
+  "issues": [
+    {
+      "id": 1,
+      "trackingCode": "ABCD23EF",
+      "name": "张三",
+      "studentId": "2024001001001",
+      "content": "图书馆空调故障，需要尽快处理。",
+      "category": "facility",
+      "distressType": null,
+      "sceneTag": null,
+      "priority": "high",
+      "status": "in_review",
+      "isPublic": true,
+      "isReported": false,
+      "assignedTo": "admin1",
+      "firstResponseAt": "2026-03-11T09:00:00.000Z",
+      "resolvedAt": null,
+      "createdAt": "2026-03-11T08:00:00.000Z",
+      "updatedAt": "2026-03-11T09:30:00.000Z",
+      "publicSummary": "已安排后勤团队处理",
+      "internalNotes": [
+        {
+          "id": 10,
+          "content": "已联系后勤团队。",
+          "createdBy": "admin1",
+          "createdAt": "2026-03-11T10:00:00.000Z"
+        }
+      ],
+      "replies": [
+        {
+          "id": 20,
+          "type": "public_reply",
+          "oldValue": null,
+          "newValue": null,
+          "content": "该问题已进入处理流程。",
+          "isPublic": true,
+          "createdBy": "admin1",
+          "createdAt": "2026-03-11T11:00:00.000Z"
+        }
+      ]
+    }
+  ]
+}
+```
 
 ### `GET /api/admin/metrics`
 

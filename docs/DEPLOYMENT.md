@@ -122,7 +122,7 @@ npm run d1:migrate:preview
 - 确认 `RESEND_API_KEY` 已在目标环境配置，且 `support@calvin-xia.cn` 可作为 Resend 发件人与回复地址
 - 确认 D1 与 KV 绑定存在
 - 访问 `/health.html` 检查 D1 / KV 状态
-- 在后台执行一次导出，确认审计日志与 CSV 正常
+- 在后台分别执行 CSV 与 JSON 导出，确认审计日志、下载文件和 JSON 嵌套备注/回复正常
 - 检查 CI 最新一次通过后再切换流量
 
 ## 9. 样式构建说明

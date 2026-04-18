@@ -413,6 +413,12 @@ describe('adminExportQuerySchema', () => {
     expect(result.data.format).toBe('csv');
     expect(result.data.hasReplies).toBe(false);
   });
+
+  it('accepts json export format', () => {
+    const result = adminExportQuerySchema.safeParse({ format: 'json' });
+    expect(result.success).toBe(true);
+    expect(result.data.format).toBe('json');
+  });
 });
 
 describe('knowledge validation schemas', () => {

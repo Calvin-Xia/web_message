@@ -338,7 +338,7 @@ export const adminMetricsQuerySchema = z.object({
 }).superRefine(validateDateRange);
 
 export const adminExportQuerySchema = z.object({
-  format: z.preprocess(emptyToUndefined, z.literal('csv').default('csv')),
+  format: z.preprocess(emptyToUndefined, z.enum(['csv', 'json']).default('csv')),
   status: enumListSchema(STATUS_VALUES, '状态无效'),
   category: enumListSchema(CATEGORY_VALUES, '分类无效'),
   priority: enumListSchema(PRIORITY_VALUES, '优先级无效'),

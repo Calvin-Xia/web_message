@@ -1,14 +1,15 @@
 import { createForbiddenOriginResponse, authorizeAdminRequest } from '../../../src/shared/auth.js';
 import { getAdminCorsPolicy } from '../../../src/shared/corsConfig.js';
 import { createCsvContent } from '../../../src/shared/csv.js';
-import { createAdminActionStatement } from '../../../src/shared/issueData.js';
-import { successResponse, errorResponse, createOptionsResponse, methodNotAllowedResponse } from '../../../src/shared/response.js';
+import { createAdminActionStatement, mapInternalNote, mapIssueUpdate, toBoolean } from '../../../src/shared/issueData.js';
+import { errorResponse, createOptionsResponse, methodNotAllowedResponse } from '../../../src/shared/response.js';
 import { checkAdminRateLimit, getClientIP } from '../../../src/shared/rateLimit.js';
 import { adminExportQuerySchema, formatZodError } from '../../../src/shared/validation.js';
 import { buildAdminIssueWhere } from '../../../src/shared/issueQueries.js';
 
 const ALLOWED_METHODS = 'GET, OPTIONS';
 const CURSOR_PAGE_SIZE = 1000;
+const NESTED_EXPORT_CHUNK_SIZE = 500;
 const MAX_EXPORT_ROWS = 50_000;
 // 管理端导出用于内部运营和审计留档，默认保留原始字段以避免二次核对时信息丢失。
 // 导出文件会落地到管理员本机，因此必须继续通过后台鉴权、限流和操作审计控制访问边界。
@@ -33,9 +34,9 @@ const EXPORT_HEADERS = [
   'public_summary',
 ];
 
-function createExportFilename() {
+function createExportFilename(format) {
   const stamp = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19);
-  return `issues_export_${stamp}.csv`;
+  return `issues_export_${stamp}.${format}`;
 }
 
 function mapExportRow(row) {
@@ -59,6 +60,114 @@ function mapExportRow(row) {
     row.updated_at,
     row.public_summary,
   ];
+}
+
+function mapJsonIssue(row, { internalNotes = [], replies = [] } = {}) {
+  return {
+    id: row.id,
+    trackingCode: row.tracking_code,
+    name: row.name,
+    studentId: row.student_id,
+    content: row.content,
+    category: row.category,
+    distressType: row.distress_type,
+    sceneTag: row.scene_tag,
+    priority: row.priority,
+    status: row.status,
+    isPublic: toBoolean(row.is_public),
+    isReported: toBoolean(row.is_reported),
+    assignedTo: row.assigned_to,
+    firstResponseAt: row.first_response_at,
+    resolvedAt: row.resolved_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    publicSummary: row.public_summary,
+    internalNotes,
+    replies,
+  };
+}
+
+function groupByIssueId(rows, mapRow) {
+  const grouped = new Map();
+
+  for (const row of rows) {
+    const issueId = Number(row.issue_id);
+    const items = grouped.get(issueId) || [];
+    items.push(mapRow(row));
+    grouped.set(issueId, items);
+  }
+
+  return grouped;
+}
+
+function chunkValues(values, size) {
+  const chunks = [];
+  for (let index = 0; index < values.length; index += size) {
+    chunks.push(values.slice(index, index + size));
+  }
+
+  return chunks;
+}
+
+async function loadNestedExportData(db, issueIds) {
+  if (issueIds.length === 0) {
+    return {
+      notesByIssueId: new Map(),
+      repliesByIssueId: new Map(),
+    };
+  }
+
+  const noteRows = [];
+  const replyRows = [];
+
+  for (const chunk of chunkValues(issueIds, NESTED_EXPORT_CHUNK_SIZE)) {
+    const placeholders = chunk.map(() => '?').join(', ');
+    const [notes, replies] = await Promise.all([
+      db.prepare(`
+        SELECT id, issue_id, content, created_by, created_at
+        FROM issue_internal_notes
+        WHERE issue_id IN (${placeholders})
+        ORDER BY issue_id ASC, created_at DESC, id DESC
+      `)
+        .bind(...chunk)
+        .all(),
+      db.prepare(`
+        SELECT id, issue_id, update_type, old_value, new_value, content, is_public, created_by, created_at
+        FROM issue_updates
+        WHERE update_type = 'public_reply' AND issue_id IN (${placeholders})
+        ORDER BY issue_id ASC, created_at ASC, id ASC
+      `)
+        .bind(...chunk)
+        .all(),
+    ]);
+
+    noteRows.push(...(notes.results || []));
+    replyRows.push(...(replies.results || []));
+  }
+
+  return {
+    notesByIssueId: groupByIssueId(noteRows, mapInternalNote),
+    repliesByIssueId: groupByIssueId(replyRows, mapIssueUpdate),
+  };
+}
+
+async function createJsonExportContent(db, rows, query, exportedAt) {
+  const issueIds = rows.map((row) => Number(row.id));
+  const { notesByIssueId, repliesByIssueId } = await loadNestedExportData(db, issueIds);
+  const issues = rows.map((row) => mapJsonIssue(row, {
+    internalNotes: notesByIssueId.get(Number(row.id)) || [],
+    replies: repliesByIssueId.get(Number(row.id)) || [],
+  }));
+
+  return JSON.stringify({
+    metadata: {
+      format: 'json',
+      exportedAt,
+      rowCount: issues.length,
+      filters: query,
+    },
+    issues,
+  }, null, 2);
 }
 
 export async function onRequest(context) {
@@ -96,9 +205,6 @@ export async function onRequest(context) {
     }
 
     const query = parsedQuery.data;
-    if (query.format !== 'csv') {
-      return errorResponse('暂不支持该导出格式', { status: 400, headers: authResult.corsHeaders });
-    }
 
     const { whereSql, bindings } = buildAdminIssueWhere(query, { tableAlias: 'issues' });
     const totalRow = await env.DB.prepare(`SELECT COUNT(*) AS total FROM issues ${whereSql}`)
@@ -157,9 +263,14 @@ export async function onRequest(context) {
       lastId = Number(batchRows[batchRows.length - 1].id);
     }
 
-    const filename = createExportFilename();
-    const csvContent = createCsvContent(EXPORT_HEADERS, rows.map(mapExportRow));
     const now = new Date().toISOString();
+    const filename = createExportFilename(query.format);
+    const content = query.format === 'json'
+      ? await createJsonExportContent(env.DB, rows, query, now)
+      : createCsvContent(EXPORT_HEADERS, rows.map(mapExportRow));
+    const contentType = query.format === 'json'
+      ? 'application/json; charset=utf-8'
+      : 'text/csv; charset=utf-8';
 
     await createAdminActionStatement(env.DB, {
       actionType: 'issues_exported',
@@ -173,11 +284,11 @@ export async function onRequest(context) {
       performedAt: now,
     }).run();
 
-    return new Response(csvContent, {
+    return new Response(content, {
       status: 200,
       headers: {
         ...authResult.corsHeaders,
-        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Type': contentType,
         'Content-Disposition': `attachment; filename="${filename}"`,
         'Cache-Control': 'no-store',
       },

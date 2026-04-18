@@ -28,7 +28,7 @@ function createIssue(overrides = {}) {
   };
 }
 
-function createExportDbMock({ total = 0, batches = [] } = {}) {
+function createExportDbMock({ total = 0, batches = [], notes = [], replies = [] } = {}) {
   const statements = [];
   const actions = [];
   let batchIndex = 0;
@@ -59,6 +59,34 @@ function createExportDbMock({ total = 0, batches = [] } = {}) {
             batchIndex += 1;
             return {
               all: async () => ({ results }),
+            };
+          },
+        };
+      }
+
+      if (sql.includes('FROM issue_internal_notes')) {
+        return {
+          bind(...bindings) {
+            record.bindings = bindings;
+            const issueIds = new Set(bindings);
+            return {
+              all: async () => ({
+                results: notes.filter((item) => issueIds.has(item.issue_id)),
+              }),
+            };
+          },
+        };
+      }
+
+      if (sql.includes('FROM issue_updates') && sql.includes("update_type = 'public_reply'")) {
+        return {
+          bind(...bindings) {
+            record.bindings = bindings;
+            const issueIds = new Set(bindings);
+            return {
+              all: async () => ({
+                results: replies.filter((item) => issueIds.has(item.issue_id)),
+              }),
             };
           },
         };
@@ -158,6 +186,95 @@ describe('admin export route', () => {
       rowCount: 2,
       filters: {
         format: 'csv',
+      },
+    });
+  });
+
+  it('exports issues as structured json with nested notes and replies', async () => {
+    const db = createExportDbMock({
+      total: 1,
+      batches: [[
+        createIssue({
+          category: 'counseling',
+          distress_type: 'sleep',
+          scene_tag: 'dormitory',
+        }),
+      ], []],
+      notes: [{
+        id: 10,
+        issue_id: 1,
+        content: '已联系辅导员跟进。',
+        created_by: 'counselor',
+        created_at: '2026-03-11T10:00:00.000Z',
+      }],
+      replies: [{
+        id: 20,
+        issue_id: 1,
+        update_type: 'public_reply',
+        old_value: null,
+        new_value: null,
+        content: '老师会在今天下午联系你。',
+        is_public: 1,
+        created_by: 'admin1',
+        created_at: '2026-03-11T11:00:00.000Z',
+      }],
+    });
+
+    const response = await onRequest(createAdminContext(
+      new Request('http://localhost/api/admin/export?format=json', {
+        headers: {
+          Authorization: 'Bearer test-secret',
+        },
+      }),
+      db,
+    ));
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Content-Type')).toContain('application/json');
+    expect(response.headers.get('Content-Disposition')).toContain('issues_export_');
+    expect(response.headers.get('Content-Disposition')).toContain('.json');
+    expect(payload).toMatchObject({
+      metadata: {
+        format: 'json',
+        rowCount: 1,
+        filters: {
+          format: 'json',
+        },
+      },
+      issues: [{
+        id: 1,
+        trackingCode: 'ABCD23EF',
+        studentId: '2024012345678',
+        category: 'counseling',
+        distressType: 'sleep',
+        sceneTag: 'dormitory',
+        isPublic: true,
+        isReported: false,
+        internalNotes: [{
+          id: 10,
+          content: '已联系辅导员跟进。',
+          createdBy: 'counselor',
+          createdAt: '2026-03-11T10:00:00.000Z',
+        }],
+        replies: [{
+          id: 20,
+          type: 'public_reply',
+          oldValue: null,
+          newValue: null,
+          content: '老师会在今天下午联系你。',
+          isPublic: true,
+          createdBy: 'admin1',
+          createdAt: '2026-03-11T11:00:00.000Z',
+        }],
+      }],
+    });
+    expect(db.actions).toHaveLength(1);
+    expect(JSON.parse(db.actions[0].details)).toMatchObject({
+      filename: expect.stringMatching(/\.json$/),
+      rowCount: 1,
+      filters: {
+        format: 'json',
       },
     });
   });

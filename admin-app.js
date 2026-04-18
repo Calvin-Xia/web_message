@@ -23,6 +23,7 @@ const statusColors = {
   resolved: '#13795b',
   closed: '#64748b',
 };
+const exportFormatLabels = { csv: 'CSV', json: 'JSON' };
 const CLEARABLE_FILTER_KEYS = new Set([
   'q',
   'status',
@@ -289,6 +290,11 @@ function getTriStateFilterValue(id) {
   return value === '' ? '' : value;
 }
 
+function getExportFormat() {
+  const value = document.getElementById('exportFormatFilter')?.value;
+  return value === 'json' ? 'json' : 'csv';
+}
+
 function getFilters() {
   return {
     q: document.getElementById('searchInput').value.trim(),
@@ -357,10 +363,10 @@ function buildMetricsQuery(refresh = false) {
   return params.toString();
 }
 
-function buildExportQuery() {
+function buildExportQuery(format = getExportFormat()) {
   const filters = getFilters();
   const params = new URLSearchParams();
-  params.set('format', 'csv');
+  params.set('format', format);
   appendFilterValue(params, 'q', filters.q);
   appendFilterValue(params, 'status', filters.status);
   appendFilterValue(params, 'category', filters.category);
@@ -493,7 +499,7 @@ function updateSearchSuggestions() {
 function renderExportHistory() {
   const container = document.getElementById('exportHistoryList');
   if (state.exportHistory.length === 0) {
-    container.innerHTML = '<div class="empty-state rounded-[1.3rem] px-4 py-5 text-sm leading-7 text-[#5f6b80]">还没有导出记录。点击上方“导出 CSV”后，这里会保留最近的导出时间和筛选摘要。</div>';
+    container.innerHTML = '<div class="empty-state rounded-[1.3rem] px-4 py-5 text-sm leading-7 text-[#5f6b80]">还没有导出记录。点击上方“导出文件”后，这里会保留最近的导出时间和筛选摘要。</div>';
     return;
   }
 
@@ -1414,12 +1420,14 @@ async function submitReply(event) {
 
 async function exportIssues() {
   const button = document.getElementById('exportButton');
+  const format = getExportFormat();
+  const formatLabel = exportFormatLabels[format] || 'CSV';
   const summary = summarizeFilters(getFilters());
   setButtonBusy(button, true, '导出中...');
-  setNotification('adminNotification', '正在生成导出文件...', 'info');
+  setNotification('adminNotification', `正在生成 ${formatLabel} 导出文件...`, 'info');
 
   try {
-    const response = await fetchWithTimeout(`${API_BASE}/admin/export?${buildExportQuery()}`, {
+    const response = await fetchWithTimeout(`${API_BASE}/admin/export?${buildExportQuery(format)}`, {
       headers: {
         Authorization: `Bearer ${state.token}`,
       },
@@ -1436,7 +1444,7 @@ async function exportIssues() {
     }
 
     const disposition = response.headers.get('Content-Disposition') || '';
-    const filename = disposition.match(/filename="?([^";]+)"?/)?.[1] || 'issues_export.csv';
+    const filename = disposition.match(/filename="?([^";]+)"?/)?.[1] || `issues_export.${format}`;
     const blob = await response.blob();
     const blobUrl = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -1450,13 +1458,13 @@ async function exportIssues() {
     pushExportHistory({
       filename,
       createdAt: new Date().toISOString(),
-      summary,
+      summary: `${formatLabel} · ${summary}`,
     });
-    setNotification('adminNotification', '导出成功，文件已开始下载。', 'success');
+    setNotification('adminNotification', `${formatLabel} 导出成功，文件已开始下载。`, 'success');
   } catch (error) {
     setNotification('adminNotification', error.name === 'AbortError' ? '导出超时，请缩小筛选范围后重试。' : error.message, 'error');
   } finally {
-    setButtonBusy(button, false, '', '导出 CSV');
+    setButtonBusy(button, false, '', '导出文件');
   }
 }
 
