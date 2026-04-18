@@ -57,6 +57,8 @@ const state = {
   availableAssignees: [],
   metrics: null,
   issues: [],
+  knowledgeItems: [],
+  editingKnowledgeId: null,
   searchHistory: loadStorageArray(SEARCH_HISTORY_KEY),
   exportHistory: loadStorageArray(EXPORT_HISTORY_KEY),
 };
@@ -881,6 +883,167 @@ async function loadDashboard(page = 1, { refreshMetrics = false } = {}) {
   return issuesResult;
 }
 
+function getActiveKnowledgeItem() {
+  if (!state.editingKnowledgeId) {
+    return null;
+  }
+
+  return state.knowledgeItems.find((item) => item.id === state.editingKnowledgeId) || null;
+}
+
+function resetKnowledgeForm() {
+  state.editingKnowledgeId = null;
+  document.getElementById('knowledgeForm').reset();
+  document.getElementById('knowledgeSortOrder').value = '0';
+  document.getElementById('knowledgeIsEnabled').checked = true;
+  document.getElementById('knowledgeFormTitle').textContent = '新增知识条目';
+  document.getElementById('knowledgeSaveButton').textContent = '保存条目';
+  document.getElementById('knowledgeCancelEdit').hidden = true;
+}
+
+function renderKnowledgeList() {
+  const container = document.getElementById('knowledgeList');
+  const summary = document.getElementById('knowledgeSummary');
+  const enabledCount = state.knowledgeItems.filter((item) => item.isEnabled).length;
+  summary.textContent = `共 ${state.knowledgeItems.length} 条，启用 ${enabledCount} 条。`;
+
+  if (state.knowledgeItems.length === 0) {
+    container.innerHTML = '<div class="empty-state rounded-[1.4rem] px-5 py-8 text-center text-sm leading-7 text-[#5f6b80]">还没有知识条目。使用左侧表单新增第一条公开建议。</div>';
+    return;
+  }
+
+  container.innerHTML = state.knowledgeItems.map((item) => `
+    <article class="interactive-card rounded-[1.4rem] border border-[rgba(23,32,51,0.08)] bg-white/72 p-5">
+      <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div class="min-w-0">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="mini-token">${escapeHtml(distressTypeLabels[item.tag] || item.tag)}</span>
+            <span class="rounded-full px-3 py-1 text-xs font-semibold ${item.isEnabled ? 'bg-[rgba(19,121,91,0.12)] text-[#13795b]' : 'bg-[rgba(23,32,51,0.08)] text-[#4c566b]'}">${item.isEnabled ? '已启用' : '已禁用'}</span>
+            <span class="text-xs uppercase tracking-[0.22em] text-[#72809a]">排序 ${escapeHtml(String(item.sortOrder))}</span>
+          </div>
+          <h4 class="display-font mt-3 break-anywhere text-2xl text-[#172033]">${escapeHtml(item.title)}</h4>
+          <p class="mt-3 break-anywhere text-sm leading-7 text-[#4c566b]">${escapeHtml(item.content)}</p>
+          <div class="mt-3 text-xs uppercase tracking-[0.22em] text-[#72809a]">更新 ${escapeHtml(formatDate(item.updatedAt))}</div>
+        </div>
+        <div class="flex flex-wrap gap-2 lg:flex-col">
+          <button class="knowledge-edit ghost-button rounded-full px-4 py-2 text-sm font-semibold text-[#172033] transition" type="button" data-id="${item.id}">编辑</button>
+          <button class="knowledge-delete rounded-full border border-[rgba(180,35,24,0.22)] bg-white/80 px-4 py-2 text-sm font-semibold text-[#b42318] transition hover:bg-[rgba(180,35,24,0.08)]" type="button" data-id="${item.id}">删除</button>
+        </div>
+      </div>
+    </article>
+  `).join('');
+
+  container.querySelectorAll('.knowledge-edit').forEach((button) => {
+    button.addEventListener('click', () => startKnowledgeEdit(Number(button.dataset.id)));
+  });
+  container.querySelectorAll('.knowledge-delete').forEach((button) => {
+    button.addEventListener('click', () => deleteKnowledgeItem(Number(button.dataset.id)));
+  });
+}
+
+async function loadKnowledgeItems() {
+  const container = document.getElementById('knowledgeList');
+  container.setAttribute('aria-busy', 'true');
+  container.innerHTML = renderFeedbackBox('正在加载知识库', 'loading');
+  try {
+    const data = await apiFetch('/admin/knowledge');
+    state.knowledgeItems = data.items || [];
+    renderKnowledgeList();
+    setNotification('knowledgeNotification', '');
+    return data;
+  } finally {
+    container.setAttribute('aria-busy', 'false');
+  }
+}
+
+function startKnowledgeEdit(itemId) {
+  const item = state.knowledgeItems.find((entry) => entry.id === itemId);
+  if (!item) {
+    return;
+  }
+
+  state.editingKnowledgeId = item.id;
+  document.getElementById('knowledgeTitle').value = item.title;
+  document.getElementById('knowledgeTag').value = item.tag;
+  document.getElementById('knowledgeSortOrder').value = String(item.sortOrder);
+  document.getElementById('knowledgeContent').value = item.content;
+  document.getElementById('knowledgeIsEnabled').checked = item.isEnabled;
+  document.getElementById('knowledgeFormTitle').textContent = '编辑知识条目';
+  document.getElementById('knowledgeSaveButton').textContent = '保存修改';
+  document.getElementById('knowledgeCancelEdit').hidden = false;
+  document.getElementById('knowledgeTitle').focus();
+}
+
+function buildKnowledgePayload() {
+  return {
+    title: document.getElementById('knowledgeTitle').value.trim(),
+    tag: document.getElementById('knowledgeTag').value,
+    content: document.getElementById('knowledgeContent').value.trim(),
+    sortOrder: Number(document.getElementById('knowledgeSortOrder').value) || 0,
+    isEnabled: document.getElementById('knowledgeIsEnabled').checked,
+  };
+}
+
+async function submitKnowledgeForm(event) {
+  event.preventDefault();
+  const button = document.getElementById('knowledgeSaveButton');
+  const activeItem = getActiveKnowledgeItem();
+  const payload = buildKnowledgePayload();
+
+  if (!payload.title || !payload.content) {
+    setNotification('knowledgeNotification', '标题和内容不能为空。', 'error');
+    return;
+  }
+
+  const path = activeItem ? `/admin/knowledge/${activeItem.id}` : '/admin/knowledge';
+  const method = activeItem ? 'PATCH' : 'POST';
+  if (activeItem) {
+    payload.updatedAt = activeItem.updatedAt;
+  }
+
+  try {
+    setButtonBusy(button, true, activeItem ? '保存中...' : '新增中...');
+    await apiFetch(path, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    resetKnowledgeForm();
+    await loadKnowledgeItems();
+    setNotification('knowledgeNotification', activeItem ? '知识条目已更新。' : '知识条目已新增。', 'success');
+  } catch (error) {
+    setNotification('knowledgeNotification', error.message, 'error');
+  } finally {
+    setButtonBusy(button, false, '', state.editingKnowledgeId ? '保存修改' : '保存条目');
+  }
+}
+
+async function deleteKnowledgeItem(itemId) {
+  const item = state.knowledgeItems.find((entry) => entry.id === itemId);
+  if (!item) {
+    return;
+  }
+
+  if (!window.confirm(`确定删除「${item.title}」吗？删除后首页不会再展示该条目。`)) {
+    return;
+  }
+
+  try {
+    await apiFetch(`/admin/knowledge/${item.id}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ updatedAt: item.updatedAt }),
+    });
+    if (state.editingKnowledgeId === item.id) {
+      resetKnowledgeForm();
+    }
+    await loadKnowledgeItems();
+    setNotification('knowledgeNotification', '知识条目已删除。', 'success');
+  } catch (error) {
+    setNotification('knowledgeNotification', error.message, 'error');
+  }
+}
+
 function openDrawerShell(trigger) {
   const drawer = document.getElementById('issueDrawer');
   lastDrawerTrigger = trigger instanceof HTMLElement
@@ -1317,7 +1480,10 @@ async function login(secretKey) {
   setNotification('loginNotification', '正在验证并加载后台数据...', 'info');
 
   try {
-    await loadDashboard(state.page, { refreshMetrics: false });
+    await Promise.all([
+      loadDashboard(state.page, { refreshMetrics: false }),
+      loadKnowledgeItems(),
+    ]);
     document.getElementById('loginSection').hidden = true;
     document.getElementById('adminShell').hidden = false;
     setNotification('loginNotification', '');
@@ -1335,6 +1501,8 @@ function logout() {
   state.token = null;
   state.activeIssue = null;
   state.activeIssueId = null;
+  state.knowledgeItems = [];
+  resetKnowledgeForm();
   sessionStorage.removeItem(STORAGE_KEY);
   document.getElementById('secretKey').value = '';
   closeDrawer();
@@ -1352,6 +1520,11 @@ function bindEvents() {
       return;
     }
     login(secretKey);
+  });
+  document.getElementById('knowledgeForm').addEventListener('submit', submitKnowledgeForm);
+  document.getElementById('knowledgeCancelEdit').addEventListener('click', () => {
+    resetKnowledgeForm();
+    setNotification('knowledgeNotification', '');
   });
 
   document.getElementById('filterForm').addEventListener('submit', (event) => {

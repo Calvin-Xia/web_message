@@ -125,6 +125,21 @@ const booleanQuerySchema = z.preprocess(stringToBoolean, z.boolean().optional())
 const optionalEmailSchema = z.preprocess(emptyToUndefined, z.string().trim().max(254, '邮箱不能超过254个字符').email('邮箱格式无效').optional());
 const distressTypeSchemas = makeCounselingFieldSchemas(DISTRESS_TYPE_VALUES, '困扰类别无效');
 const sceneTagSchemas = makeCounselingFieldSchemas(SCENE_TAG_VALUES, '场景标签无效');
+const timestampSchema = z.string().trim().refine(isValidTimestamp, '更新时间格式无效');
+const knowledgeSortOrderSchema = z.preprocess(
+  emptyToUndefined,
+  z.coerce.number().int('排序必须为整数').min(0, '排序必须为非负整数')
+);
+
+const knowledgeBaseFields = {
+  title: z.string().trim().min(1, '标题不能为空').max(80, '标题不能超过80个字符'),
+  tag: z.enum(DISTRESS_TYPE_VALUES, {
+    error: () => ({ message: '困扰类别无效' }),
+  }),
+  content: z.string().trim().min(1, '内容不能为空').max(1000, '内容不能超过1000个字符'),
+  sortOrder: knowledgeSortOrderSchema,
+  isEnabled: z.boolean(),
+};
 
 export const issueSchema = z.object({
   name: z.string().trim().min(1, '姓名不能为空').max(50, '姓名不能超过50个字符'),
@@ -226,7 +241,7 @@ export const adminIssueListQuerySchema = paginationSchema.extend({
 export const issueIdSchema = z.coerce.number().int().positive('问题 ID 无效');
 
 const adminIssuePatchBaseSchema = z.object({
-  updatedAt: z.string().trim().refine(isValidTimestamp, '更新时间格式无效'),
+  updatedAt: timestampSchema,
   category: z.preprocess(emptyToUndefined, z.enum(CATEGORY_VALUES).optional()),
   priority: z.preprocess(emptyToUndefined, z.enum(PRIORITY_VALUES).optional()),
   status: z.preprocess(emptyToUndefined, z.enum(STATUS_VALUES).optional()),
@@ -291,6 +306,29 @@ export const adminActionListQuerySchema = paginationSchema.extend({
   targetId: z.preprocess(emptyToUndefined, z.coerce.number().int().positive().optional()),
   actionType: z.preprocess(emptyToUndefined, z.string().max(50).optional()),
 });
+
+export const knowledgeIdSchema = z.coerce.number().int().positive('知识条目 ID 无效');
+
+export const knowledgeCreateSchema = z.object({
+  ...knowledgeBaseFields,
+  sortOrder: knowledgeSortOrderSchema.default(0),
+  isEnabled: z.boolean().default(true),
+}).strict();
+
+export const knowledgePatchSchema = z.object({
+  updatedAt: timestampSchema,
+  title: knowledgeBaseFields.title.optional(),
+  tag: knowledgeBaseFields.tag.optional(),
+  content: knowledgeBaseFields.content.optional(),
+  sortOrder: knowledgeBaseFields.sortOrder.optional(),
+  isEnabled: knowledgeBaseFields.isEnabled.optional(),
+}).strict().refine((value) => Object.keys(value).some((key) => key !== 'updatedAt'), {
+  message: '至少提供一个更新字段',
+});
+
+export const knowledgeDeleteSchema = z.object({
+  updatedAt: timestampSchema,
+}).strict();
 
 export const adminMetricsQuerySchema = z.object({
   startDate: dateQuerySchema,

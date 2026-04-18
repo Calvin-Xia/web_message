@@ -65,6 +65,7 @@ class FakeD1Database {
     this.issueUpdates = [];
     this.issueInternalNotes = [];
     this.adminActions = [];
+    this.knowledgeItems = [];
     this.rateLimitState = [];
     this.requestObservations = [];
     this.ids = {
@@ -72,6 +73,7 @@ class FakeD1Database {
       update: 1,
       note: 1,
       action: 1,
+      knowledgeItem: 1,
       observation: 1,
     };
   }
@@ -82,6 +84,7 @@ class FakeD1Database {
       issueUpdates: clone(this.issueUpdates),
       issueInternalNotes: clone(this.issueInternalNotes),
       adminActions: clone(this.adminActions),
+      knowledgeItems: clone(this.knowledgeItems),
       rateLimitState: clone(this.rateLimitState),
       requestObservations: clone(this.requestObservations),
       ids: clone(this.ids),
@@ -93,6 +96,7 @@ class FakeD1Database {
     this.issueUpdates = snapshot.issueUpdates;
     this.issueInternalNotes = snapshot.issueInternalNotes;
     this.adminActions = snapshot.adminActions;
+    this.knowledgeItems = snapshot.knowledgeItems;
     this.rateLimitState = snapshot.rateLimitState;
     this.requestObservations = snapshot.requestObservations;
     this.ids = snapshot.ids;
@@ -144,6 +148,10 @@ class FakeD1Database {
 
   findIssueByTrackingCode(trackingCode) {
     return this.issues.find((issue) => issue.tracking_code === trackingCode);
+  }
+
+  findKnowledgeItemById(itemId) {
+    return this.knowledgeItems.find((item) => item.id === itemId);
   }
 
   filterAdminIssues(sql, bindings = []) {
@@ -374,6 +382,24 @@ class FakeD1Database {
       return { success: true, meta: { last_row_id: note.id, changes: 1 } };
     }
 
+    if (sql.startsWith('INSERT INTO knowledge_items (')) {
+      const columns = parseInsertColumns(sql, 'knowledge_items');
+      const valuesByColumn = Object.fromEntries(columns.map((column, index) => [column, bindings[index]]));
+      const now = new Date().toISOString();
+      const item = {
+        id: this.ids.knowledgeItem++,
+        title: valuesByColumn.title,
+        tag: valuesByColumn.tag,
+        content: valuesByColumn.content,
+        sort_order: valuesByColumn.sort_order ?? 0,
+        is_enabled: valuesByColumn.is_enabled ?? 1,
+        created_at: valuesByColumn.created_at ?? now,
+        updated_at: valuesByColumn.updated_at ?? now,
+      };
+      this.knowledgeItems.push(item);
+      return { success: true, meta: { last_row_id: item.id, changes: 1 } };
+    }
+
     if (sql.startsWith('INSERT INTO admin_actions (') && sql.includes('SELECT ?, ?, id,')) {
       const [actionType, targetType, details, performedBy, performedAt, ipAddress, issueIdOrCode, updatedAt] = bindings;
       const issue = bindings.length === 7
@@ -497,6 +523,21 @@ class FakeD1Database {
       const [issueId] = bindings;
       const row = this.findIssueById(issueId);
       return row ? clone(row) : null;
+    }
+
+    if (sql === 'SELECT * FROM knowledge_items WHERE id = ? LIMIT 1') {
+      const [itemId] = bindings;
+      const row = this.findKnowledgeItemById(itemId);
+      return row ? clone(row) : null;
+    }
+
+    if (sql.includes('FROM knowledge_items') && sql.includes('ORDER BY sort_order ASC, id ASC')) {
+      const enabledOnly = sql.includes('WHERE is_enabled = 1');
+      const results = this.knowledgeItems
+        .filter((item) => !enabledOnly || Number(item.is_enabled) === 1)
+        .sort((left, right) => Number(left.sort_order) - Number(right.sort_order) || left.id - right.id)
+        .map((item) => clone(item));
+      return { results };
     }
 
     if (sql.startsWith('SELECT COUNT(*) AS total FROM issues')) {
@@ -668,6 +709,39 @@ class FakeD1Database {
       });
 
       return { success: true, meta: { changes: 1 } };
+    }
+
+    if (sql.startsWith('UPDATE knowledge_items SET ')) {
+      const match = sql.match(/^UPDATE knowledge_items SET (.+) WHERE id = \? AND updated_at = \?$/);
+      if (!match) {
+        throw new Error(`Unsupported update statement: ${sql}`);
+      }
+
+      const assignments = match[1].split(',').map((item) => item.trim());
+      const itemId = bindings[assignments.length];
+      const expectedUpdatedAt = bindings[assignments.length + 1];
+      const item = this.findKnowledgeItemById(itemId);
+      if (!item) {
+        return { success: true, meta: { changes: 0 } };
+      }
+
+      if (item.updated_at !== expectedUpdatedAt) {
+        return { success: true, meta: { changes: 0 } };
+      }
+
+      assignments.forEach((assignment, index) => {
+        const column = assignment.replace(/ = \?$/, '');
+        item[column] = bindings[index];
+      });
+
+      return { success: true, meta: { changes: 1 } };
+    }
+
+    if (sql === 'DELETE FROM knowledge_items WHERE id = ? AND updated_at = ?') {
+      const [itemId, expectedUpdatedAt] = bindings;
+      const before = this.knowledgeItems.length;
+      this.knowledgeItems = this.knowledgeItems.filter((item) => item.id !== itemId || item.updated_at !== expectedUpdatedAt);
+      return { success: true, meta: { changes: before - this.knowledgeItems.length } };
     }
 
     if (sql.startsWith('SELECT issues.id,') && sql.includes('FROM issues')) {

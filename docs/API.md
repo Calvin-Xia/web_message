@@ -118,7 +118,6 @@
 返回公开心理咨询反馈的脱敏聚合数据，用于校园心理压力热区与困扰类别展示。
 默认统计最近 `90` 天，只统计 `isPublic = true` 且 `category = counseling` 的问题；未填写 `sceneTag` 的记录不进入场景热区。
 首页校园矢量地图不会从该接口获取地点级数据；它只使用 `sceneHotspots` 按场景合并热度，并与静态地图资产 `/storage/campus-care-map.json` 在浏览器端渲染。
-当前公开知识库使用前端固定脱敏支持模板，作为 MVP 内容；如需运营人员免部署维护，后续可迁移到 API/KV 配置源。
 
 查询参数：
 
@@ -150,6 +149,39 @@
     ],
     "distressTypes": [
       { "distressType": "sleep", "total": 1 }
+    ]
+  }
+}
+```
+
+### `GET /api/knowledge`
+
+返回首页公开知识库卡片。只返回已启用条目，按 `sortOrder` 与 `id` 升序排列。
+首页在用户选择心理咨询分类且选择具体困扰类别时，会在浏览器端按 `tag` 匹配展示对应卡片；未选择具体困扰类别时展示全部已启用条目。
+
+限流与缓存：
+
+- 使用公开读接口限流策略。
+- 成功响应包含 `Cache-Control: public, max-age=60`。
+- 方法不支持返回 `405`。
+
+示例响应：
+
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "id": 1,
+        "title": "学业压力",
+        "tag": "academic_pressure",
+        "content": "先把任务拆成今天能完成的一小步，给自己留出固定休息段。",
+        "sortOrder": 10,
+        "isEnabled": true,
+        "createdAt": "2026-04-18T08:00:00.000Z",
+        "updatedAt": "2026-04-18T08:00:00.000Z"
+      }
     ]
   }
 }
@@ -268,6 +300,48 @@
 ### `GET /api/admin/actions`
 
 分页查询后台操作审计日志。
+
+### `GET /api/admin/knowledge`
+
+返回全部知识条目，包括禁用条目。按 `sortOrder` 与 `id` 升序排列。
+
+### `POST /api/admin/knowledge`
+
+创建知识条目，并记录 `knowledge_created` 审计动作。
+
+请求体：
+
+```json
+{
+  "title": "学业压力",
+  "tag": "academic_pressure",
+  "content": "先把任务拆成今天能完成的一小步。",
+  "sortOrder": 10,
+  "isEnabled": true
+}
+```
+
+字段说明：
+
+- `tag`：心理困扰类别，取值为 `academic_pressure` / `relationship` / `adaptation` / `mood` / `sleep` / `other`
+- `sortOrder`：非负整数，默认 `0`
+- `isEnabled`：默认 `true`；禁用后后台仍可见，首页不展示
+
+### `PATCH /api/admin/knowledge/:id`
+
+更新知识条目，并记录 `knowledge_updated` 审计动作。请求体必须包含 `updatedAt` 进行乐观并发校验；记录已被其他管理员更新时返回 `409`。
+
+允许更新：
+
+- `title`
+- `tag`
+- `content`
+- `sortOrder`
+- `isEnabled`
+
+### `DELETE /api/admin/knowledge/:id`
+
+硬删除知识条目，并记录 `knowledge_deleted` 审计动作。请求体必须包含 `updatedAt`；记录已被其他管理员更新时返回 `409`。
 
 ### `GET /api/admin/export`
 

@@ -41,28 +41,14 @@ const priorityLabels = {
   high: '高',
   urgent: '紧急',
 };
-const knowledgeBaseItems = [
-  {
-    title: '学业压力',
-    tag: 'academic_pressure',
-    content: '先把任务拆成今天能完成的一小步，给自己留出固定休息段。压力持续影响睡眠或饮食时，建议尽早联系辅导员或心理中心。',
-  },
-  {
-    title: '人际关系',
-    tag: 'relationship',
-    content: '先记录让你不舒服的具体事件和边界需求，再选择合适时机沟通。冲突升级或感到孤立时，可以请可信任的老师陪同梳理。',
-  },
-  {
-    title: '睡眠问题',
-    tag: 'sleep',
-    content: '睡前减少刷屏和高强度学习，尝试固定起床时间。连续多日明显失眠、早醒或白天难以学习时，请寻求专业支持。',
-  },
-];
 const state = {
   page: 1,
   pageSize: PUBLIC_LIST_PAGE_SIZE,
   searchHistory: loadStorageArray(SEARCH_HISTORY_KEY),
   items: [],
+  knowledgeItems: [],
+  knowledgeStatus: 'idle',
+  knowledgeError: '',
   insights: null,
   campusHeat: normalizeSceneHeat([]),
   campusMap: null,
@@ -237,6 +223,8 @@ function syncCounselingFields() {
     distressType.value = '';
     sceneTag.value = '';
   }
+
+  renderKnowledgeBase();
 }
 
 function isValidEmailAddress(value) {
@@ -593,7 +581,35 @@ function renderPublicList(items, pagination) {
 
 function renderKnowledgeBase() {
   const container = document.getElementById('knowledgeBase');
-  container.innerHTML = knowledgeBaseItems.map((item) => `
+  if (!container) {
+    return;
+  }
+
+  if (state.knowledgeStatus === 'loading') {
+    container.innerHTML = `<div class="md:col-span-2 xl:col-span-3">${renderFeedbackBox('正在加载知识库', 'loading')}</div>`;
+    return;
+  }
+
+  if (state.knowledgeStatus === 'error') {
+    container.innerHTML = `<div class="md:col-span-2 xl:col-span-3">${renderFeedbackBox(state.knowledgeError || '知识库加载失败，请稍后再试。', 'error')}</div>`;
+    return;
+  }
+
+  const category = document.getElementById('category')?.value || '';
+  const distressType = document.getElementById('distressType')?.value || '';
+  const visibleItems = category === 'counseling' && distressType
+    ? state.knowledgeItems.filter((item) => item.tag === distressType)
+    : state.knowledgeItems;
+
+  if (visibleItems.length === 0) {
+    const message = category === 'counseling' && distressType
+      ? '暂时没有对应困扰类别的知识卡片。你仍然可以提交问题，后台会继续补充自助建议。'
+      : '暂时没有可公开展示的知识卡片。';
+    container.innerHTML = `<div class="empty-state rounded-[1.4rem] px-5 py-8 text-center text-sm leading-7 text-[#5f6b80] md:col-span-2 xl:col-span-3">${escapeHtml(message)}</div>`;
+    return;
+  }
+
+  container.innerHTML = visibleItems.map((item) => `
     <article class="interactive-card rounded-[1.4rem] border border-[rgba(23,32,51,0.08)] bg-white/72 p-5">
       <div class="flex flex-wrap items-center gap-2">
         <span class="mini-token">${escapeHtml(distressTypeLabels[item.tag] || item.title)}</span>
@@ -602,6 +618,28 @@ function renderKnowledgeBase() {
       <p class="mt-3 text-sm leading-7 text-[#4c566b]">${escapeHtml(item.content)}</p>
     </article>
   `).join('');
+}
+
+async function loadKnowledgeBase() {
+  state.knowledgeStatus = 'loading';
+  state.knowledgeError = '';
+  renderKnowledgeBase();
+
+  try {
+    const response = await fetchWithTimeout(`${API_BASE}/knowledge`);
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(result.error || '知识库加载失败');
+    }
+
+    state.knowledgeItems = result.data?.items || [];
+    state.knowledgeStatus = 'ready';
+  } catch (error) {
+    state.knowledgeStatus = 'error';
+    state.knowledgeError = error.name === 'AbortError' ? '知识库加载超时，请稍后再试。' : error.message;
+  } finally {
+    renderKnowledgeBase();
+  }
 }
 
 function getCampusFeatureStats(scene, heat = state.campusHeat) {
@@ -1030,6 +1068,7 @@ async function copyTrackingCode() {
 function bindEvents() {
   document.getElementById('issueForm').addEventListener('submit', handleSubmit);
   document.getElementById('category').addEventListener('change', syncCounselingFields);
+  document.getElementById('distressType').addEventListener('change', renderKnowledgeBase);
   document.getElementById('email').addEventListener('input', syncNotificationPreference);
   document.getElementById('email').addEventListener('blur', handleEmailBlur);
   document.getElementById('content').addEventListener('input', () => {
@@ -1101,13 +1140,13 @@ function bindEvents() {
 restoreFiltersFromUrl();
 syncAdvancedPublicFiltersState();
 renderSearchHistory();
-renderKnowledgeBase();
 bindEvents();
 syncNotificationPreference();
 syncCounselingFields();
 syncContentCounter();
 
 
+loadKnowledgeBase();
 loadPublicList(state.page);
 loadInsights();
 

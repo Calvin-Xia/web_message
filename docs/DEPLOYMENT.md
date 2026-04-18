@@ -95,7 +95,8 @@ npm run deploy
 - `0006_add_counseling_insights_fields.sql` 新增心理咨询扩展字段，并为新初始化环境创建复合索引。
 - `0007_bound_public_insights_indexes.sql` 为公开心理热区接口补充带公开与时间范围约束的聚合索引。
 - `0008_replace_counseling_single_column_indexes.sql` 是已运行旧版 `0006` 环境的前向修复迁移，会替换早期单列索引为 `(category, distress_type)` 与 `(category, scene_tag)` 复合索引。
-- 新数据库按迁移顺序执行即可；已经应用过旧版 `0006` 的远端数据库也需要继续执行到 `0008`。
+- `0009_add_knowledge_items.sql` 新增动态公开知识库表、索引与三条初始心理支持建议。
+- 新数据库按迁移顺序执行即可；已经应用过旧版 `0006` 的远端数据库也需要继续执行到最新迁移。
 
 预发数据库迁移：
 

@@ -7,6 +7,10 @@ import {
   adminMetricsQuerySchema,
   createAdminIssuePatchSchema,
   formatZodError,
+  knowledgeCreateSchema,
+  knowledgeDeleteSchema,
+  knowledgeIdSchema,
+  knowledgePatchSchema,
   issueSchema,
   noteSchema,
   publicInsightsQuerySchema,
@@ -408,6 +412,73 @@ describe('adminExportQuerySchema', () => {
     expect(result.success).toBe(true);
     expect(result.data.format).toBe('csv');
     expect(result.data.hasReplies).toBe(false);
+  });
+});
+
+describe('knowledge validation schemas', () => {
+  it('normalizes create payloads and defaults optional fields', () => {
+    const result = knowledgeCreateSchema.safeParse({
+      title: '  学业压力  ',
+      tag: 'academic_pressure',
+      content: '  先把任务拆成今天能完成的一小步。  ',
+      sortOrder: '20',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({
+      title: '学业压力',
+      tag: 'academic_pressure',
+      content: '先把任务拆成今天能完成的一小步。',
+      sortOrder: 20,
+      isEnabled: true,
+    });
+  });
+
+  it('rejects invalid create fields', () => {
+    const result = knowledgeCreateSchema.safeParse({
+      title: '',
+      tag: 'invalid',
+      content: '',
+      sortOrder: '-1',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error.issues.map((issue) => issue.message)).toContain('标题不能为空');
+    expect(result.error.issues.map((issue) => issue.message)).toContain('困扰类别无效');
+    expect(result.error.issues.map((issue) => issue.message)).toContain('内容不能为空');
+    expect(result.error.issues.map((issue) => issue.message)).toContain('排序必须为非负整数');
+  });
+
+  it('requires updatedAt and at least one changed field for patch payloads', () => {
+    const emptyPatch = knowledgePatchSchema.safeParse({
+      updatedAt: '2026-04-18T08:00:00.000Z',
+    });
+    const validPatch = knowledgePatchSchema.safeParse({
+      updatedAt: '2026-04-18T08:00:00.000Z',
+      isEnabled: false,
+      sortOrder: 0,
+    });
+
+    expect(emptyPatch.success).toBe(false);
+    expect(emptyPatch.error.issues[0].message).toBe('至少提供一个更新字段');
+    expect(validPatch.success).toBe(true);
+    expect(validPatch.data).toEqual({
+      updatedAt: '2026-04-18T08:00:00.000Z',
+      isEnabled: false,
+      sortOrder: 0,
+    });
+  });
+
+  it('validates ids and delete concurrency payloads', () => {
+    expect(knowledgeIdSchema.parse('12')).toBe(12);
+    expect(() => knowledgeIdSchema.parse('bad-id')).toThrow();
+
+    const deleteResult = knowledgeDeleteSchema.safeParse({
+      updatedAt: 'not-a-date',
+    });
+
+    expect(deleteResult.success).toBe(false);
+    expect(deleteResult.error.issues[0].message).toBe('更新时间格式无效');
   });
 });
 

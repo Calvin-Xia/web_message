@@ -1,6 +1,6 @@
 # 问题反馈系统
 
-一个基于 Cloudflare Pages Functions、D1 与 KV 的校园问题反馈系统。当前仓库已经覆盖公开提交与追踪、后台运营台、心理咨询热区、健康检查、测试基建与安全加固。
+一个基于 Cloudflare Pages Functions、D1 与 KV 的校园问题反馈系统。当前仓库已经覆盖公开提交与追踪、后台运营台、动态知识库、心理咨询热区、健康检查、测试基建与安全加固。
 
 ## 当前状态
 
@@ -8,6 +8,7 @@
 - `/health.html` 已升级为健康检查面板，支持服务状态、关键指标、限流命中率与响应时间趋势展示。
 - API 层新增统一安全头与 HTTPS 强制跳转保护，后台接口继续使用受控 CORS 与 Bearer 鉴权。
 - 公开首页已接入校园心理压力热区与懒加载校园矢量地图，地图使用预处理静态 GeoJSON 资产与 `/api/insights` 聚合数据渲染。
+- 公开知识库已改为 D1 动态内容，后台可新增、编辑、禁用或删除知识条目，并与心理困扰类别关联。
 - Vitest 已覆盖核心 API、共享工具、校园地图规则和前端数据处理辅助逻辑，并可生成覆盖率报告。
 - GitHub Actions CI 已配置，提交或 PR 会自动构建样式、执行测试并上传覆盖率产物。
 
@@ -15,8 +16,9 @@
 
 - 公开用户提交问题并生成追踪编号
 - 公开追踪页查看状态、时间线与公开回复
+- 公开知识库按心理困扰类别动态展示自助建议
 - 公开心理咨询热区展示，支持校园矢量地图悬停查看公开聚合数据
-- 后台运营台支持筛选、状态流转、备注、回复、导出与统计
+- 后台运营台支持筛选、状态流转、备注、回复、知识库管理、导出与统计
 - 健康检查 API 与可视化健康面板
 - 限流、输入验证、日志脱敏、安全响应头与运维文档
 
@@ -29,7 +31,7 @@ flowchart LR
     Static --> API["Pages Functions /api/*"]
     Static --> MapAsset["/storage/campus-care-map.json\npreprocessed campus vector data"]
     AdminUI --> API
-    API --> D1["Cloudflare D1\nissues / updates / notes / admin_actions"]
+    API --> D1["Cloudflare D1\nissues / updates / notes / knowledge_items / admin_actions"]
     API --> KV["Cloudflare KV\nrate limit + observability snapshot"]
     API --> Health["/api/health\nservices + metrics + alerts"]
 ```
@@ -50,10 +52,13 @@ flowchart LR
 - `POST /api/issues`
 - `GET /api/issues/:trackingCode`
 - `GET /api/insights`
+- `GET /api/knowledge`
 - `GET /api/admin/issues`
 - `GET/PATCH /api/admin/issues/:id`
 - `POST /api/admin/issues/:id/notes`
 - `POST /api/admin/issues/:id/replies`
+- `GET/POST /api/admin/knowledge`
+- `PATCH/DELETE /api/admin/knowledge/:id`
 - `GET /api/admin/actions`
 - `GET /api/admin/export`
 - `GET /api/admin/metrics`
