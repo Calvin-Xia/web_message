@@ -71,6 +71,8 @@ npm run dev
 - `http://localhost:8787/tracking.html`
 - `http://localhost:8787/health.html`
 
+本地检查首页与后台页时，同时确认桌面端左侧菜单常驻、移动端左下角圆形菜单按钮可打开左侧抽屉，且后台问题详情抽屉仍从右侧覆盖。
+
 ## 5. 测试与覆盖率
 
 ```bash
@@ -122,13 +124,14 @@ npm run d1:migrate:preview
 - 确认 `RESEND_API_KEY` 已在目标环境配置，且 `support@calvin-xia.cn` 可作为 Resend 发件人与回复地址
 - 确认 D1 与 KV 绑定存在
 - 访问 `/health.html` 检查 D1 / KV 状态
+- 使用移动端视口检查 `/` 与 `/admin.html` 的侧边菜单：左下角圆形菜单按钮可打开抽屉，点击遮罩、按 `Escape` 或点击导航链接后可关闭，后台详情抽屉层级不被左侧菜单遮挡
 - 在后台分别执行 CSV 与 JSON 导出，确认审计日志、下载文件和 JSON 嵌套备注/回复正常
 - 检查 CI 最新一次通过后再切换流量
 
 ## 9. 样式构建说明
 
 - 页面依赖根目录的 `styles.css`，它由 `src/input.css` 编译生成。
-- 如果修改了 `src/input.css`，或者新增了页面里使用的 Tailwind 类名，发布前必须重新执行 `npm run build`。
+- 如果修改了 `src/input.css`、侧边菜单布局样式，或者新增了页面里使用的 Tailwind 类名，发布前必须重新执行 `npm run build`。
 - 如果通过 Cloudflare Pages Dashboard 配置 Git 自动部署，建议将 Build command 设置为 `npm run build`，Build output directory 设置为 `.`
 
 ## 10. 校园地图资产

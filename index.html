@@ -73,13 +73,6 @@
     .page-title {
       transform: translateX(-0.08em);
     }
-    .hero-link-grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 1rem;
-      width: min(100%, 40.25rem);
-      margin-top: 1.5rem;
-    }
     .hero-actions {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -92,8 +85,7 @@
     .hero-actions a:last-child {
       grid-column: 2 / 4;
     }
-    body[data-page-role] .hero-actions a,
-    body[data-page-role] .hero-link-grid .ghost-button {
+    body[data-page-role] .hero-actions a {
       display: inline-flex;
       width: 100%;
       min-width: 0;
@@ -106,16 +98,11 @@
       font-weight: 700;
       line-height: 1.35;
     }
-    body[data-page-role] .hero-link-grid .ghost-button {
-      border-color: rgba(36, 87, 214, 0.16);
-      background: #f7fbff;
-    }
     @media (max-width: 640px) {
       .header-keywords {
         gap: 0.35rem 0.9rem;
       }
-      .hero-actions,
-      .hero-link-grid {
+      .hero-actions {
         grid-template-columns: 1fr;
       }
       .hero-actions a:first-child,
@@ -127,6 +114,29 @@
 </head>
 <body data-page-role="public" class="min-h-screen px-4 py-5 md:px-8 md:py-8">
   <a class="skip-link" href="#mainContent">跳到主要内容</a>
+  <div class="side-nav-backdrop" data-side-nav-backdrop hidden></div>
+  <div class="page-shell" data-side-nav-shell>
+    <aside id="publicSideNav" class="side-nav" data-side-nav tabindex="-1" aria-label="首页侧边菜单">
+      <div class="side-nav__brand">
+        <div class="side-nav__eyebrow">Public Desk</div>
+        <div class="side-nav__title">留言处理台</div>
+      </div>
+      <nav class="side-nav__section" aria-label="首页分区">
+        <a class="side-nav__link" href="#newSubmission" data-side-nav-link aria-current="page">提交新留言</a>
+        <a class="side-nav__link" href="#publicFeed" data-side-nav-link>公开同步区</a>
+        <a class="side-nav__link" href="#insightsPanel" data-side-nav-link>校园心理压力热区</a>
+        <a class="side-nav__link" href="#knowledgePanel" data-side-nav-link>公开知识库</a>
+      </nav>
+      <nav class="side-nav__section" aria-label="相关页面">
+        <a class="side-nav__link side-nav__link--muted" href="/tracking.html">追踪进度</a>
+        <a class="side-nav__link side-nav__link--muted" href="/admin.html">管理后台</a>
+        <a class="side-nav__link side-nav__link--muted" href="/health.html">系统状态</a>
+      </nav>
+    </aside>
+
+    <div class="page-shell__content">
+      <button class="side-nav-toggle ghost-button" type="button" data-side-nav-toggle aria-controls="publicSideNav" aria-expanded="false" aria-label="打开侧边菜单"><span class="side-nav-toggle__icon" aria-hidden="true"><span></span><span></span><span></span></span><span class="side-nav-toggle__label">菜单</span></button>
+
   <header class="mx-auto flex max-w-6xl flex-col gap-4 md:flex-row md:items-center md:justify-between">
     <div>
       <div class="text-xs font-semibold uppercase tracking-[0.35em] text-[#5f6b80]">Public Desk</div>
@@ -137,11 +147,6 @@
         <span>私密查询</span>
       </p>
     </div>
-    <nav class="flex flex-wrap gap-2 text-sm text-[#445069]">
-      <a class="ghost-button rounded-full px-4 py-2 transition-colors" href="/tracking.html">追踪进度</a>
-      <a class="ghost-button rounded-full px-4 py-2 transition-colors" href="/admin.html">管理后台</a>
-      <a class="ghost-button rounded-full px-4 py-2 transition-colors" href="/health.html">系统状态</a>
-    </nav>
   </header>
 
   <main id="mainContent" class="mx-auto mt-6 max-w-6xl space-y-8 pb-8 md:mt-8">
@@ -154,11 +159,6 @@
           <div class="hero-actions mt-6">
             <a class="primary-button rounded-full px-5 py-3 text-sm font-semibold transition" href="#newSubmission">开始提交</a>
             <a class="ghost-button rounded-full px-5 py-3 text-sm font-semibold transition" href="/tracking.html">已有编号，直接查询</a>
-          </div>
-          <div class="hero-link-grid" aria-label="下方区域跳转">
-            <a class="ghost-button bg-white/80 transition-colors" href="#publicFeed">公开查询</a>
-            <a class="ghost-button bg-white/80 transition-colors" href="#insightsPanel">热力图</a>
-            <a class="ghost-button bg-white/80 transition-colors" href="#knowledgePanel">公共知识库</a>
           </div>
         </div>
       </div>
@@ -175,7 +175,7 @@
         <div id="submitNotification" class="mt-4" aria-live="polite" aria-atomic="true"></div>
 
         <form id="issueForm" class="mt-4 space-y-4" novalidate>
-          <fieldset class="form-section space-y-4">
+          <fieldset class="form-section form-section--stacked">
             <legend class="form-section__title">身份信息</legend>
             <p class="form-section__hint">用于校验和后续联系，不在公开列表展示。</p>
             <div class="grid gap-4 sm:grid-cols-2">
@@ -199,7 +199,7 @@
             </label>
           </fieldset>
 
-          <fieldset class="form-section space-y-4">
+          <fieldset class="form-section form-section--stacked">
             <legend class="form-section__title">问题内容</legend>
             <label class="space-y-2 text-sm font-medium text-[#25314a]">
               <span>分类 <span class="required-mark" aria-hidden="true">*</span></span>
@@ -377,7 +377,10 @@
       渝公网安备50010102001439号
     </a>
   </footer>
+    </div>
+  </div>
 
+  <script type="module" src="/side-nav.js"></script>
   <script type="module" src="/public-app.js"></script>
 </body>
 </html>

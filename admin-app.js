@@ -1050,7 +1050,24 @@ async function deleteKnowledgeItem(itemId) {
   }
 }
 
+function closeSideNavForDrawer() {
+  const sideNavToggle = document.querySelector('[data-side-nav-toggle]');
+  const sideNav = document.querySelector('[data-side-nav]');
+  const sideNavBackdrop = document.querySelector('[data-side-nav-backdrop]');
+  const isDesktopSideNav = sideNavToggle
+    ? window.getComputedStyle(sideNavToggle).display === 'none'
+    : false;
+
+  document.body.removeAttribute('data-side-nav-open');
+  sideNavToggle?.setAttribute('aria-expanded', 'false');
+  sideNav?.setAttribute('aria-hidden', String(!isDesktopSideNav));
+  if (sideNavBackdrop) {
+    sideNavBackdrop.hidden = true;
+  }
+}
+
 function openDrawerShell(trigger) {
+  closeSideNavForDrawer();
   const drawer = document.getElementById('issueDrawer');
   lastDrawerTrigger = trigger instanceof HTMLElement
     ? trigger
@@ -1494,6 +1511,7 @@ async function login(secretKey) {
     ]);
     document.getElementById('loginSection').hidden = true;
     document.getElementById('adminShell').hidden = false;
+    document.body.dataset.adminAuthenticated = 'true';
     setNotification('loginNotification', '');
     document.getElementById('searchInput')?.focus();
   } catch (error) {
@@ -1516,6 +1534,7 @@ function logout() {
   closeDrawer();
   document.getElementById('loginSection').hidden = false;
   document.getElementById('adminShell').hidden = true;
+  delete document.body.dataset.adminAuthenticated;
   document.getElementById('secretKey').focus();
 }
 

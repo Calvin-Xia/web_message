@@ -245,6 +245,27 @@
 </head>
 <body data-page-role="admin" class="min-h-screen px-4 py-5 md:px-8 md:py-8">
   <a class="skip-link" href="#mainContent">跳到主要内容</a>
+  <div class="side-nav-backdrop" data-side-nav-backdrop hidden></div>
+  <div class="page-shell" data-side-nav-shell>
+    <aside id="adminSideNav" class="side-nav" data-side-nav tabindex="-1" aria-label="后台侧边菜单">
+      <div class="side-nav__brand">
+        <div class="side-nav__eyebrow">Admin Desk</div>
+        <div class="side-nav__title">留言后台</div>
+      </div>
+      <nav class="side-nav__section side-nav__admin-section" aria-label="后台分区">
+        <a class="side-nav__link" href="#metricsSection" data-side-nav-link aria-current="page">运营面板</a>
+        <a class="side-nav__link" href="#knowledgeSection" data-side-nav-link>知识库管理</a>
+        <a class="side-nav__link" href="#queueSection" data-side-nav-link>后台问题列表</a>
+      </nav>
+      <nav class="side-nav__section" aria-label="相关页面">
+        <a class="side-nav__link side-nav__link--muted" href="/">返回首页</a>
+        <a class="side-nav__link side-nav__link--muted" href="/tracking.html">追踪页</a>
+      </nav>
+    </aside>
+
+    <div class="page-shell__content">
+      <button class="side-nav-toggle ghost-button" type="button" data-side-nav-toggle aria-controls="adminSideNav" aria-expanded="false" aria-label="打开侧边菜单"><span class="side-nav-toggle__icon" aria-hidden="true"><span></span><span></span><span></span></span><span class="side-nav-toggle__label">菜单</span></button>
+
   <header class="mx-auto flex max-w-7xl flex-col gap-4 md:flex-row md:items-center md:justify-between">
     <div>
       <div class="text-xs font-semibold uppercase tracking-[0.35em] text-[#5f6b80]">Admin Operations Desk</div>
@@ -273,7 +294,7 @@
     </section>
 
     <section id="adminShell" hidden class="space-y-6">
-      <section class="surface-panel rounded-[2rem] p-6 md:p-7">
+      <section id="metricsSection" class="surface-panel rounded-[2rem] p-6 md:p-7">
         <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div class="max-w-2xl">
             <div class="text-xs font-semibold uppercase tracking-[0.3em] text-[#72809a]">Metrics Cockpit</div>
@@ -414,7 +435,7 @@
         </div>
       </section>
 
-      <section class="surface-panel rounded-[2rem] p-6 md:p-7">
+      <section id="knowledgeSection" class="surface-panel rounded-[2rem] p-6 md:p-7">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <div class="text-xs font-semibold uppercase tracking-[0.3em] text-[#72809a]">Knowledge Base</div>
@@ -471,7 +492,7 @@
         </div>
       </section>
 
-      <section class="surface-panel rounded-[2rem] p-6 md:p-7">
+      <section id="queueSection" class="surface-panel rounded-[2rem] p-6 md:p-7">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <div class="text-xs font-semibold uppercase tracking-[0.3em] text-[#72809a]">Issue Queue</div>
@@ -649,6 +670,8 @@
       渝公网安备50010102001439号
     </a>
   </footer>
+    </div>
+  </div>
 
   <div id="drawerBackdrop" hidden class="fixed inset-0 z-40 bg-[#172033]/35 backdrop-blur-sm"></div>
   <aside id="issueDrawer" hidden role="dialog" aria-modal="true" aria-labelledby="drawerTitle" aria-hidden="true" class="drawer-scroll fixed inset-y-0 right-0 z-50 h-full w-full max-w-2xl overflow-y-auto bg-[#f8f4ec] shadow-[0_30px_80px_rgba(11,18,31,0.34)]">
@@ -668,6 +691,7 @@
     </div>
   </aside>
 
+  <script type="module" src="/side-nav.js"></script>
   <script type="module" src="/admin-app.js"></script>
 </body>
 </html>
