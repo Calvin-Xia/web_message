@@ -1,3 +1,4 @@
+import { closeSideNav } from './side-nav.js';
 import { distressTypeLabels, sceneTagLabels } from './src/shared/labels.js';
 
 const API_BASE = '/api';
@@ -1050,24 +1051,8 @@ async function deleteKnowledgeItem(itemId) {
   }
 }
 
-function closeSideNavForDrawer() {
-  const sideNavToggle = document.querySelector('[data-side-nav-toggle]');
-  const sideNav = document.querySelector('[data-side-nav]');
-  const sideNavBackdrop = document.querySelector('[data-side-nav-backdrop]');
-  const isDesktopSideNav = sideNavToggle
-    ? window.getComputedStyle(sideNavToggle).display === 'none'
-    : false;
-
-  document.body.removeAttribute('data-side-nav-open');
-  sideNavToggle?.setAttribute('aria-expanded', 'false');
-  sideNav?.setAttribute('aria-hidden', String(!isDesktopSideNav));
-  if (sideNavBackdrop) {
-    sideNavBackdrop.hidden = true;
-  }
-}
-
 function openDrawerShell(trigger) {
-  closeSideNavForDrawer();
+  closeSideNav();
   const drawer = document.getElementById('issueDrawer');
   lastDrawerTrigger = trigger instanceof HTMLElement
     ? trigger

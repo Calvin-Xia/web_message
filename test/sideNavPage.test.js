@@ -91,10 +91,9 @@ describe('side navigation pages', () => {
   it('closes the mobile side nav before opening the admin issue drawer', () => {
     const script = readSource('admin-app.js');
 
-    expect(script).toContain('function closeSideNavForDrawer()');
-    expect(script).toContain("document.body.removeAttribute('data-side-nav-open');");
-    expect(script).toContain("sideNavToggle?.setAttribute('aria-expanded', 'false');");
-    expect(script).toContain('closeSideNavForDrawer();');
+    expect(script).toContain("import { closeSideNav } from './side-nav.js';");
+    expect(script).not.toContain('function closeSideNavForDrawer()');
+    expect(script).toContain('closeSideNav();');
   });
 
   it('uses a graphical mobile menu affordance instead of text-only buttons', () => {

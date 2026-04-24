@@ -92,6 +92,10 @@ function groupByIssueId(rows, mapRow) {
 
   for (const row of rows) {
     const issueId = Number(row.issue_id);
+    if (!Number.isSafeInteger(issueId) || issueId <= 0) {
+      continue;
+    }
+
     const items = grouped.get(issueId) || [];
     items.push(mapRow(row));
     grouped.set(issueId, items);
@@ -158,12 +162,20 @@ async function createJsonExportContent(db, rows, query, exportedAt) {
     internalNotes: notesByIssueId.get(Number(row.id)) || [],
     replies: repliesByIssueId.get(Number(row.id)) || [],
   }));
+  const nestedRowCounts = issues.reduce((counts, issue) => ({
+    internalNotes: counts.internalNotes + issue.internalNotes.length,
+    replies: counts.replies + issue.replies.length,
+  }), {
+    internalNotes: 0,
+    replies: 0,
+  });
 
   return JSON.stringify({
     metadata: {
       format: 'json',
       exportedAt,
       rowCount: issues.length,
+      nestedRowCounts,
       filters: query,
     },
     issues,

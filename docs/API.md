@@ -360,6 +360,7 @@ JSON 使用 camelCase 字段，并在每条问题下包含关联的 `internalNot
     "format": "json",
     "exportedAt": "2026-04-18T12:00:00.000Z",
     "rowCount": 1,
+    "nestedRowCounts": { "internalNotes": 1, "replies": 1 },
     "filters": { "format": "json", "status": ["in_review"] }
   },
   "issues": [

@@ -129,8 +129,9 @@ function matchesSelector(element, selector) {
   return false;
 }
 
-function createWindow({ button, isDesktop, innerHeight }) {
+function createWindow({ button, isDesktop, innerHeight, deferAnimationFrame }) {
   const eventListeners = new Map();
+  const animationFrameCallbacks = [];
 
   return {
     innerHeight,
@@ -140,8 +141,18 @@ function createWindow({ button, isDesktop, innerHeight }) {
       };
     },
     requestAnimationFrame(callback) {
+      if (deferAnimationFrame) {
+        animationFrameCallbacks.push(callback);
+        return animationFrameCallbacks.length;
+      }
+
       callback();
       return 1;
+    },
+    flushAnimationFrames() {
+      while (animationFrameCallbacks.length > 0) {
+        animationFrameCallbacks.shift()();
+      }
     },
     addEventListener(type, listener) {
       const listeners = eventListeners.get(type) || [];
@@ -155,7 +166,7 @@ function createWindow({ button, isDesktop, innerHeight }) {
   };
 }
 
-function createSideNavDom({ desktop = false, innerHeight = 800, sections = [] } = {}) {
+function createSideNavDom({ desktop = false, innerHeight = 800, sections = [], deferAnimationFrame = false } = {}) {
   const document = new FakeDocument();
   let desktopMode = desktop;
   const shell = document.register(new FakeElement({ attributes: { 'data-side-nav-shell': '' } }));
@@ -197,6 +208,7 @@ function createSideNavDom({ desktop = false, innerHeight = 800, sections = [] } 
   const window = createWindow({
     button,
     innerHeight,
+    deferAnimationFrame,
     isDesktop: () => desktopMode,
   });
 
@@ -218,7 +230,7 @@ async function importSideNavWith(dom) {
   globalThis.document = dom.document;
   globalThis.window = dom.window;
   globalThis.HTMLElement = FakeElement;
-  await import('../side-nav.js');
+  return import('../side-nav.js');
 }
 
 async function importSideNavLogic() {
@@ -272,6 +284,19 @@ describe('side navigation behavior', () => {
     expect(dom.document.activeElement).toBe(dom.button);
   });
 
+  it('exports a close helper that uses the shared side nav state sync', async () => {
+    const dom = createSideNavDom();
+    const { closeSideNav } = await importSideNavWith(dom);
+
+    dom.button.dispatchEvent({ type: 'click' });
+    closeSideNav();
+
+    expect(dom.document.body.hasAttribute('data-side-nav-open')).toBe(false);
+    expect(dom.button.getAttribute('aria-expanded')).toBe('false');
+    expect(dom.nav.getAttribute('aria-hidden')).toBe('true');
+    expect(dom.backdrop.hidden).toBe(true);
+  });
+
   it('clears the mobile open state when CSS switches to desktop mode', async () => {
     const dom = createSideNavDom();
     await importSideNavWith(dom);
@@ -299,6 +324,23 @@ describe('side navigation behavior', () => {
     await importSideNavWith(dom);
 
     expect(dom.links[0].getAttribute('data-side-nav-state')).toBe('transition');
+    expect(dom.links[0].hasAttribute('aria-current')).toBe(false);
+    expect(dom.links[1].getAttribute('aria-current')).toBe('page');
+  });
+
+  it('sets the initial active section without waiting for the first animation frame', async () => {
+    const dom = createSideNavDom({
+      desktop: true,
+      innerHeight: 700,
+      deferAnimationFrame: true,
+      sections: [
+        { id: 'first', rect: { top: -720, bottom: -360 } },
+        { id: 'second', rect: { top: 200, bottom: 620 } },
+      ],
+    });
+
+    await importSideNavWith(dom);
+
     expect(dom.links[0].hasAttribute('aria-current')).toBe(false);
     expect(dom.links[1].getAttribute('aria-current')).toBe('page');
   });

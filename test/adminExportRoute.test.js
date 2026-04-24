@@ -28,7 +28,7 @@ function createIssue(overrides = {}) {
   };
 }
 
-function createExportDbMock({ total = 0, batches = [], notes = [], replies = [] } = {}) {
+function createExportDbMock({ total = 0, batches = [], notes = [], replies = [], rawNestedRows = false } = {}) {
   const statements = [];
   const actions = [];
   let batchIndex = 0;
@@ -71,7 +71,7 @@ function createExportDbMock({ total = 0, batches = [], notes = [], replies = [] 
             const issueIds = new Set(bindings);
             return {
               all: async () => ({
-                results: notes.filter((item) => issueIds.has(item.issue_id)),
+                results: rawNestedRows ? notes : notes.filter((item) => issueIds.has(item.issue_id)),
               }),
             };
           },
@@ -85,7 +85,7 @@ function createExportDbMock({ total = 0, batches = [], notes = [], replies = [] 
             const issueIds = new Set(bindings);
             return {
               all: async () => ({
-                results: replies.filter((item) => issueIds.has(item.issue_id)),
+                results: rawNestedRows ? replies : replies.filter((item) => issueIds.has(item.issue_id)),
               }),
             };
           },
@@ -238,6 +238,10 @@ describe('admin export route', () => {
       metadata: {
         format: 'json',
         rowCount: 1,
+        nestedRowCounts: {
+          internalNotes: 1,
+          replies: 1,
+        },
         filters: {
           format: 'json',
         },
@@ -277,6 +281,80 @@ describe('admin export route', () => {
         format: 'json',
       },
     });
+  });
+
+  it('skips nested export rows with invalid issue ids', async () => {
+    const invalidNote = {
+      id: 99,
+      issue_id: null,
+      created_by: 'system',
+      created_at: '2026-03-11T12:00:00.000Z',
+    };
+    Object.defineProperty(invalidNote, 'content', {
+      enumerable: true,
+      get() {
+        throw new Error('invalid note should not be mapped');
+      },
+    });
+
+    const invalidReply = {
+      id: 98,
+      issue_id: undefined,
+      update_type: 'public_reply',
+      old_value: null,
+      new_value: null,
+      is_public: 1,
+      created_by: 'system',
+      created_at: '2026-03-11T12:10:00.000Z',
+    };
+    Object.defineProperty(invalidReply, 'content', {
+      enumerable: true,
+      get() {
+        throw new Error('invalid reply should not be mapped');
+      },
+    });
+
+    const db = createExportDbMock({
+      total: 1,
+      rawNestedRows: true,
+      batches: [[createIssue()], []],
+      notes: [{
+        id: 10,
+        issue_id: 1,
+        content: '已联系辅导员跟进。',
+        created_by: 'counselor',
+        created_at: '2026-03-11T10:00:00.000Z',
+      }, invalidNote],
+      replies: [{
+        id: 20,
+        issue_id: 1,
+        update_type: 'public_reply',
+        old_value: null,
+        new_value: null,
+        content: '老师会在今天下午联系你。',
+        is_public: 1,
+        created_by: 'admin1',
+        created_at: '2026-03-11T11:00:00.000Z',
+      }, invalidReply],
+    });
+
+    const response = await onRequest(createAdminContext(
+      new Request('http://localhost/api/admin/export?format=json', {
+        headers: {
+          Authorization: 'Bearer test-secret',
+        },
+      }),
+      db,
+    ));
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.metadata.nestedRowCounts).toEqual({
+      internalNotes: 1,
+      replies: 1,
+    });
+    expect(payload.issues[0].internalNotes).toEqual([expect.objectContaining({ id: 10 })]);
+    expect(payload.issues[0].replies).toEqual([expect.objectContaining({ id: 20 })]);
   });
 
   it('rejects exports that exceed the safe row limit', async () => {

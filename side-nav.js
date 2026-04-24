@@ -1,5 +1,10 @@
 const shell = typeof document === 'undefined' ? null : document.querySelector('[data-side-nav-shell]');
 export const SIDE_NAV_TRANSITION_ZONE_PX = 112;
+let closeSideNavController = () => {};
+
+export function closeSideNav(options = {}) {
+  closeSideNavController(options);
+}
 
 export function findCenteredSection(metrics, viewportCenter) {
   const centered = metrics.find(({ rect }) => viewportCenter >= rect.top && viewportCenter < rect.bottom);
@@ -103,6 +108,8 @@ if (shell) {
     }
   }
 
+  closeSideNavController = closeNav;
+
   function setActiveSections(sectionLinks, activeSectionId, transitionSectionIds = []) {
     if (!nav) {
       return;
@@ -175,8 +182,7 @@ if (shell) {
       });
     };
 
-    setActiveSections(sectionLinks, sections[0].id);
-    scheduleActiveSectionUpdate();
+    updateActiveSections(sectionLinks, sections);
     window.addEventListener('scroll', scheduleActiveSectionUpdate, { passive: true });
     window.addEventListener('resize', scheduleActiveSectionUpdate);
   }
