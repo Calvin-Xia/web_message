@@ -10,7 +10,7 @@ import { buildAdminIssueWhere } from '../../../src/shared/issueQueries.js';
 const ALLOWED_METHODS = 'GET, OPTIONS';
 const CURSOR_PAGE_SIZE = 1000;
 const NESTED_EXPORT_CHUNK_SIZE = 500;
-const MAX_EXPORT_ROWS = 50_000;
+const MAX_EXPORT_ROWS = 5_000;
 // 管理端导出用于内部运营和审计留档，默认保留原始字段以避免二次核对时信息丢失。
 // 导出文件会落地到管理员本机，因此必须继续通过后台鉴权、限流和操作审计控制访问边界。
 const EXPORT_HEADERS = [

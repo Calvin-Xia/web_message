@@ -58,6 +58,15 @@ describe('admin CORS policy', () => {
     expect(nestedBranchPolicy.isOriginAllowed).toBe(false);
   });
 
+  it('allows single-level Pages branches in preview deployments', () => {
+    const branchPolicy = getAdminCorsPolicy(`https://feature.${PRODUCTION_PAGES_HOST}`, { ENVIRONMENT: 'preview' });
+    const nestedBranchPolicy = getAdminCorsPolicy(`https://feature.preview.${PRODUCTION_PAGES_HOST}`, { ENVIRONMENT: 'preview' });
+
+    expect(branchPolicy.isOriginAllowed).toBe(true);
+    expect(branchPolicy.headers['Access-Control-Allow-Origin']).toBe(`https://feature.${PRODUCTION_PAGES_HOST}`);
+    expect(nestedBranchPolicy.isOriginAllowed).toBe(false);
+  });
+
   it('rejects invalid schemes, ports, and untrusted production origins', () => {
     const invalidPolicy = getAdminCorsPolicy('file:///tmp/test', { ENVIRONMENT: 'development' });
     const evilPolicy = getAdminCorsPolicy('https://evil.example.com', { ENVIRONMENT: 'production' });

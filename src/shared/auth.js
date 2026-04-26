@@ -41,6 +41,13 @@ function createJsonErrorResponse(error, status, corsHeaders) {
   });
 }
 
+function createAdminNoStoreHeaders(corsHeaders) {
+  return {
+    ...corsHeaders,
+    'Cache-Control': 'no-store',
+  };
+}
+
 export function createUnauthorizedResponse(error, corsHeaders) {
   return createJsonErrorResponse(error, 401, corsHeaders);
 }
@@ -72,7 +79,7 @@ export function authorizeAdminRequest(request, env, methods = DEFAULT_ADMIN_METH
 
   return {
     ok: true,
-    corsHeaders: corsPolicy.headers,
+    corsHeaders: createAdminNoStoreHeaders(corsPolicy.headers),
     actor: 'admin',
   };
 }

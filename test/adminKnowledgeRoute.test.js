@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createAppEnv, createD1Database } from './helpers/fakeCloudflare.js';
 import { onRequest as onKnowledgeCollectionRequest } from '../functions/api/admin/knowledge.js';
 import { onRequest as onKnowledgeItemRequest } from '../functions/api/admin/knowledge/[id].js';
@@ -25,6 +25,26 @@ function createAuthorizedRequest(url, options = {}) {
     },
   });
 }
+
+function createAuditFailingDb(backingDb = createD1Database()) {
+  return {
+    backingDb,
+    prepare(sql) {
+      if (String(sql).includes('INSERT INTO admin_actions')) {
+        throw new Error('audit write failed');
+      }
+
+      return backingDb.prepare(sql);
+    },
+    batch(statements) {
+      return backingDb.batch(statements);
+    },
+  };
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe('admin knowledge collection route', () => {
   it('returns all knowledge items including disabled entries', async () => {
@@ -114,6 +134,38 @@ describe('admin knowledge collection route', () => {
 
     expect(response.status).toBe(400);
     expect(payload.success).toBe(false);
+  });
+
+  it('does not persist a created item when audit logging fails', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const backingDb = createD1Database();
+    const env = createAppEnv({
+      DB: createAuditFailingDb(backingDb),
+      RATE_LIMIT_STORE: createD1Database(),
+    });
+
+    const response = await onKnowledgeCollectionRequest({
+      request: createAuthorizedRequest('http://localhost/api/admin/knowledge', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: '情绪波动',
+          tag: 'mood',
+          content: '先把情绪命名，再做一次缓慢呼吸。',
+          sortOrder: 40,
+          isEnabled: true,
+        }),
+      }),
+      env,
+      params: {},
+    });
+
+    expect(response.status).toBe(500);
+    expect(backingDb.knowledgeItems).toHaveLength(0);
+    expect(backingDb.adminActions).toHaveLength(0);
+    expect(errorSpy).toHaveBeenCalled();
   });
 
   it('supports preflight and rejects missing admin authorization', async () => {
@@ -208,6 +260,36 @@ describe('admin knowledge item route', () => {
     expect(payload.error).toBe('知识条目已被其他管理员更新，请刷新后重试');
   });
 
+  it('does not persist item updates when audit logging fails', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const backingDb = createD1Database();
+    backingDb.knowledgeItems.push(createKnowledgeItem());
+    const env = createAppEnv({
+      DB: createAuditFailingDb(backingDb),
+      RATE_LIMIT_STORE: createD1Database(),
+    });
+
+    const response = await onKnowledgeItemRequest({
+      request: createAuthorizedRequest('http://localhost/api/admin/knowledge/1', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: '睡眠支持',
+          updatedAt: '2026-04-18T08:00:00.000Z',
+        }),
+      }),
+      env,
+      params: { id: '1' },
+    });
+
+    expect(response.status).toBe(500);
+    expect(backingDb.knowledgeItems[0].title).toBe('睡眠问题');
+    expect(backingDb.adminActions).toHaveLength(0);
+    expect(errorSpy).toHaveBeenCalled();
+  });
+
   it('deletes an item with optimistic concurrency and records an audit action', async () => {
     const env = createAppEnv();
     env.DB.knowledgeItems.push(createKnowledgeItem());
@@ -235,6 +317,35 @@ describe('admin knowledge item route', () => {
       target_type: 'knowledge_item',
       target_id: 1,
     });
+  });
+
+  it('does not delete an item when audit logging fails', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const backingDb = createD1Database();
+    backingDb.knowledgeItems.push(createKnowledgeItem());
+    const env = createAppEnv({
+      DB: createAuditFailingDb(backingDb),
+      RATE_LIMIT_STORE: createD1Database(),
+    });
+
+    const response = await onKnowledgeItemRequest({
+      request: createAuthorizedRequest('http://localhost/api/admin/knowledge/1', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          updatedAt: '2026-04-18T08:00:00.000Z',
+        }),
+      }),
+      env,
+      params: { id: '1' },
+    });
+
+    expect(response.status).toBe(500);
+    expect(backingDb.knowledgeItems).toHaveLength(1);
+    expect(backingDb.adminActions).toHaveLength(0);
+    expect(errorSpy).toHaveBeenCalled();
   });
 
   it('rejects invalid ids and unsupported methods', async () => {

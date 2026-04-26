@@ -98,6 +98,7 @@ describe('admin issues route', () => {
     const payload = await response.json();
 
     expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
     expect(payload.success).toBe(true);
     expect(payload.data.items).toHaveLength(1);
 

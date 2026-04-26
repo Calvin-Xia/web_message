@@ -84,6 +84,7 @@ describe('authorizeAdminRequest', () => {
         'Access-Control-Allow-Methods': 'GET, POST, PATCH, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization',
         'Access-Control-Allow-Origin': 'http://localhost:8788',
+        'Cache-Control': 'no-store',
         Vary: 'Origin',
       },
       actor: 'admin',

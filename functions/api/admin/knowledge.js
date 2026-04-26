@@ -1,6 +1,6 @@
 import { createForbiddenOriginResponse, authorizeAdminRequest } from '../../../src/shared/auth.js';
 import { getAdminCorsPolicy } from '../../../src/shared/corsConfig.js';
-import { createKnowledgeActionStatement, getKnowledgeItemById, mapKnowledgeItem } from '../../../src/shared/knowledgeData.js';
+import { createKnowledgeCreatedActionStatement, getKnowledgeItemById, mapKnowledgeItem } from '../../../src/shared/knowledgeData.js';
 import { successResponse, errorResponse, createOptionsResponse, methodNotAllowedResponse } from '../../../src/shared/response.js';
 import { checkAdminRateLimit, getClientIP } from '../../../src/shared/rateLimit.js';
 import { parseJsonBody } from '../../../src/shared/request.js';
@@ -64,31 +64,36 @@ export async function onRequest(context) {
 
     const payload = validationResult.data;
     const now = new Date().toISOString();
-    const insertResult = await env.DB.prepare(`
-      INSERT INTO knowledge_items (
-        title, tag, content, sort_order, is_enabled, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
-    `)
-      .bind(
-        payload.title,
-        payload.tag,
-        payload.content,
-        payload.sortOrder,
-        payload.isEnabled ? 1 : 0,
-        now,
-        now,
-      )
-      .run();
+    const [insertResult, auditResult] = await env.DB.batch([
+      env.DB.prepare(`
+        INSERT INTO knowledge_items (
+          title, tag, content, sort_order, is_enabled, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+      `)
+        .bind(
+          payload.title,
+          payload.tag,
+          payload.content,
+          payload.sortOrder,
+          payload.isEnabled ? 1 : 0,
+          now,
+          now,
+        ),
+      createKnowledgeCreatedActionStatement(env.DB, {
+        actionType: 'knowledge_created',
+        payload,
+        performedBy: authResult.actor,
+        ipAddress: getClientIP(request),
+        performedAt: now,
+      }),
+    ]);
+
+    if (Number(auditResult?.meta?.changes) !== 1) {
+      throw new Error('knowledge audit action was not recorded');
+    }
 
     const itemId = Number(insertResult?.meta?.last_row_id);
     const createdItem = await getKnowledgeItemById(env.DB, itemId);
-    await createKnowledgeActionStatement(env.DB, {
-      actionType: 'knowledge_created',
-      item: createdItem,
-      performedBy: authResult.actor,
-      ipAddress: getClientIP(request),
-      performedAt: now,
-    }).run();
 
     return successResponse(mapKnowledgeItem(createdItem), {
       status: 201,

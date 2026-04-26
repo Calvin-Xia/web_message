@@ -400,6 +400,47 @@ class FakeD1Database {
       return { success: true, meta: { last_row_id: item.id, changes: 1 } };
     }
 
+    if (sql.startsWith('INSERT INTO admin_actions (') && sql.includes('FROM knowledge_items')) {
+      const [actionType, targetType, details, performedBy, performedAt, ipAddress, ...selectors] = bindings;
+      let item = null;
+
+      if (sql.includes('WHERE id = ? AND updated_at = ?')) {
+        const [itemId, expectedUpdatedAt] = selectors;
+        item = this.findKnowledgeItemById(itemId);
+        if (!item || item.updated_at !== expectedUpdatedAt) {
+          return { success: true, meta: { last_row_id: null, changes: 0 } };
+        }
+      } else {
+        const [title, tag, content, sortOrder, isEnabled, createdAt, updatedAt] = selectors;
+        item = this.knowledgeItems
+          .slice()
+          .reverse()
+          .find((candidate) => (
+            candidate.title === title
+            && candidate.tag === tag
+            && candidate.content === content
+            && candidate.sort_order === sortOrder
+            && candidate.is_enabled === isEnabled
+            && candidate.created_at === createdAt
+            && candidate.updated_at === updatedAt
+          ));
+      }
+
+      if (!item) {
+        return { success: true, meta: { last_row_id: null, changes: 0 } };
+      }
+
+      return this.insertAdminAction({
+        actionType,
+        targetType,
+        targetId: item.id,
+        details,
+        performedBy,
+        performedAt,
+        ipAddress,
+      });
+    }
+
     if (sql.startsWith('INSERT INTO admin_actions (') && sql.includes('SELECT ?, ?, id,')) {
       const [actionType, targetType, details, performedBy, performedAt, ipAddress, issueIdOrCode, updatedAt] = bindings;
       const issue = bindings.length === 7

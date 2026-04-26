@@ -359,7 +359,7 @@ describe('admin export route', () => {
 
   it('rejects exports that exceed the safe row limit', async () => {
     const db = createExportDbMock({
-      total: 50_001,
+      total: 5_001,
       batches: [],
     });
 
@@ -374,7 +374,7 @@ describe('admin export route', () => {
     const payload = await response.json();
 
     expect(response.status).toBe(413);
-    expect(payload.error).toBe('导出结果超过 50000 条，请缩小筛选范围后重试');
+    expect(payload.error).toBe('导出结果超过 5000 条，请缩小筛选范围后重试');
     expect(db.actions).toHaveLength(0);
     expect(db.statements).toHaveLength(1);
   });

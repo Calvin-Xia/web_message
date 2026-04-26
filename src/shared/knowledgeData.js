@@ -44,3 +44,75 @@ export function createKnowledgeActionStatement(db, {
     performedAt,
   });
 }
+
+export function createKnowledgeCreatedActionStatement(db, {
+  actionType,
+  payload,
+  performedBy,
+  ipAddress,
+  performedAt,
+}) {
+  return db.prepare(`
+    INSERT INTO admin_actions (
+      action_type, target_type, target_id, details, performed_by, performed_at, ip_address
+    )
+    SELECT ?, ?, id, ?, ?, ?, ?
+    FROM knowledge_items
+    WHERE title = ?
+      AND tag = ?
+      AND content = ?
+      AND sort_order = ?
+      AND is_enabled = ?
+      AND created_at = ?
+      AND updated_at = ?
+    ORDER BY id DESC
+    LIMIT 1
+  `)
+    .bind(
+      actionType,
+      'knowledge_item',
+      JSON.stringify({
+        title: payload.title,
+        tag: payload.tag,
+      }),
+      performedBy,
+      performedAt,
+      ipAddress,
+      payload.title,
+      payload.tag,
+      payload.content,
+      payload.sortOrder,
+      payload.isEnabled ? 1 : 0,
+      performedAt,
+      performedAt,
+    );
+}
+
+export function createConditionalKnowledgeActionStatement(db, {
+  actionType,
+  item,
+  expectedUpdatedAt,
+  details = {},
+  performedBy,
+  ipAddress,
+  performedAt,
+}) {
+  return db.prepare(`
+    INSERT INTO admin_actions (
+      action_type, target_type, target_id, details, performed_by, performed_at, ip_address
+    )
+    SELECT ?, ?, id, ?, ?, ?, ?
+    FROM knowledge_items
+    WHERE id = ? AND updated_at = ?
+  `)
+    .bind(
+      actionType,
+      'knowledge_item',
+      JSON.stringify(createKnowledgeAuditDetails(mapKnowledgeItem(item), details)),
+      performedBy,
+      performedAt,
+      ipAddress,
+      item.id,
+      expectedUpdatedAt,
+    );
+}

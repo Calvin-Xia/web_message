@@ -1,9 +1,15 @@
+const SPREADSHEET_FORMULA_PREFIX_PATTERN = /^\s*[=+\-@]/;
+
+function neutralizeSpreadsheetFormula(value) {
+  return SPREADSHEET_FORMULA_PREFIX_PATTERN.test(value) ? `'${value}` : value;
+}
+
 export function escapeCsvValue(value) {
   if (value == null) {
     return '';
   }
 
-  const normalized = String(value);
+  const normalized = neutralizeSpreadsheetFormula(String(value));
   if (/[",\r\n]/.test(normalized)) {
     return `"${normalized.replace(/"/g, '""')}"`;
   }

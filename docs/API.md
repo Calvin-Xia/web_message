@@ -234,7 +234,7 @@
 所有后台接口需要：
 
 - 请求头 `Authorization: Bearer <ADMIN_SECRET_KEY>`
-- 受信任 `Origin`（生产允许 `https://issue.calvin-xia.cn`、`https://demo.calvin-xia.cn`、`https://web-message-board.pages.dev` 与单层 Pages 预览子域；允许来源在 `src/shared/corsConfig.js` 统一维护）
+- 受信任 `Origin`（生产与预览允许 `https://issue.calvin-xia.cn`、`https://demo.calvin-xia.cn`、`https://web-message-board.pages.dev` 与单层 Pages 预览子域；允许来源在 `src/shared/corsConfig.js` 统一维护）
 
 ### `GET /api/admin/issues`
 
@@ -350,7 +350,7 @@
 - `csv`：默认格式，返回扁平表格文件。
 - `json`：返回结构化 JSON 文件，适合与其他系统对接。
 
-单次导出最多 `50000` 条，超过上限时会返回错误并提示缩小筛选范围。
+单次导出最多 `5000` 条，超过上限时会返回错误并提示缩小筛选范围。
 CSV 包含 `distress_type` 与 `scene_tag` 两列。
 JSON 使用 camelCase 字段，并在每条问题下包含关联的 `internalNotes` 与 `replies`：
 

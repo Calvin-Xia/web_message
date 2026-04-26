@@ -65,6 +65,10 @@ function isTrustedNonProductionOrigin(url) {
   return LOOPBACK_ADMIN_HOSTS.has(hostname);
 }
 
+function isTrustedPreviewOrigin(url) {
+  return isTrustedNonProductionOrigin(url) || isTrustedProductionOrigin(url);
+}
+
 export function getAdminCorsPolicy(origin, env = {}, methods = DEFAULT_ADMIN_METHODS) {
   const hasOrigin = typeof origin === 'string' && origin.trim() !== '';
 
@@ -88,8 +92,12 @@ export function getAdminCorsPolicy(origin, env = {}, methods = DEFAULT_ADMIN_MET
   }
 
   const url = new URL(normalizedOrigin);
-  const isProduction = (env.ENVIRONMENT || 'development') === 'production';
-  const isOriginAllowed = isProduction ? isTrustedProductionOrigin(url) : isTrustedNonProductionOrigin(url);
+  const environment = env.ENVIRONMENT || 'development';
+  const isOriginAllowed = environment === 'production'
+    ? isTrustedProductionOrigin(url)
+    : environment === 'preview'
+      ? isTrustedPreviewOrigin(url)
+      : isTrustedNonProductionOrigin(url);
 
   return {
     hasOrigin: true,

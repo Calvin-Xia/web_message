@@ -1,6 +1,6 @@
 import { createForbiddenOriginResponse, authorizeAdminRequest } from '../../../../src/shared/auth.js';
 import { getAdminCorsPolicy } from '../../../../src/shared/corsConfig.js';
-import { createKnowledgeActionStatement, getKnowledgeItemById, mapKnowledgeItem } from '../../../../src/shared/knowledgeData.js';
+import { createConditionalKnowledgeActionStatement, getKnowledgeItemById, mapKnowledgeItem } from '../../../../src/shared/knowledgeData.js';
 import { successResponse, errorResponse, createOptionsResponse, methodNotAllowedResponse, notFoundResponse } from '../../../../src/shared/response.js';
 import { checkAdminRateLimit, getClientIP } from '../../../../src/shared/rateLimit.js';
 import { parseJsonBody } from '../../../../src/shared/request.js';
@@ -102,9 +102,18 @@ export async function onRequest(context) {
     const ipAddress = getClientIP(request);
 
     if (request.method === 'DELETE') {
-      const deleteResult = await env.DB.prepare('DELETE FROM knowledge_items WHERE id = ? AND updated_at = ?')
-        .bind(itemId, payload.updatedAt)
-        .run();
+      const [auditResult, deleteResult] = await env.DB.batch([
+        createConditionalKnowledgeActionStatement(env.DB, {
+          actionType: 'knowledge_deleted',
+          item: existingItem,
+          expectedUpdatedAt: payload.updatedAt,
+          performedBy: authResult.actor,
+          ipAddress,
+          performedAt: now,
+        }),
+        env.DB.prepare('DELETE FROM knowledge_items WHERE id = ? AND updated_at = ?')
+          .bind(itemId, payload.updatedAt),
+      ]);
 
       if (Number(deleteResult?.meta?.changes) !== 1) {
         const latestItem = await getKnowledgeItemById(env.DB, itemId);
@@ -118,13 +127,9 @@ export async function onRequest(context) {
         });
       }
 
-      await createKnowledgeActionStatement(env.DB, {
-        actionType: 'knowledge_deleted',
-        item: existingItem,
-        performedBy: authResult.actor,
-        ipAddress,
-        performedAt: now,
-      }).run();
+      if (Number(auditResult?.meta?.changes) !== 1) {
+        throw new Error('knowledge delete audit action was not recorded');
+      }
 
       return successResponse({
         id: itemId,
@@ -202,13 +207,28 @@ export async function onRequest(context) {
     }
 
     addAssignment(assignments, bindings, 'updated_at', now);
-    const updateResult = await env.DB.prepare(`
-      UPDATE knowledge_items
-      SET ${assignments.join(', ')}
-      WHERE id = ? AND updated_at = ?
-    `)
-      .bind(...bindings, itemId, payload.updatedAt)
-      .run();
+    const auditItem = {
+      ...existingItem,
+      title: payload.title ?? existingItem.title,
+      tag: payload.tag ?? existingItem.tag,
+    };
+    const [updateResult, auditResult] = await env.DB.batch([
+      env.DB.prepare(`
+        UPDATE knowledge_items
+        SET ${assignments.join(', ')}
+        WHERE id = ? AND updated_at = ?
+      `)
+        .bind(...bindings, itemId, payload.updatedAt),
+      createConditionalKnowledgeActionStatement(env.DB, {
+        actionType: 'knowledge_updated',
+        item: auditItem,
+        expectedUpdatedAt: now,
+        details: { changes },
+        performedBy: authResult.actor,
+        ipAddress,
+        performedAt: now,
+      }),
+    ]);
 
     if (Number(updateResult?.meta?.changes) !== 1) {
       const latestItem = await getKnowledgeItemById(env.DB, itemId);
@@ -222,15 +242,11 @@ export async function onRequest(context) {
       });
     }
 
+    if (Number(auditResult?.meta?.changes) !== 1) {
+      throw new Error('knowledge update audit action was not recorded');
+    }
+
     const updatedItem = await getKnowledgeItemById(env.DB, itemId);
-    await createKnowledgeActionStatement(env.DB, {
-      actionType: 'knowledge_updated',
-      item: updatedItem,
-      details: { changes },
-      performedBy: authResult.actor,
-      ipAddress,
-      performedAt: now,
-    }).run();
 
     return successResponse({
       item: mapKnowledgeItem(updatedItem),
