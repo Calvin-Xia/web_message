@@ -7,6 +7,7 @@
 - `/api/health` 已扩展为结构化健康检查接口，覆盖 D1、KV、延迟、趋势、告警规则与脱敏错误日志。
 - `/health.html` 已升级为健康检查面板，支持服务状态、关键指标、限流命中率与响应时间趋势展示。
 - API 层新增统一安全头与 HTTPS 强制跳转保护，后台接口继续使用受控 CORS 与 Bearer 鉴权。
+- 后台认证已升级为多用户账号 + JWT，保留共享密钥备用入口，并提供登录、登出、密码重置和用户管理 API。
 - 首页与后台页已接入共享侧边菜单：桌面端左侧常驻导航，移动端左下角圆形入口打开抽屉式导航，并通过 `side-nav.js` 维护打开状态、键盘关闭和当前分区高亮。
 - 公开首页已接入校园心理压力热区与懒加载校园矢量地图，地图使用预处理静态 GeoJSON 资产与 `/api/insights` 聚合数据渲染。
 - 公开知识库已改为 D1 动态内容，后台可新增、编辑、禁用或删除知识条目，并与心理困扰类别关联。
@@ -21,6 +22,7 @@
 - 公开心理咨询热区展示，支持校园矢量地图悬停查看公开聚合数据
 - 首页与后台运营台提供侧边分区导航，移动端使用菜单抽屉访问页面入口
 - 后台运营台支持筛选、状态流转、备注、回复、知识库管理、导出与统计
+- 后台支持管理员账号登录、登出、用户创建/编辑/禁用与角色权限
 - 健康检查 API 与可视化健康面板
 - 限流、输入验证、日志脱敏、安全响应头与运维文档
 
@@ -29,7 +31,8 @@
 ```mermaid
 flowchart LR
     User["公开用户"] --> Static["Pages 静态页面\nindex / tracking / health"]
-    Admin["管理员"] --> AdminUI["admin.html + admin-app.js"]
+    Admin["管理员"] --> LoginUI["login.html + login-app.js"]
+    LoginUI --> AdminUI["admin.html + admin-app.js"]
     Static --> SideNav["side-nav.js\nshared sidebar behavior"]
     AdminUI --> SideNav
     Static --> API["Pages Functions /api/*"]
@@ -46,6 +49,7 @@ flowchart LR
 
 - `/`：公开提交页、公开问题列表与校园心理压力热区
 - `/tracking.html`：追踪页
+- `/login.html`：管理员账号登录、忘记密码、共享密钥备用入口
 - `/admin.html`：后台运营台
 - `/health.html`：健康检查面板
 
@@ -65,6 +69,12 @@ flowchart LR
 - `GET /api/issues/:trackingCode`
 - `GET /api/insights`
 - `GET /api/knowledge`
+- `POST /api/admin/auth/login`
+- `POST /api/admin/auth/logout`
+- `POST /api/admin/auth/forgot-password`
+- `POST /api/admin/auth/reset-password`
+- `GET/POST /api/admin/users`
+- `PATCH/DELETE /api/admin/users/:id`
 - `GET /api/admin/issues`
 - `GET/PATCH /api/admin/issues/:id`
 - `POST /api/admin/issues/:id/notes`
@@ -81,9 +91,11 @@ flowchart LR
 
 | 变量 | 必填 | 用途 |
 | --- | --- | --- |
-| `ADMIN_SECRET_KEY` | 是 | 后台 Bearer 鉴权密钥 |
+| `ADMIN_SECRET_KEY` | 是 | 共享密钥备用 Bearer 鉴权 |
+| `ADMIN_JWT_SECRET` | 是 | 后台 JWT HMAC-SHA256 签名密钥 |
 | `ENVIRONMENT` | 是 | 环境标识：`local` / `preview` / `production` |
 | `RESEND_API_KEY` | 通知功能需要 | 邮件通知投递密钥；未配置时邮件发送会失败并记录错误 |
+| `ADMIN_RESET_EMAIL` | 密码重置建议配置 | 管理员密码重置邮件收件人；未配置时退回支持邮箱 |
 | `PUBLIC_BASE_URL` | 否 | 邮件中的追踪链接基准地址；未配置时按请求来源或默认生产域名推断 |
 
 本地示例见 `.dev.vars.example`。
@@ -119,4 +131,4 @@ npm run d1:migrate:local
 
 ## 安全说明
 
-输入验证、CORS、HTTPS/HSTS、安全响应头、日志脱敏与“无 Cookie”策略见 [docs/SECURITY.md](./docs/SECURITY.md)。
+输入验证、CORS、HTTPS/HSTS、安全响应头、JWT/备用共享密钥、日志脱敏与“无 Cookie”策略见 [docs/SECURITY.md](./docs/SECURITY.md)。

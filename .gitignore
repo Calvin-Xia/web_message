@@ -8,9 +8,13 @@ dist
 .DS_Store
 Thumbs.db
 .trae/
+.sisyphus/
+.playwright-mcp/
 spec/
 output/
 REPO_PRD.md
+prd-*/
+logs/
 
 diff.txt
 diff_output.txt

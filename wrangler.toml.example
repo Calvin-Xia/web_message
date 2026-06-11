@@ -8,6 +8,7 @@ pages_build_output_dir = "./"
 # For local development: Create .dev.vars file with ADMIN_SECRET_KEY=your-key
 # For production: Set ADMIN_SECRET_KEY in Cloudflare Pages Dashboard > Settings > Environment Variables > Secrets
 # The ADMIN_SECRET_KEY must be at least 32 characters for security
+# Also configure ADMIN_JWT_SECRET for username/password login and optional ADMIN_RESET_EMAIL for reset links.
 
 # KV namespace binding (for rate limiting)
 [[kv_namespaces]]

@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>管理员登录</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body data-page-role="admin" class="min-h-screen px-4 py-8 text-[#172033] md:px-8">
+  <main class="mx-auto grid min-h-[calc(100vh-4rem)] w-full max-w-5xl items-center gap-6 lg:grid-cols-[1fr_0.9fr]">
+    <section class="space-y-5">
+      <div class="text-xs font-semibold uppercase tracking-[0.35em] text-[#5f6b80]">Admin Access</div>
+      <h1 class="display-font text-4xl md:text-5xl">管理员登录</h1>
+      <p class="max-w-xl text-sm leading-7 text-[#4c566b]">使用独立账号进入后台；共享密钥作为备用入口保留。</p>
+      <div id="loginNotification" aria-live="polite" aria-atomic="true"></div>
+    </section>
+
+    <section class="surface-panel p-6 md:p-8">
+      <form id="passwordLoginForm" class="space-y-4">
+        <label class="space-y-2 text-sm font-medium text-[#25314a]">
+          <span>用户名</span>
+          <input id="username" name="username" autocomplete="username" class="field-shell h-12 w-full px-4" required maxlength="50">
+        </label>
+        <label class="space-y-2 text-sm font-medium text-[#25314a]">
+          <span>密码</span>
+          <input id="password" name="password" type="password" autocomplete="current-password" class="field-shell h-12 w-full px-4" required maxlength="100">
+        </label>
+        <label class="flex items-center gap-3 text-sm font-medium text-[#25314a]">
+          <input id="rememberMe" name="rememberMe" type="checkbox" class="h-4 w-4 rounded border-[#b9c3d6] text-[#2457d6] focus:ring-[#2457d6]">
+          <span>记住登录状态</span>
+        </label>
+        <button id="loginButton" class="primary-button inline-flex h-12 w-full items-center justify-center px-5 text-sm font-semibold transition" type="submit">登录</button>
+      </form>
+
+      <div class="mt-5 flex flex-wrap items-center justify-between gap-3 text-sm">
+        <button id="forgotPasswordButton" class="ghost-button px-4 py-2 text-sm font-semibold" type="button">忘记密码</button>
+        <button id="sharedKeyToggle" class="ghost-button px-4 py-2 text-sm font-semibold" type="button">使用共享密钥</button>
+      </div>
+
+      <form id="forgotPasswordForm" class="mt-5 hidden space-y-3">
+        <label class="space-y-2 text-sm font-medium text-[#25314a]">
+          <span>用户名</span>
+          <input id="forgotUsername" class="field-shell h-11 w-full px-4" maxlength="50">
+        </label>
+        <button id="forgotSubmitButton" class="ghost-button inline-flex h-11 w-full items-center justify-center px-5 text-sm font-semibold transition" type="submit">发送重置邮件</button>
+      </form>
+
+      <form id="resetPasswordForm" class="mt-5 hidden space-y-3">
+        <label class="space-y-2 text-sm font-medium text-[#25314a]">
+          <span>新密码</span>
+          <input id="newPassword" type="password" autocomplete="new-password" class="field-shell h-11 w-full px-4" maxlength="100">
+          <span class="text-xs text-[#5f6b80]">至少8位，包含大小写字母、数字和特殊字符（?!@#$%^&*[]{})</span>
+        </label>
+        <button id="resetSubmitButton" class="ghost-button inline-flex h-11 w-full items-center justify-center px-5 text-sm font-semibold transition" type="submit">重置密码</button>
+      </form>
+
+      <form id="sharedKeyLoginForm" class="mt-5 hidden space-y-3">
+        <label class="space-y-2 text-sm font-medium text-[#25314a]">
+          <span>共享密钥</span>
+          <input id="sharedKey" type="password" class="field-shell h-11 w-full px-4">
+        </label>
+        <button id="sharedKeySubmitButton" class="dark-button inline-flex h-11 w-full items-center justify-center px-5 text-sm font-semibold transition" type="submit">使用备用入口</button>
+      </form>
+    </section>
+  </main>
+  <script type="module" src="/login-app.js"></script>
+</body>
+</html>

@@ -6,6 +6,13 @@
 # Quote the value if it contains #, &, $, or spaces.
 ADMIN_SECRET_KEY="your-secret-key-here-change-me"
 
+# JWT signing secret for username/password admin auth.
+# Use a different 32+ character value in production.
+ADMIN_JWT_SECRET="your-jwt-secret-here-change-me-too"
+
+# Optional recipient for administrator password reset emails.
+ADMIN_RESET_EMAIL="admin@example.edu"
+
 # Resend API key for transactional notification emails.
 RESEND_API_KEY="re_xxxxxxxxx"
 
@@ -14,4 +21,4 @@ RESEND_API_KEY="re_xxxxxxxxx"
 ENVIRONMENT="local"
 
 # Optional public base URL used in email tracking links.
-PUBLIC_BASE_URL="http://localhost:8787"
+PUBLIC_BASE_URL="http://localhost:8788"

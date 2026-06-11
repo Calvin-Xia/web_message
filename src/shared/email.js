@@ -121,6 +121,30 @@ function createReplyEmailContent(issue, replyContent, trackingUrl) {
   return { html, text };
 }
 
+function createPasswordResetEmailContent(username, resetUrl) {
+  const text = [
+    `管理员账号 ${username} 请求重置密码。`,
+    `请在 1 小时内打开以下链接完成重置：`,
+    resetUrl,
+    '',
+    '如果不是你发起的请求，请忽略此邮件。',
+    '',
+    SUPPORT_EMAIL,
+  ].join('\n');
+
+  const html = `
+    <div style="font-family:Arial,'PingFang SC','Microsoft YaHei',sans-serif;color:#172033;line-height:1.7;">
+      <p>管理员账号 <strong>${escapeHtml(username)}</strong> 请求重置密码。</p>
+      <p>请在 1 小时内打开以下链接完成重置：</p>
+      <p><a href="${escapeHtml(resetUrl)}">重置密码</a></p>
+      <p>如果不是你发起的请求，请忽略此邮件。</p>
+      <p>${escapeHtml(SUPPORT_EMAIL)}</p>
+    </div>
+  `.trim();
+
+  return { html, text };
+}
+
 async function sendEmailRequest(env, payload, idempotencyKey) {
   if (!env.RESEND_API_KEY) {
     return {
@@ -242,6 +266,21 @@ export async function sendIssueReplyNotification({ env, requestUrl, issue, reply
     from: SUPPORT_EMAIL,
     to: [issue.email],
     subject: `管理员已回复你的问题（${issue.tracking_code}）`,
+    html: content.html,
+    text: content.text,
+    reply_to: [SUPPORT_EMAIL],
+  }, idempotencyKey);
+}
+
+export async function sendPasswordResetEmail({ env, requestUrl, username, resetToken, idempotencyKey }) {
+  const resetUrl = `${resolvePublicBaseUrl(requestUrl, env)}/login.html?token=${encodeURIComponent(resetToken)}`;
+  const content = createPasswordResetEmailContent(username, resetUrl);
+  const recipient = env.ADMIN_RESET_EMAIL || SUPPORT_EMAIL;
+
+  return sendEmailWithRetry(env, {
+    from: SUPPORT_EMAIL,
+    to: [recipient],
+    subject: `管理员密码重置：${username}`,
     html: content.html,
     text: content.text,
     reply_to: [SUPPORT_EMAIL],

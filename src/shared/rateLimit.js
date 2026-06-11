@@ -21,6 +21,16 @@ const RATE_LIMIT_CONFIG = {
     periodSeconds: 60,
     blockDuration: 120,
   },
+  adminLogin: {
+    maxRequests: 5,
+    periodSeconds: 15 * 60,
+    blockDuration: 15 * 60,
+  },
+  adminForgotPassword: {
+    maxRequests: 3,
+    periodSeconds: 60 * 60,
+    blockDuration: 60 * 60,
+  },
 };
 
 function createRateLimitResponse(corsHeaders, retryAfterSeconds) {

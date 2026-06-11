@@ -5,19 +5,24 @@ import {
   adminExportQuerySchema,
   adminIssueListQuerySchema,
   adminMetricsQuerySchema,
+  createUserSchema,
   createAdminIssuePatchSchema,
+  forgotPasswordSchema,
   formatZodError,
   knowledgeCreateSchema,
   knowledgeDeleteSchema,
   knowledgeIdSchema,
   knowledgePatchSchema,
+  loginSchema,
   issueSchema,
   noteSchema,
   publicInsightsQuerySchema,
   publicIssueListQuerySchema,
   replySchema,
+  resetPasswordSchema,
   statusUpdateSchema,
   trackingCodeSchema,
+  updateUserSchema,
 } from '../src/shared/validation.js';
 
 describe('issueSchema', () => {
@@ -403,6 +408,57 @@ describe('adminActionListQuerySchema', () => {
     const result = adminActionListQuerySchema.safeParse({ targetId: '12', actionType: 'reply_added' });
     expect(result.success).toBe(true);
     expect(result.data.targetId).toBe(12);
+  });
+});
+
+describe('admin auth validation schemas', () => {
+  it('validates login payloads and defaults rememberMe to false', () => {
+    const result = loginSchema.safeParse({
+      username: 'admin',
+      password: 'Admin123!',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.data.rememberMe).toBe(false);
+  });
+
+  it('validates create user payloads with password policy and role enum', () => {
+    const valid = createUserSchema.safeParse({
+      username: 'handler_1',
+      password: 'Secure123!',
+      displayName: '处理员1',
+      role: 'handler',
+    });
+    const invalid = createUserSchema.safeParse({
+      username: 'bad-name',
+      password: 'weakpass',
+      displayName: '',
+      role: 'owner',
+    });
+
+    expect(valid.success).toBe(true);
+    expect(invalid.success).toBe(false);
+    expect(invalid.error.issues.map((issue) => issue.message)).toContain('用户名只能包含字母、数字和下划线');
+    expect(invalid.error.issues.map((issue) => issue.message)).toContain('密码必须包含大小写字母、数字和特殊字符（?!@#$%^&*[]{}）');
+    expect(invalid.error.issues.map((issue) => issue.message)).toContain('显示名称不能为空');
+    expect(invalid.error.issues.map((issue) => issue.message)).toContain('角色无效');
+  });
+
+  it('validates update user, forgot password and reset password payloads', () => {
+    const update = updateUserSchema.safeParse({
+      displayName: '管理员',
+      role: 'admin',
+      isEnabled: false,
+    });
+    const forgot = forgotPasswordSchema.safeParse({ username: 'admin' });
+    const reset = resetPasswordSchema.safeParse({
+      token: 'reset-token',
+      newPassword: 'NewPass123!',
+    });
+
+    expect(update.success).toBe(true);
+    expect(forgot.success).toBe(true);
+    expect(reset.success).toBe(true);
   });
 });
 

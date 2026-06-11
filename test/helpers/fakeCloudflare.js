@@ -66,6 +66,8 @@ class FakeD1Database {
     this.issueInternalNotes = [];
     this.adminActions = [];
     this.knowledgeItems = [];
+    this.adminUsers = [];
+    this.passwordResetTokens = [];
     this.rateLimitState = [];
     this.requestObservations = [];
     this.ids = {
@@ -74,6 +76,7 @@ class FakeD1Database {
       note: 1,
       action: 1,
       knowledgeItem: 1,
+      adminUser: 1,
       observation: 1,
     };
   }
@@ -85,6 +88,8 @@ class FakeD1Database {
       issueInternalNotes: clone(this.issueInternalNotes),
       adminActions: clone(this.adminActions),
       knowledgeItems: clone(this.knowledgeItems),
+      adminUsers: clone(this.adminUsers),
+      passwordResetTokens: clone(this.passwordResetTokens),
       rateLimitState: clone(this.rateLimitState),
       requestObservations: clone(this.requestObservations),
       ids: clone(this.ids),
@@ -97,6 +102,8 @@ class FakeD1Database {
     this.issueInternalNotes = snapshot.issueInternalNotes;
     this.adminActions = snapshot.adminActions;
     this.knowledgeItems = snapshot.knowledgeItems;
+    this.adminUsers = snapshot.adminUsers;
+    this.passwordResetTokens = snapshot.passwordResetTokens;
     this.rateLimitState = snapshot.rateLimitState;
     this.requestObservations = snapshot.requestObservations;
     this.ids = snapshot.ids;
@@ -152,6 +159,14 @@ class FakeD1Database {
 
   findKnowledgeItemById(itemId) {
     return this.knowledgeItems.find((item) => item.id === itemId);
+  }
+
+  findAdminUserById(userId) {
+    return this.adminUsers.find((user) => user.id === Number(userId));
+  }
+
+  findAdminUserByUsername(username) {
+    return this.adminUsers.find((user) => user.username === username);
   }
 
   filterAdminIssues(sql, bindings = []) {
@@ -400,6 +415,43 @@ class FakeD1Database {
       return { success: true, meta: { last_row_id: item.id, changes: 1 } };
     }
 
+    if (sql.startsWith('INSERT INTO admin_users (')) {
+      const columns = parseInsertColumns(sql, 'admin_users');
+      const valuesByColumn = Object.fromEntries(columns.map((column, index) => [column, bindings[index]]));
+      if (this.findAdminUserByUsername(valuesByColumn.username)) {
+        throw new Error('UNIQUE constraint failed: admin_users.username');
+      }
+
+      const now = new Date().toISOString();
+      const user = {
+        id: this.ids.adminUser++,
+        username: valuesByColumn.username,
+        password_hash: valuesByColumn.password_hash,
+        display_name: valuesByColumn.display_name,
+        role: valuesByColumn.role,
+        is_enabled: valuesByColumn.is_enabled ?? 1,
+        last_login_at: valuesByColumn.last_login_at ?? null,
+        created_at: valuesByColumn.created_at ?? now,
+        updated_at: valuesByColumn.updated_at ?? now,
+      };
+      this.adminUsers.push(user);
+      return { success: true, meta: { last_row_id: user.id, changes: 1 } };
+    }
+
+    if (sql.startsWith('INSERT INTO admin_password_reset_tokens (')) {
+      const columns = parseInsertColumns(sql, 'admin_password_reset_tokens');
+      const valuesByColumn = Object.fromEntries(columns.map((column, index) => [column, bindings[index]]));
+      const row = {
+        token_hash: valuesByColumn.token_hash,
+        user_id: valuesByColumn.user_id,
+        expires_at: valuesByColumn.expires_at,
+        created_at: valuesByColumn.created_at,
+        used_at: valuesByColumn.used_at ?? null,
+      };
+      this.passwordResetTokens.push(row);
+      return { success: true, meta: { last_row_id: null, changes: 1 } };
+    }
+
     if (sql.startsWith('INSERT INTO admin_actions (') && sql.includes('FROM knowledge_items')) {
       const [actionType, targetType, details, performedBy, performedAt, ipAddress, ...selectors] = bindings;
       let item = null;
@@ -569,6 +621,42 @@ class FakeD1Database {
     if (sql === 'SELECT * FROM knowledge_items WHERE id = ? LIMIT 1') {
       const [itemId] = bindings;
       const row = this.findKnowledgeItemById(itemId);
+      return row ? clone(row) : null;
+    }
+
+    if (sql === 'SELECT * FROM admin_users WHERE username = ? LIMIT 1') {
+      const [username] = bindings;
+      const row = this.findAdminUserByUsername(username);
+      return row ? clone(row) : null;
+    }
+
+    if (sql === 'SELECT * FROM admin_users WHERE id = ? LIMIT 1') {
+      const [userId] = bindings;
+      const row = this.findAdminUserById(userId);
+      return row ? clone(row) : null;
+    }
+
+    if (sql.startsWith('SELECT id, username, display_name, role, is_enabled, last_login_at, created_at, updated_at FROM admin_users')) {
+      return {
+        results: this.adminUsers
+          .slice()
+          .sort((left, right) => left.username.localeCompare(right.username) || left.id - right.id)
+          .map((user) => ({
+            id: user.id,
+            username: user.username,
+            display_name: user.display_name,
+            role: user.role,
+            is_enabled: user.is_enabled,
+            last_login_at: user.last_login_at,
+            created_at: user.created_at,
+            updated_at: user.updated_at,
+          })),
+      };
+    }
+
+    if (sql.startsWith('SELECT * FROM admin_password_reset_tokens WHERE token_hash = ? AND used_at IS NULL LIMIT 1')) {
+      const [tokenHash] = bindings;
+      const row = this.passwordResetTokens.find((item) => item.token_hash === tokenHash && item.used_at == null);
       return row ? clone(row) : null;
     }
 
@@ -775,6 +863,38 @@ class FakeD1Database {
         item[column] = bindings[index];
       });
 
+      return { success: true, meta: { changes: 1 } };
+    }
+
+    if (sql.startsWith('UPDATE admin_users SET ')) {
+      const match = sql.match(/^UPDATE admin_users SET (.+) WHERE id = \?$/);
+      if (!match) {
+        throw new Error(`Unsupported admin user update statement: ${sql}`);
+      }
+
+      const assignments = match[1].split(',').map((item) => item.trim());
+      const userId = bindings[assignments.length];
+      const user = this.findAdminUserById(userId);
+      if (!user) {
+        return { success: true, meta: { changes: 0 } };
+      }
+
+      assignments.forEach((assignment, index) => {
+        const column = assignment.replace(/ = \?$/, '');
+        user[column] = bindings[index];
+      });
+
+      return { success: true, meta: { changes: 1 } };
+    }
+
+    if (sql === 'UPDATE admin_password_reset_tokens SET used_at = ? WHERE token_hash = ? AND used_at IS NULL') {
+      const [usedAt, tokenHash] = bindings;
+      const row = this.passwordResetTokens.find((item) => item.token_hash === tokenHash && item.used_at == null);
+      if (!row) {
+        return { success: true, meta: { changes: 0 } };
+      }
+
+      row.used_at = usedAt;
       return { success: true, meta: { changes: 1 } };
     }
 

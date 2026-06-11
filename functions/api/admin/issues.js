@@ -40,7 +40,7 @@ export async function onRequest(context) {
     return rateLimitResponse;
   }
 
-  const authResult = authorizeAdminRequest(request, env, ALLOWED_METHODS);
+  const authResult = await authorizeAdminRequest(request, env, ALLOWED_METHODS);
   if (!authResult.ok) {
     return authResult.response;
   }
@@ -95,10 +95,10 @@ export async function onRequest(context) {
       .first();
 
     const assigneeRows = await env.DB.prepare(`
-      SELECT DISTINCT assigned_to
-      FROM issues
-      WHERE COALESCE(TRIM(assigned_to), '') <> ''
-      ORDER BY assigned_to COLLATE NOCASE ASC
+      SELECT username
+      FROM admin_users
+      WHERE is_enabled = 1
+      ORDER BY username COLLATE NOCASE ASC
     `).all();
 
     return successResponse({
@@ -112,7 +112,7 @@ export async function onRequest(context) {
         byStatus: createStatusBreakdown(statsRow),
       },
       meta: {
-        availableAssignees: (assigneeRows.results || []).map((row) => row.assigned_to),
+        availableAssignees: (assigneeRows.results || []).map((row) => row.username),
       },
     }, {
       headers: authResult.corsHeaders,

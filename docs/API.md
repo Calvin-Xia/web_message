@@ -233,8 +233,109 @@
 
 所有后台接口需要：
 
-- 请求头 `Authorization: Bearer <ADMIN_SECRET_KEY>`
+- 请求头 `Authorization: Bearer <JWT>`；共享密钥 `Authorization: Bearer <ADMIN_SECRET_KEY>` 仍作为备用入口兼容
 - 受信任 `Origin`（生产与预览允许 `https://issue.calvin-xia.cn`、`https://demo.calvin-xia.cn`、`https://web-message-board.pages.dev` 与单层 Pages 预览子域；允许来源在 `src/shared/corsConfig.js` 统一维护）
+
+### `POST /api/admin/auth/login`
+
+管理员账号密码登录。默认 JWT 有效期为 24 小时，`rememberMe=true` 时为 7 天。
+
+请求体：
+
+```json
+{
+  "username": "admin",
+  "password": "admin123",
+  "rememberMe": false
+}
+```
+
+成功响应：
+
+```json
+{
+  "success": true,
+  "data": {
+    "token": "eyJ...",
+    "expiresAt": "2026-06-11T00:00:00.000Z",
+    "user": {
+      "id": 1,
+      "username": "admin",
+      "displayName": "管理员",
+      "role": "admin"
+    }
+  }
+}
+```
+
+错误响应：
+
+- `401`：用户名或密码错误
+- `403`：账号已禁用
+
+### `POST /api/admin/auth/logout`
+
+登出当前 JWT。JWT 会写入 KV 黑名单，黑名单 TTL 与令牌剩余有效期一致。共享密钥调用该接口也会返回成功，但不会写入黑名单。
+
+### `POST /api/admin/auth/forgot-password`
+
+发起密码重置。无论用户名是否存在，都返回相同响应，避免用户名枚举。
+
+```json
+{
+  "username": "admin"
+}
+```
+
+如果用户存在且已启用，系统会生成 1 小时有效的重置 token，仅保存 token hash，并通过 Resend 发送重置链接。由于 `admin_users` 表不保存邮箱，收件人由 `ADMIN_RESET_EMAIL` 配置；未配置时退回 `support@calvin-xia.cn`。
+
+### `POST /api/admin/auth/reset-password`
+
+使用邮件中的 token 重置密码。
+
+```json
+{
+  "token": "reset-token",
+  "newPassword": "NewPass123!"
+}
+```
+
+新密码必须至少 8 位，并包含大小写字母、数字和 `?!@#$%^&*[]{}` 中的特殊字符。token 无效、过期或已使用时返回 `400`。
+
+### `GET /api/admin/users`
+
+获取后台用户列表。仅 `admin` 角色可访问；响应不包含 `password_hash`。
+
+### `POST /api/admin/users`
+
+创建后台用户。仅 `admin` 角色可访问。
+
+```json
+{
+  "username": "handler1",
+  "password": "Handler123!",
+  "displayName": "处理员1",
+  "role": "handler"
+}
+```
+
+用户名只允许字母、数字和下划线；重复用户名返回 `409`。
+
+### `PATCH /api/admin/users/:id`
+
+更新后台用户显示名、角色或启用状态。仅 `admin` 角色可访问。
+
+```json
+{
+  "displayName": "处理员一号",
+  "role": "admin",
+  "isEnabled": true
+}
+```
+
+### `DELETE /api/admin/users/:id`
+
+软删除后台用户，即设置 `is_enabled = 0`。仅 `admin` 角色可访问，不能删除当前登录用户。
 
 ### `GET /api/admin/issues`
 
