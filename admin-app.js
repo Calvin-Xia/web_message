@@ -3,7 +3,10 @@ import { distressTypeLabels, sceneTagLabels } from './src/shared/labels.js';
 
 const API_BASE = '/api';
 const REQUEST_TIMEOUT = 15000;
-const STORAGE_KEY = 'issue-admin-secret';
+const ADMIN_TOKEN_KEY = 'admin_token';
+const ADMIN_USER_KEY = 'admin_user';
+const ADMIN_EXPIRES_AT_KEY = 'admin_expires_at';
+const SHARED_SECRET_KEY = 'issue-admin-secret';
 const SEARCH_HISTORY_KEY = 'issue-admin-search-history';
 const EXPORT_HISTORY_KEY = 'issue-admin-export-history';
 const MAX_HISTORY_ITEMS = 8;
@@ -51,6 +54,7 @@ const DRAWER_FOCUS_SELECTOR = [
 ].join(',');
 const state = {
   token: null,
+  user: loadStoredUser(),
   page: 1,
   pageSize: 20,
   metricsPeriod: 'week',
@@ -60,7 +64,9 @@ const state = {
   metrics: null,
   issues: [],
   knowledgeItems: [],
+  users: [],
   editingKnowledgeId: null,
+  editingUserId: null,
   searchHistory: loadStorageArray(SEARCH_HISTORY_KEY),
   exportHistory: loadStorageArray(EXPORT_HISTORY_KEY),
 };
@@ -74,6 +80,15 @@ function loadStorageArray(key) {
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
+  }
+}
+
+function loadStoredUser() {
+  try {
+    const value = window.localStorage.getItem(ADMIN_USER_KEY);
+    return value ? JSON.parse(value) : null;
+  } catch {
+    return null;
   }
 }
 
@@ -206,12 +221,16 @@ async function fetchWithTimeout(url, options = {}, timeout = REQUEST_TIMEOUT) {
 }
 
 async function apiFetch(path, options = {}) {
+  const headers = {
+    ...(options.headers || {}),
+  };
+  if (state.token) {
+    headers.Authorization = `Bearer ${state.token}`;
+  }
+
   const response = await fetchWithTimeout(`${API_BASE}${path}`, {
     ...options,
-    headers: {
-      ...(options.headers || {}),
-      Authorization: `Bearer ${state.token}`,
-    },
+    headers,
   });
   let payload = null;
   try {
@@ -220,11 +239,48 @@ async function apiFetch(path, options = {}) {
     payload = null;
   }
 
+  if (response.status === 401) {
+    clearAuthState();
+    window.location.assign('/login.html');
+    throw new Error(payload?.error || '登录已过期，请重新登录');
+  }
+
   if (!response.ok || !payload?.success) {
     throw new Error(payload?.error || '请求失败');
   }
 
   return payload.data;
+}
+
+function clearAuthState() {
+  state.token = null;
+  state.user = null;
+  window.localStorage.removeItem(ADMIN_TOKEN_KEY);
+  window.localStorage.removeItem(ADMIN_USER_KEY);
+  window.localStorage.removeItem(ADMIN_EXPIRES_AT_KEY);
+  window.sessionStorage.removeItem(SHARED_SECRET_KEY);
+}
+
+function updateCurrentUserBadge() {
+  const badge = document.getElementById('currentUserBadge');
+  if (!badge) {
+    return;
+  }
+
+  if (!state.user) {
+    badge.textContent = '共享密钥';
+    return;
+  }
+
+  const roleLabel = state.user.role === 'admin' ? '管理员' : '处理者';
+  badge.textContent = `${state.user.displayName || state.user.username} · ${roleLabel}`;
+}
+
+function showAuthenticatedShell() {
+  document.getElementById('loginSection').hidden = true;
+  document.getElementById('adminShell').hidden = false;
+  document.body.dataset.adminAuthenticated = 'true';
+  updateCurrentUserBadge();
 }
 
 function setNotification(targetId, message = '', type = 'info') {
@@ -1051,6 +1107,196 @@ async function deleteKnowledgeItem(itemId) {
   }
 }
 
+function getRoleLabel(role) {
+  return role === 'admin' ? '管理员' : '处理者';
+}
+
+function renderUsers() {
+  const container = document.getElementById('userList');
+  if (!container) {
+    return;
+  }
+
+  if (state.users.length === 0) {
+    container.innerHTML = '<div class="empty-state rounded-[1.4rem] px-5 py-8 text-center text-sm leading-7 text-[#5f6b80]">暂无用户，或当前账号没有用户管理权限。</div>';
+    return;
+  }
+
+  container.innerHTML = `
+    <table class="w-full min-w-[760px] border-separate border-spacing-y-2 text-left text-sm">
+      <thead class="text-xs uppercase tracking-[0.2em] text-[#72809a]">
+        <tr>
+          <th class="px-4 py-2">用户名</th>
+          <th class="px-4 py-2">显示名</th>
+          <th class="px-4 py-2">角色</th>
+          <th class="px-4 py-2">状态</th>
+          <th class="px-4 py-2">最后登录</th>
+          <th class="px-4 py-2 text-right">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${state.users.map((user) => `
+          <tr class="bg-white/72 align-middle">
+            <td class="rounded-l-[1rem] px-4 py-3 font-semibold text-[#172033]">${escapeHtml(user.username)}</td>
+            <td class="px-4 py-3 text-[#445069]">${escapeHtml(user.displayName)}</td>
+            <td class="px-4 py-3"><span class="mini-token">${escapeHtml(getRoleLabel(user.role))}</span></td>
+            <td class="px-4 py-3">
+              <span class="rounded-full px-3 py-1 text-xs font-semibold ${user.isEnabled ? 'bg-[rgba(19,121,91,0.12)] text-[#13795b]' : 'bg-[rgba(178,58,50,0.12)] text-[#b23a32]'}">${user.isEnabled ? '启用' : '禁用'}</span>
+            </td>
+            <td class="px-4 py-3 text-[#5f6b80]">${escapeHtml(formatDate(user.lastLoginAt))}</td>
+            <td class="rounded-r-[1rem] px-4 py-3 text-right">
+              <button class="ghost-button rounded-full px-3 py-2 text-xs font-semibold text-[#172033]" type="button" data-user-action="edit" data-user-id="${user.id}">编辑</button>
+              ${user.isEnabled
+                ? `<button class="ghost-button rounded-full px-3 py-2 text-xs font-semibold text-[#b23a32]" type="button" data-user-action="disable" data-user-id="${user.id}">禁用</button>`
+                : `<button class="ghost-button rounded-full px-3 py-2 text-xs font-semibold text-[#13795b]" type="button" data-user-action="enable" data-user-id="${user.id}">启用</button>`
+              }
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+async function loadUsers() {
+  const container = document.getElementById('userList');
+  if (!container) {
+    return null;
+  }
+
+  container.setAttribute('aria-busy', 'true');
+  container.innerHTML = renderFeedbackBox('正在加载用户列表', 'loading');
+  try {
+    const data = await apiFetch('/admin/users');
+    state.users = data.items || [];
+    renderUsers();
+    setNotification('userNotification', '');
+    return data;
+  } catch (error) {
+    state.users = [];
+    renderUsers();
+    setNotification('userNotification', error.message, error.message === '权限不足' ? 'info' : 'error');
+    return null;
+  } finally {
+    container.setAttribute('aria-busy', 'false');
+  }
+}
+
+function closeUserModal() {
+  document.getElementById('userModal').hidden = true;
+  state.editingUserId = null;
+  document.getElementById('userForm').reset();
+}
+
+function openUserModal(user = null) {
+  state.editingUserId = user?.id ?? null;
+  document.getElementById('userModalTitle').textContent = user ? '编辑用户' : '创建用户';
+  document.getElementById('usernameField').hidden = Boolean(user);
+  document.getElementById('passwordField').hidden = Boolean(user);
+  document.getElementById('userEnabledField').hidden = !user;
+  document.getElementById('userUsername').value = user?.username || '';
+  document.getElementById('userPassword').value = '';
+  document.getElementById('userDisplayName').value = user?.displayName || '';
+  document.getElementById('userRole').value = user?.role || 'handler';
+  document.getElementById('userIsEnabled').checked = user?.isEnabled ?? true;
+  document.getElementById('userModal').hidden = false;
+  window.requestAnimationFrame(() => {
+    document.getElementById(user ? 'userDisplayName' : 'userUsername')?.focus();
+  });
+}
+
+async function submitUserForm(event) {
+  event.preventDefault();
+  const button = document.getElementById('userSaveButton');
+  const isEditing = state.editingUserId != null;
+  const payload = {
+    displayName: document.getElementById('userDisplayName').value.trim(),
+    role: document.getElementById('userRole').value,
+  };
+
+  if (isEditing) {
+    payload.isEnabled = document.getElementById('userIsEnabled').checked;
+  } else {
+    payload.username = document.getElementById('userUsername').value.trim();
+    payload.password = document.getElementById('userPassword').value;
+  }
+
+  try {
+    setButtonBusy(button, true, '保存中...');
+    await apiFetch(isEditing ? `/admin/users/${state.editingUserId}` : '/admin/users', {
+      method: isEditing ? 'PATCH' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    closeUserModal();
+    await loadUsers();
+    setNotification('userNotification', isEditing ? '用户已更新。' : '用户已创建。', 'success');
+  } catch (error) {
+    setNotification('userNotification', error.message, 'error');
+  } finally {
+    setButtonBusy(button, false, '', '保存用户');
+  }
+}
+
+async function disableUser(userId) {
+  const user = state.users.find((item) => item.id === userId);
+  if (!user || !window.confirm(`确定禁用用户「${user.username}」吗？`)) {
+    return;
+  }
+
+  try {
+    await apiFetch(`/admin/users/${userId}`, { method: 'DELETE' });
+    await loadUsers();
+    setNotification('userNotification', '用户已禁用。', 'success');
+  } catch (error) {
+    setNotification('userNotification', error.message, 'error');
+  }
+}
+
+async function enableUser(userId) {
+  const user = state.users.find((item) => item.id === userId);
+  if (!user) {
+    return;
+  }
+
+  try {
+    await apiFetch(`/admin/users/${userId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isEnabled: true }),
+    });
+    await loadUsers();
+    setNotification('userNotification', '用户已启用。', 'success');
+  } catch (error) {
+    setNotification('userNotification', error.message, 'error');
+  }
+}
+
+function handleUserListClick(event) {
+  const button = event.target instanceof Element
+    ? event.target.closest('[data-user-action]')
+    : null;
+  if (!(button instanceof HTMLElement)) {
+    return;
+  }
+
+  const userId = Number(button.dataset.userId);
+  const user = state.users.find((item) => item.id === userId);
+  if (button.dataset.userAction === 'edit') {
+    openUserModal(user);
+    return;
+  }
+
+  if (button.dataset.userAction === 'disable') {
+    disableUser(userId);
+    return;
+  }
+
+  if (button.dataset.userAction === 'enable') {
+    enableUser(userId);
+  }
+}
+
 function openDrawerShell(trigger) {
   closeSideNav();
   const drawer = document.getElementById('issueDrawer');
@@ -1435,6 +1681,12 @@ async function exportIssues() {
       },
     }, 30000);
 
+    if (response.status === 401) {
+      clearAuthState();
+      window.location.assign('/login.html');
+      throw new Error('登录已过期，请重新登录');
+    }
+
     if (!response.ok) {
       let payload = null;
       try {
@@ -1484,7 +1736,8 @@ async function copyFilterLink() {
 
 async function login(secretKey) {
   state.token = secretKey;
-  sessionStorage.setItem(STORAGE_KEY, secretKey);
+  state.user = null;
+  sessionStorage.setItem(SHARED_SECRET_KEY, secretKey);
   const button = document.getElementById('loginButton');
   setButtonBusy(button, true, '验证中...');
   setNotification('loginNotification', '正在验证并加载后台数据...', 'info');
@@ -1494,13 +1747,12 @@ async function login(secretKey) {
       loadDashboard(state.page, { refreshMetrics: false }),
       loadKnowledgeItems(),
     ]);
-    document.getElementById('loginSection').hidden = true;
-    document.getElementById('adminShell').hidden = false;
-    document.body.dataset.adminAuthenticated = 'true';
+    showAuthenticatedShell();
+    loadUsers();
     setNotification('loginNotification', '');
     document.getElementById('searchInput')?.focus();
   } catch (error) {
-    sessionStorage.removeItem(STORAGE_KEY);
+    sessionStorage.removeItem(SHARED_SECRET_KEY);
     state.token = null;
     setNotification('loginNotification', error.message, 'error');
   } finally {
@@ -1508,19 +1760,27 @@ async function login(secretKey) {
   }
 }
 
-function logout() {
-  state.token = null;
+async function logout() {
+  try {
+    if (state.token) {
+      await apiFetch('/admin/auth/logout', { method: 'POST' });
+    }
+  } catch {
+    // 本地状态仍然清理，避免登出失败时卡在旧凭据。
+  }
+
+  clearAuthState();
   state.activeIssue = null;
   state.activeIssueId = null;
   state.knowledgeItems = [];
+  state.users = [];
   resetKnowledgeForm();
-  sessionStorage.removeItem(STORAGE_KEY);
   document.getElementById('secretKey').value = '';
   closeDrawer();
   document.getElementById('loginSection').hidden = false;
   document.getElementById('adminShell').hidden = true;
   delete document.body.dataset.adminAuthenticated;
-  document.getElementById('secretKey').focus();
+  window.location.assign('/login.html');
 }
 
 function bindEvents() {
@@ -1538,6 +1798,11 @@ function bindEvents() {
     resetKnowledgeForm();
     setNotification('knowledgeNotification', '');
   });
+  document.getElementById('createUserButton').addEventListener('click', () => openUserModal());
+  document.getElementById('userList').addEventListener('click', handleUserListClick);
+  document.getElementById('userForm').addEventListener('submit', submitUserForm);
+  document.getElementById('userModalClose').addEventListener('click', closeUserModal);
+  document.getElementById('userCancelButton').addEventListener('click', closeUserModal);
 
   document.getElementById('filterForm').addEventListener('submit', (event) => {
     event.preventDefault();
@@ -1631,10 +1896,23 @@ renderSearchHistory();
 renderExportHistory();
 bindEvents();
 
-const storedSecret = sessionStorage.getItem(STORAGE_KEY);
-if (storedSecret) {
+const storedToken = window.localStorage.getItem(ADMIN_TOKEN_KEY);
+const storedSecret = window.sessionStorage.getItem(SHARED_SECRET_KEY);
+if (storedToken) {
+  state.token = storedToken;
+  state.user = loadStoredUser();
+  showAuthenticatedShell();
+  Promise.all([
+    loadDashboard(state.page, { refreshMetrics: false }),
+    loadKnowledgeItems(),
+  ])
+    .then(() => loadUsers())
+    .catch((error) => setNotification('adminNotification', error.message, 'error'));
+} else if (storedSecret) {
   document.getElementById('secretKey').value = storedSecret;
   login(storedSecret);
+} else {
+  setNotification('loginNotification', '推荐使用账号密码登录，或在下方输入共享密钥。', 'info');
 }
 
 

@@ -2,6 +2,7 @@ import {
   DEFAULT_ADMIN_METHODS,
   getAdminCorsPolicy,
 } from './corsConfig.js';
+import { verifyToken } from './jwt.js';
 
 export function getAdminKeyFromEnv(env) {
   return env.ADMIN_SECRET_KEY || null;
@@ -56,7 +57,24 @@ export function createForbiddenOriginResponse(corsHeaders) {
   return createJsonErrorResponse('来源不受信任', 403, corsHeaders);
 }
 
-export function authorizeAdminRequest(request, env, methods = DEFAULT_ADMIN_METHODS) {
+export function createForbiddenRoleResponse(corsHeaders) {
+  return createJsonErrorResponse('权限不足', 403, corsHeaders);
+}
+
+function getBearerToken(authHeader) {
+  if (!authHeader) {
+    return null;
+  }
+
+  const parts = authHeader.split(' ');
+  if (parts.length !== 2 || parts[0] !== 'Bearer') {
+    return null;
+  }
+
+  return parts[1];
+}
+
+export async function authorizeAdminRequest(request, env, methods = DEFAULT_ADMIN_METHODS) {
   const origin = request.headers.get('Origin');
   const corsPolicy = getAdminCorsPolicy(origin, env, methods);
 
@@ -68,12 +86,28 @@ export function authorizeAdminRequest(request, env, methods = DEFAULT_ADMIN_METH
     };
   }
 
-  const authResult = verifyAdminKey(request.headers.get('Authorization'), env);
-  if (!authResult.valid) {
+  const authHeader = request.headers.get('Authorization');
+  const bearerToken = getBearerToken(authHeader);
+  if (bearerToken) {
+    const tokenResult = await verifyToken(bearerToken, env);
+    if (tokenResult.valid) {
+      return {
+        ok: true,
+        corsHeaders: createAdminNoStoreHeaders(corsPolicy.headers),
+        actor: tokenResult.user.username,
+        authType: 'jwt',
+        user: tokenResult.user,
+        token: bearerToken,
+      };
+    }
+  }
+
+  const sharedKeyResult = verifyAdminKey(authHeader, env);
+  if (!sharedKeyResult.valid) {
     return {
       ok: false,
       corsHeaders: corsPolicy.headers,
-      response: createUnauthorizedResponse(authResult.error, corsPolicy.headers),
+      response: createUnauthorizedResponse(sharedKeyResult.error, corsPolicy.headers),
     };
   }
 
@@ -81,6 +115,28 @@ export function authorizeAdminRequest(request, env, methods = DEFAULT_ADMIN_METH
     ok: true,
     corsHeaders: createAdminNoStoreHeaders(corsPolicy.headers),
     actor: 'admin',
+    authType: 'shared_key',
+    user: {
+      id: null,
+      username: 'admin',
+      role: 'admin',
+    },
+  };
+}
+
+export function requireAdminRole(authResult) {
+  if (!authResult.ok) {
+    return authResult;
+  }
+
+  if (authResult.user?.role === 'admin') {
+    return authResult;
+  }
+
+  return {
+    ok: false,
+    corsHeaders: authResult.corsHeaders,
+    response: createForbiddenRoleResponse(authResult.corsHeaders),
   };
 }
 

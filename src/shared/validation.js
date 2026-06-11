@@ -16,6 +16,9 @@ import {
 
 const studentIdPattern = /^\d{4}$|^\d{5}$|^\d{13}$/;
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+const usernamePattern = /^[a-zA-Z0-9_]+$/;
+const passwordPolicyPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[?!@#$%^&*\[\]{}])[A-Za-z\d?!@#$%^&*\[\]{}]+$/;
+const PASSWORD_ALLOWED_SPECIAL_CHARS = '?!@#$%^&*[]{}';
 
 function emptyToUndefined(value) {
   if (typeof value !== 'string') {
@@ -306,6 +309,50 @@ export const adminActionListQuerySchema = paginationSchema.extend({
   targetId: z.preprocess(emptyToUndefined, z.coerce.number().int().positive().optional()),
   actionType: z.preprocess(emptyToUndefined, z.string().max(50).optional()),
 });
+
+export const loginSchema = z.object({
+  username: z.string().trim().min(1, '用户名不能为空').max(50, '用户名不能超过50个字符'),
+  password: z.string().min(1, '密码不能为空').max(100, '密码不能超过100个字符'),
+  rememberMe: z.boolean().default(false),
+}).strict();
+
+export const createUserSchema = z.object({
+  username: z.string()
+    .trim()
+    .min(3, '用户名至少需要3个字符')
+    .max(50, '用户名不能超过50个字符')
+    .regex(usernamePattern, '用户名只能包含字母、数字和下划线'),
+  password: z.string()
+    .min(8, '密码至少需要8个字符')
+    .max(100, '密码不能超过100个字符')
+    .regex(passwordPolicyPattern, `密码必须包含大小写字母、数字和特殊字符（${PASSWORD_ALLOWED_SPECIAL_CHARS}）`),
+  displayName: z.string().trim().min(1, '显示名称不能为空').max(50, '显示名称不能超过50个字符'),
+  role: z.enum(['handler', 'admin'], {
+    error: () => ({ message: '角色无效' }),
+  }),
+}).strict();
+
+export const updateUserSchema = z.object({
+  displayName: z.string().trim().min(1, '显示名称不能为空').max(50, '显示名称不能超过50个字符').optional(),
+  role: z.enum(['handler', 'admin'], {
+    error: () => ({ message: '角色无效' }),
+  }).optional(),
+  isEnabled: z.boolean().optional(),
+}).strict().refine((value) => Object.keys(value).length > 0, {
+  message: '至少提供一个更新字段',
+});
+
+export const forgotPasswordSchema = z.object({
+  username: z.string().trim().min(1, '用户名不能为空').max(50, '用户名不能超过50个字符'),
+}).strict();
+
+export const resetPasswordSchema = z.object({
+  token: z.string().trim().min(1, '重置令牌不能为空'),
+  newPassword: z.string()
+    .min(8, '密码至少需要8个字符')
+    .max(100, '密码不能超过100个字符')
+    .regex(passwordPolicyPattern, `密码必须包含大小写字母、数字和特殊字符（${PASSWORD_ALLOWED_SPECIAL_CHARS}）`),
+}).strict();
 
 export const knowledgeIdSchema = z.coerce.number().int().positive('知识条目 ID 无效');
 

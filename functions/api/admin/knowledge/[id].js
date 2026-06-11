@@ -68,7 +68,7 @@ export async function onRequest(context) {
     return rateLimitResponse;
   }
 
-  const authResult = authorizeAdminRequest(request, env, ALLOWED_METHODS);
+  const authResult = await authorizeAdminRequest(request, env, ALLOWED_METHODS);
   if (!authResult.ok) {
     return authResult.response;
   }

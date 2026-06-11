@@ -33,6 +33,7 @@ npx wrangler kv namespace create RATE_LIMIT_KV
 
 - 应用限流计数
 - 健康检查观测快照
+- JWT 登出黑名单
 
 ## 3. 环境变量
 
@@ -40,9 +41,11 @@ npx wrangler kv namespace create RATE_LIMIT_KV
 
 ```bash
 ADMIN_SECRET_KEY="replace-with-real-secret"
+ADMIN_JWT_SECRET="replace-with-real-jwt-secret"
+ADMIN_RESET_EMAIL="admin@example.edu"
 RESEND_API_KEY="re_xxxxxxxxx"
 ENVIRONMENT="local"
-PUBLIC_BASE_URL="http://localhost:8787"
+PUBLIC_BASE_URL="http://localhost:8788"
 ```
 
 ### Pages Dashboard
@@ -50,12 +53,20 @@ PUBLIC_BASE_URL="http://localhost:8787"
 生产与预发环境至少配置：
 
 - `ADMIN_SECRET_KEY`
+- `ADMIN_JWT_SECRET`
 - `ENVIRONMENT`
 - `RESEND_API_KEY`
 
 可选配置：
 
 - `PUBLIC_BASE_URL`
+- `ADMIN_RESET_EMAIL`
+
+说明：
+
+- `ADMIN_SECRET_KEY` 仍用于共享密钥备用登录。
+- `ADMIN_JWT_SECRET` 用于 HMAC-SHA256 JWT 签名，生产环境应与共享密钥不同且至少 32 字符。
+- `ADMIN_RESET_EMAIL` 是管理员密码重置邮件收件人；当前 `admin_users` 表不保存邮箱，未配置时会发送到 `support@calvin-xia.cn`。
 
 ## 4. 本地开发与迁移
 
@@ -66,10 +77,11 @@ npm run dev
 
 默认访问：
 
-- `http://localhost:8787/`
-- `http://localhost:8787/admin.html`
-- `http://localhost:8787/tracking.html`
-- `http://localhost:8787/health.html`
+- `http://localhost:8788/`
+- `http://localhost:8788/login.html`
+- `http://localhost:8788/admin.html`
+- `http://localhost:8788/tracking.html`
+- `http://localhost:8788/health.html`
 
 本地检查首页与后台页时，同时确认桌面端左侧菜单常驻、移动端左下角圆形菜单按钮可打开左侧抽屉，且后台问题详情抽屉仍从右侧覆盖。
 
@@ -98,6 +110,7 @@ npm run deploy
 - `0007_bound_public_insights_indexes.sql` 为公开心理热区接口补充带公开与时间范围约束的聚合索引。
 - `0008_replace_counseling_single_column_indexes.sql` 是已运行旧版 `0006` 环境的前向修复迁移，会替换早期单列索引为 `(category, distress_type)` 与 `(category, scene_tag)` 复合索引。
 - `0009_add_knowledge_items.sql` 新增动态公开知识库表、索引与三条初始心理支持建议。
+- `0010_add_admin_auth.sql` 新增 `admin_users` 与 `admin_password_reset_tokens`，并插入默认管理员 `admin/admin123`。上线后应立即用登录页重置或在 D1 中更新该账号密码。
 - 新数据库按迁移顺序执行即可；已经应用过旧版 `0006` 的远端数据库也需要继续执行到最新迁移。
 
 预发数据库迁移：
@@ -120,9 +133,11 @@ npm run d1:migrate:preview
 
 - 确认本次发布前已经重新生成 `styles.css`。使用 `npm run build`，或直接运行带有自动预编译的 `npm run deploy` / `npm run pages:deploy`。
 - 如果校园 GeoJSON 源数据有变化，确认已经执行 `npm run build:map -- <geojson>` 并提交更新后的 `storage/campus-care-map.json`
-- 确认 `ADMIN_SECRET_KEY` 已在目标环境配置
+- 确认 `ADMIN_SECRET_KEY` 与 `ADMIN_JWT_SECRET` 已在目标环境配置
 - 确认 `RESEND_API_KEY` 已在目标环境配置，且 `support@calvin-xia.cn` 可作为 Resend 发件人与回复地址
+- 如需密码重置邮件投递到指定收件箱，确认 `ADMIN_RESET_EMAIL` 已配置
 - 确认 D1 与 KV 绑定存在
+- 执行 `0010_add_admin_auth.sql` 后，首次使用 `admin/admin123` 登录并立即更改默认密码
 - 访问 `/health.html` 检查 D1 / KV 状态
 - 使用移动端视口检查 `/` 与 `/admin.html` 的侧边菜单：左下角圆形菜单按钮可打开抽屉，点击遮罩、按 `Escape` 或点击导航链接后可关闭，后台详情抽屉层级不被左侧菜单遮挡
 - 在后台分别执行 CSV 与 JSON 导出，确认审计日志、下载文件和 JSON 嵌套备注/回复正常
