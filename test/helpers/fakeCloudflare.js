@@ -1,3 +1,5 @@
+import { getSLAStatus } from '../../src/shared/sla.js';
+
 function normalizeSql(sql) {
   return sql.replace(/\s+/g, ' ').trim();
 }
@@ -67,6 +69,8 @@ class FakeD1Database {
     this.adminActions = [];
     this.knowledgeItems = [];
     this.adminUsers = [];
+    this.slaRules = [];
+    this.assignRules = [];
     this.passwordResetTokens = [];
     this.rateLimitState = [];
     this.requestObservations = [];
@@ -77,6 +81,8 @@ class FakeD1Database {
       action: 1,
       knowledgeItem: 1,
       adminUser: 1,
+      slaRule: 1,
+      assignRule: 1,
       observation: 1,
     };
   }
@@ -89,6 +95,8 @@ class FakeD1Database {
       adminActions: clone(this.adminActions),
       knowledgeItems: clone(this.knowledgeItems),
       adminUsers: clone(this.adminUsers),
+      slaRules: clone(this.slaRules),
+      assignRules: clone(this.assignRules),
       passwordResetTokens: clone(this.passwordResetTokens),
       rateLimitState: clone(this.rateLimitState),
       requestObservations: clone(this.requestObservations),
@@ -103,6 +111,8 @@ class FakeD1Database {
     this.adminActions = snapshot.adminActions;
     this.knowledgeItems = snapshot.knowledgeItems;
     this.adminUsers = snapshot.adminUsers;
+    this.slaRules = snapshot.slaRules;
+    this.assignRules = snapshot.assignRules;
     this.passwordResetTokens = snapshot.passwordResetTokens;
     this.rateLimitState = snapshot.rateLimitState;
     this.requestObservations = snapshot.requestObservations;
@@ -167,6 +177,18 @@ class FakeD1Database {
 
   findAdminUserByUsername(username) {
     return this.adminUsers.find((user) => user.username === username);
+  }
+
+  findSLARuleById(ruleId) {
+    return this.slaRules.find((rule) => rule.id === Number(ruleId));
+  }
+
+  findSLARuleByPriority(priority) {
+    return this.slaRules.find((rule) => rule.priority === priority);
+  }
+
+  findAssignRuleById(ruleId) {
+    return this.assignRules.find((rule) => rule.id === Number(ruleId));
   }
 
   filterAdminIssues(sql, bindings = []) {
@@ -234,6 +256,20 @@ class FakeD1Database {
       issues = issues.filter((issue) => String(issue.assigned_to || '').trim() !== '');
     } else if (sql.includes("COALESCE(TRIM(issues.assigned_to), '') = ''")) {
       issues = issues.filter((issue) => String(issue.assigned_to || '').trim() === '');
+    }
+
+    if (sql.includes('issues.sla_response_deadline') || sql.includes('issues.sla_resolution_deadline')) {
+      const wantsViolated = sql.includes("datetime(issues.sla_response_deadline) < datetime('now')")
+        || sql.includes("datetime(issues.sla_resolution_deadline) < datetime('now')");
+      const wantsWarning = sql.includes("datetime(issues.sla_response_deadline) <= datetime('now', '+1 hour')")
+        || sql.includes("datetime(issues.sla_resolution_deadline) <= datetime('now', '+1 hour')");
+      const wantsNormal = sql.includes('NOT ((');
+      issues = issues.filter((issue) => {
+        const status = getSLAStatus(issue);
+        return (wantsViolated && status === 'violated')
+          || (wantsWarning && status === 'warning')
+          || (wantsNormal && status === 'normal');
+      });
     }
 
     if (sql.includes('date(issues.created_at) >= date(?)')) {
@@ -328,9 +364,12 @@ class FakeD1Database {
         priority: valuesByColumn.priority,
         status: valuesByColumn.status,
         public_summary: null,
-        assigned_to: null,
+        assigned_to: valuesByColumn.assigned_to ?? null,
+        assigned_at: valuesByColumn.assigned_at ?? null,
         first_response_at: null,
         resolved_at: null,
+        sla_response_deadline: valuesByColumn.sla_response_deadline ?? null,
+        sla_resolution_deadline: valuesByColumn.sla_resolution_deadline ?? null,
         created_at: valuesByColumn.created_at,
         updated_at: valuesByColumn.updated_at,
       };
@@ -436,6 +475,47 @@ class FakeD1Database {
       };
       this.adminUsers.push(user);
       return { success: true, meta: { last_row_id: user.id, changes: 1 } };
+    }
+
+    if (sql.startsWith('INSERT INTO sla_rules (')) {
+      const columns = parseInsertColumns(sql, 'sla_rules');
+      const valuesByColumn = Object.fromEntries(columns.map((column, index) => [column, bindings[index]]));
+      if (this.findSLARuleByPriority(valuesByColumn.priority)) {
+        throw new Error('UNIQUE constraint failed: sla_rules.priority');
+      }
+
+      const now = new Date().toISOString();
+      const rule = {
+        id: this.ids.slaRule++,
+        name: valuesByColumn.name,
+        priority: valuesByColumn.priority,
+        response_hours: valuesByColumn.response_hours,
+        resolution_hours: valuesByColumn.resolution_hours,
+        is_enabled: valuesByColumn.is_enabled ?? 1,
+        created_at: valuesByColumn.created_at ?? now,
+        updated_at: valuesByColumn.updated_at ?? now,
+      };
+      this.slaRules.push(rule);
+      return { success: true, meta: { last_row_id: rule.id, changes: 1 } };
+    }
+
+    if (sql.startsWith('INSERT INTO assign_rules (')) {
+      const columns = parseInsertColumns(sql, 'assign_rules');
+      const valuesByColumn = Object.fromEntries(columns.map((column, index) => [column, bindings[index]]));
+      const now = new Date().toISOString();
+      const rule = {
+        id: this.ids.assignRule++,
+        name: valuesByColumn.name,
+        category: valuesByColumn.category ?? null,
+        keywords: valuesByColumn.keywords ?? '[]',
+        assign_to: valuesByColumn.assign_to,
+        priority: valuesByColumn.priority ?? 0,
+        is_enabled: valuesByColumn.is_enabled ?? 1,
+        created_at: valuesByColumn.created_at ?? now,
+        updated_at: valuesByColumn.updated_at ?? now,
+      };
+      this.assignRules.push(rule);
+      return { success: true, meta: { last_row_id: rule.id, changes: 1 } };
     }
 
     if (sql.startsWith('INSERT INTO admin_password_reset_tokens (')) {
@@ -636,6 +716,63 @@ class FakeD1Database {
       return row ? clone(row) : null;
     }
 
+    if (sql === 'SELECT * FROM sla_rules WHERE priority = ? AND is_enabled = 1 LIMIT 1') {
+      const [priority] = bindings;
+      const row = this.slaRules.find((rule) => rule.priority === priority && Number(rule.is_enabled) === 1);
+      return row ? clone(row) : null;
+    }
+
+    if (sql === 'SELECT id FROM sla_rules WHERE priority = ? LIMIT 1') {
+      const [priority] = bindings;
+      const row = this.findSLARuleByPriority(priority);
+      return row ? { id: row.id } : null;
+    }
+
+    if (sql === 'SELECT * FROM sla_rules WHERE id = ? LIMIT 1') {
+      const [ruleId] = bindings;
+      const row = this.findSLARuleById(ruleId);
+      return row ? clone(row) : null;
+    }
+
+    if (sql.startsWith('SELECT * FROM sla_rules ORDER BY')) {
+      const priorityOrder = new Map([
+        ['urgent', 1],
+        ['high', 2],
+        ['normal', 3],
+        ['low', 4],
+      ]);
+      return {
+        results: this.slaRules
+          .slice()
+          .sort((left, right) => (priorityOrder.get(left.priority) || 5) - (priorityOrder.get(right.priority) || 5) || left.id - right.id)
+          .map((rule) => clone(rule)),
+      };
+    }
+
+    if (sql === 'SELECT * FROM assign_rules WHERE id = ? LIMIT 1') {
+      const [ruleId] = bindings;
+      const row = this.findAssignRuleById(ruleId);
+      return row ? clone(row) : null;
+    }
+
+    if (sql === 'SELECT * FROM assign_rules WHERE is_enabled = 1 ORDER BY priority DESC, id ASC') {
+      return {
+        results: this.assignRules
+          .filter((rule) => Number(rule.is_enabled) === 1)
+          .sort((left, right) => Number(right.priority) - Number(left.priority) || left.id - right.id)
+          .map((rule) => clone(rule)),
+      };
+    }
+
+    if (sql === 'SELECT * FROM assign_rules ORDER BY priority DESC, id ASC') {
+      return {
+        results: this.assignRules
+          .slice()
+          .sort((left, right) => Number(right.priority) - Number(left.priority) || left.id - right.id)
+          .map((rule) => clone(rule)),
+      };
+    }
+
     if (sql.startsWith('SELECT id, username, display_name, role, is_enabled, last_login_at, created_at, updated_at FROM admin_users')) {
       return {
         results: this.adminUsers
@@ -650,6 +787,18 @@ class FakeD1Database {
             last_login_at: user.last_login_at,
             created_at: user.created_at,
             updated_at: user.updated_at,
+          })),
+      };
+    }
+
+    if (sql.startsWith('SELECT username, display_name FROM admin_users WHERE is_enabled = 1')) {
+      return {
+        results: this.adminUsers
+          .filter((user) => Number(user.is_enabled) === 1)
+          .sort((left, right) => left.username.localeCompare(right.username))
+          .map((user) => ({
+            username: user.username,
+            display_name: user.display_name,
           })),
       };
     }
@@ -672,6 +821,40 @@ class FakeD1Database {
     if (sql.startsWith('SELECT COUNT(*) AS total FROM issues')) {
       return {
         total: this.filterAdminIssues(sql, bindings).length,
+      };
+    }
+
+    if (sql.startsWith('SELECT * FROM issues') && sql.includes('ORDER BY created_at ASC, id ASC')) {
+      return {
+        results: this.filterAdminIssues(sql, bindings).sort((left, right) => left.created_at.localeCompare(right.created_at) || left.id - right.id).map((issue) => clone(issue)),
+      };
+    }
+
+    if (sql.startsWith('SELECT id, tracking_code, priority, status, first_response_at, resolved_at, assigned_to, sla_response_deadline, sla_resolution_deadline, created_at FROM issues')) {
+      const limit = Number(bindings.at(-1)) || this.issues.length;
+      const dateBindings = bindings.slice(0, -1);
+      let bindingIndex = 0;
+      let issues = this.issues.filter((issue) => (
+        issue.sla_response_deadline != null
+        || issue.sla_resolution_deadline != null
+      ));
+
+      if (sql.includes('date(created_at) >= date(?)')) {
+        const startDate = dateBindings[bindingIndex];
+        bindingIndex += 1;
+        issues = issues.filter((issue) => String(issue.created_at || '').slice(0, 10) >= startDate);
+      }
+
+      if (sql.includes('date(created_at) <= date(?)')) {
+        const endDate = dateBindings[bindingIndex];
+        issues = issues.filter((issue) => String(issue.created_at || '').slice(0, 10) <= endDate);
+      }
+
+      return {
+        results: issues
+          .sort((left, right) => right.created_at.localeCompare(left.created_at) || right.id - left.id)
+          .slice(0, limit)
+          .map((issue) => clone(issue)),
       };
     }
 
@@ -887,6 +1070,50 @@ class FakeD1Database {
       return { success: true, meta: { changes: 1 } };
     }
 
+    if (sql.startsWith('UPDATE sla_rules SET ')) {
+      const match = sql.match(/^UPDATE sla_rules SET (.+) WHERE id = \? AND updated_at = \?$/);
+      if (!match) {
+        throw new Error(`Unsupported SLA rule update statement: ${sql}`);
+      }
+
+      const assignments = match[1].split(',').map((item) => item.trim());
+      const ruleId = bindings[assignments.length];
+      const expectedUpdatedAt = bindings[assignments.length + 1];
+      const rule = this.findSLARuleById(ruleId);
+      if (!rule || rule.updated_at !== expectedUpdatedAt) {
+        return { success: true, meta: { changes: 0 } };
+      }
+
+      assignments.forEach((assignment, index) => {
+        const column = assignment.replace(/ = \?$/, '');
+        rule[column] = bindings[index];
+      });
+
+      return { success: true, meta: { changes: 1 } };
+    }
+
+    if (sql.startsWith('UPDATE assign_rules SET ')) {
+      const match = sql.match(/^UPDATE assign_rules SET (.+) WHERE id = \? AND updated_at = \?$/);
+      if (!match) {
+        throw new Error(`Unsupported assign rule update statement: ${sql}`);
+      }
+
+      const assignments = match[1].split(',').map((item) => item.trim());
+      const ruleId = bindings[assignments.length];
+      const expectedUpdatedAt = bindings[assignments.length + 1];
+      const rule = this.findAssignRuleById(ruleId);
+      if (!rule || rule.updated_at !== expectedUpdatedAt) {
+        return { success: true, meta: { changes: 0 } };
+      }
+
+      assignments.forEach((assignment, index) => {
+        const column = assignment.replace(/ = \?$/, '');
+        rule[column] = bindings[index];
+      });
+
+      return { success: true, meta: { changes: 1 } };
+    }
+
     if (sql === 'UPDATE admin_password_reset_tokens SET used_at = ? WHERE token_hash = ? AND used_at IS NULL') {
       const [usedAt, tokenHash] = bindings;
       const row = this.passwordResetTokens.find((item) => item.token_hash === tokenHash && item.used_at == null);
@@ -903,6 +1130,13 @@ class FakeD1Database {
       const before = this.knowledgeItems.length;
       this.knowledgeItems = this.knowledgeItems.filter((item) => item.id !== itemId || item.updated_at !== expectedUpdatedAt);
       return { success: true, meta: { changes: before - this.knowledgeItems.length } };
+    }
+
+    if (sql === 'DELETE FROM assign_rules WHERE id = ?') {
+      const [ruleId] = bindings;
+      const before = this.assignRules.length;
+      this.assignRules = this.assignRules.filter((rule) => rule.id !== Number(ruleId));
+      return { success: true, meta: { changes: before - this.assignRules.length } };
     }
 
     if (sql.startsWith('SELECT issues.id,') && sql.includes('FROM issues')) {

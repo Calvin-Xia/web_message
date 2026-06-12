@@ -13,6 +13,7 @@ const MAX_HISTORY_ITEMS = 8;
 const statusLabels = { submitted: '已提交', in_review: '审核中', in_progress: '处理中', resolved: '已解决', closed: '已关闭' };
 const categoryLabels = { academic: '学业相关', facility: '设施问题', service: '服务咨询', complaint: '投诉建议', counseling: '心理咨询', other: '其他' };
 const priorityLabels = { low: '低', normal: '普通', high: '高', urgent: '紧急' };
+const slaStatusLabels = { normal: '正常', warning: '即将超时', violated: '已超时' };
 const statusTransitions = {
   submitted: ['submitted', 'in_review', 'closed'],
   in_review: ['in_review', 'in_progress', 'closed'],
@@ -26,6 +27,11 @@ const statusColors = {
   in_progress: '#5f57c6',
   resolved: '#13795b',
   closed: '#64748b',
+};
+const slaStatusColors = {
+  normal: '#13795b',
+  warning: '#d98a17',
+  violated: '#b23a32',
 };
 const exportFormatLabels = { csv: 'CSV', json: 'JSON' };
 const CLEARABLE_FILTER_KEYS = new Set([
@@ -42,6 +48,7 @@ const CLEARABLE_FILTER_KEYS = new Set([
   'hasNotes',
   'hasReplies',
   'isAssigned',
+  'slaStatus',
   'sort',
 ]);
 const DRAWER_FOCUS_SELECTOR = [
@@ -58,15 +65,22 @@ const state = {
   page: 1,
   pageSize: 20,
   metricsPeriod: 'week',
+  assignStatsPeriod: 'week',
   activeIssueId: null,
   activeIssue: null,
   availableAssignees: [],
   metrics: null,
   issues: [],
+  selectedIssueIds: new Set(),
+  slaRules: [],
+  assignRules: [],
   knowledgeItems: [],
   users: [],
   editingKnowledgeId: null,
   editingUserId: null,
+  editingSlaRuleId: null,
+  editingAssignRuleId: null,
+  pendingBatchPayload: null,
   searchHistory: loadStorageArray(SEARCH_HISTORY_KEY),
   exportHistory: loadStorageArray(EXPORT_HISTORY_KEY),
 };
@@ -197,6 +211,39 @@ function formatDuration(seconds) {
   return `${Math.max(1, minutes)}m`;
 }
 
+function formatHours(value) {
+  const numeric = Number(value) || 0;
+  return `${numeric.toFixed(numeric % 1 === 0 ? 0 : 1)}h`;
+}
+
+function formatSlaCountdown(item) {
+  const candidates = [item.slaResponseDeadline, item.slaResolutionDeadline].filter(Boolean);
+  if (!candidates.length) {
+    return '未设置';
+  }
+
+  const now = Date.now();
+  const nextDeadline = candidates
+    .map((value) => Date.parse(value))
+    .filter((value) => !Number.isNaN(value))
+    .sort((left, right) => left - right)[0];
+  if (!nextDeadline) {
+    return '未设置';
+  }
+
+  const diff = nextDeadline - now;
+  if (diff < 0) {
+    return `超时 ${formatDuration(Math.abs(diff) / 1000)}`;
+  }
+
+  return `剩余 ${formatDuration(diff / 1000)}`;
+}
+
+function renderSlaStatusBadge(status, countdown = '') {
+  const safeStatus = status in slaStatusLabels ? status : 'normal';
+  return `<span class="rounded-full px-3 py-1 text-xs font-semibold" style="background:${slaStatusColors[safeStatus]}1f;color:${slaStatusColors[safeStatus]}">${escapeHtml(slaStatusLabels[safeStatus])}${countdown ? ` · ${escapeHtml(countdown)}` : ''}</span>`;
+}
+
 function summarizeFilters(filters) {
   const summary = [];
   if (filters.q) summary.push(`关键词: ${filters.q}`);
@@ -207,6 +254,7 @@ function summarizeFilters(filters) {
   if (filters.sceneTag.length) summary.push(`场景 ${filters.sceneTag.length} 项`);
   if (filters.startDate || filters.endDate) summary.push(`时间 ${filters.startDate || '最早'} - ${filters.endDate || '最新'}`);
   if (filters.assignedTo) summary.push(`指派 ${filters.assignedTo}`);
+  if (filters.slaStatus) summary.push(`SLA ${slaStatusLabels[filters.slaStatus] || filters.slaStatus}`);
   return summary.length ? summary.join(' · ') : '全部数据';
 }
 
@@ -342,6 +390,14 @@ function updatePeriodButtons() {
   });
 }
 
+function updateAssignPeriodButtons() {
+  document.querySelectorAll('[data-assign-period-button]').forEach((button) => {
+    const active = button.dataset.assignPeriodButton === state.assignStatsPeriod;
+    button.dataset.active = active ? 'true' : 'false';
+    button.setAttribute('aria-pressed', String(active));
+  });
+}
+
 function getTriStateFilterValue(id) {
   const value = document.getElementById(id).value;
   return value === '' ? '' : value;
@@ -367,6 +423,7 @@ function getFilters() {
     hasNotes: getTriStateFilterValue('hasNotesFilter'),
     hasReplies: getTriStateFilterValue('hasRepliesFilter'),
     isAssigned: getTriStateFilterValue('isAssignedFilter'),
+    slaStatus: getTriStateFilterValue('slaStatusFilter'),
     sortField: document.getElementById('sortFieldFilter').value,
     sortOrder: document.getElementById('sortOrderFilter').value,
   };
@@ -403,6 +460,7 @@ function buildListQuery(page = 1) {
   appendFilterValue(params, 'hasNotes', filters.hasNotes);
   appendFilterValue(params, 'hasReplies', filters.hasReplies);
   appendFilterValue(params, 'isAssigned', filters.isAssigned);
+  appendFilterValue(params, 'slaStatus', filters.slaStatus);
   appendFilterValue(params, 'sortField', filters.sortField);
   appendFilterValue(params, 'sortOrder', filters.sortOrder);
   return params.toString();
@@ -437,6 +495,7 @@ function buildExportQuery(format = getExportFormat()) {
   appendFilterValue(params, 'hasNotes', filters.hasNotes);
   appendFilterValue(params, 'hasReplies', filters.hasReplies);
   appendFilterValue(params, 'isAssigned', filters.isAssigned);
+  appendFilterValue(params, 'slaStatus', filters.slaStatus);
   return params.toString();
 }
 
@@ -458,6 +517,7 @@ function syncUrl(page = state.page) {
   appendFilterValue(params, 'hasNotes', filters.hasNotes);
   appendFilterValue(params, 'hasReplies', filters.hasReplies);
   appendFilterValue(params, 'isAssigned', filters.isAssigned);
+  appendFilterValue(params, 'slaStatus', filters.slaStatus);
   appendFilterValue(params, 'sortField', filters.sortField);
   appendFilterValue(params, 'sortOrder', filters.sortOrder);
   const next = params.toString();
@@ -476,6 +536,7 @@ function restoreFiltersFromUrl() {
   document.getElementById('hasNotesFilter').value = params.get('hasNotes') || '';
   document.getElementById('hasRepliesFilter').value = params.get('hasReplies') || '';
   document.getElementById('isAssignedFilter').value = params.get('isAssigned') || '';
+  document.getElementById('slaStatusFilter').value = params.get('slaStatus') || '';
   document.getElementById('sortFieldFilter').value = params.get('sortField') || 'createdAt';
   document.getElementById('sortOrderFilter').value = params.get('sortOrder') || 'desc';
   setMultiFilterValues('status', (params.get('status') || '').split(',').filter(Boolean));
@@ -498,6 +559,7 @@ function syncAdvancedAdminFiltersState() {
     || document.getElementById('hasNotesFilter').value
     || document.getElementById('hasRepliesFilter').value
     || document.getElementById('isAssignedFilter').value
+    || document.getElementById('slaStatusFilter').value
     || getMultiFilterValues('distressType').length > 0
     || getMultiFilterValues('sceneTag').length > 0
     || document.getElementById('sortFieldFilter').value !== 'createdAt'
@@ -584,6 +646,7 @@ function renderActiveFilterChips(filters) {
   if (filters.hasNotes) chips.push({ key: 'hasNotes', label: filters.hasNotes === 'true' ? '有备注' : '无备注' });
   if (filters.hasReplies) chips.push({ key: 'hasReplies', label: filters.hasReplies === 'true' ? '有回复' : '无回复' });
   if (filters.isAssigned) chips.push({ key: 'isAssigned', label: filters.isAssigned === 'true' ? '已分配' : '未分配' });
+  if (filters.slaStatus) chips.push({ key: 'slaStatus', label: `SLA: ${slaStatusLabels[filters.slaStatus] || filters.slaStatus}` });
   if (filters.sortField !== 'createdAt' || filters.sortOrder !== 'desc') {
     chips.push({
       key: 'sort',
@@ -623,6 +686,7 @@ function clearFilter(key, value = '') {
     hasNotes: () => { document.getElementById('hasNotesFilter').value = ''; },
     hasReplies: () => { document.getElementById('hasRepliesFilter').value = ''; },
     isAssigned: () => { document.getElementById('isAssignedFilter').value = ''; },
+    slaStatus: () => { document.getElementById('slaStatusFilter').value = ''; },
     sort: () => {
       document.getElementById('sortFieldFilter').value = 'createdAt';
       document.getElementById('sortOrderFilter').value = 'desc';
@@ -841,13 +905,119 @@ function renderTrendChart(trends) {
     <div class="chart-summary">${escapeHtml(summary)}</div>
   `;
 }
+
+function getSelectedIssueIds() {
+  return Array.from(state.selectedIssueIds);
+}
+
+function syncBatchToolbar() {
+  const toolbar = document.getElementById('batchToolbar');
+  const count = state.selectedIssueIds.size;
+  if (!toolbar) {
+    return;
+  }
+
+  toolbar.hidden = state.issues.length === 0;
+  document.getElementById('batchSelectionCount').textContent = `已选择 ${count} 条`;
+  document.getElementById('executeBatchButton').disabled = count === 0;
+  const selectAll = document.getElementById('selectAllIssues');
+  selectAll.checked = state.issues.length > 0 && state.issues.every((item) => state.selectedIssueIds.has(item.id));
+  selectAll.indeterminate = count > 0 && !selectAll.checked;
+  document.querySelectorAll('[data-issue-select]').forEach((input) => {
+    input.checked = state.selectedIssueIds.has(Number(input.value));
+  });
+}
+
+function buildBatchPayload() {
+  const updates = {};
+  const status = document.getElementById('batchStatus').value;
+  const priority = document.getElementById('batchPriority').value;
+  const assignedTo = document.getElementById('batchAssignedTo').value.trim();
+
+  if (status) updates.status = status;
+  if (priority) updates.priority = priority;
+  if (assignedTo) updates.assignedTo = assignedTo;
+
+  const selectedIds = getSelectedIssueIds();
+  const selectedIssues = state.issues.filter((item) => selectedIds.includes(item.id));
+  const updatedAt = selectedIssues.reduce((latest, item) => (item.updatedAt > latest ? item.updatedAt : latest), '');
+
+  return {
+    issueIds: selectedIds,
+    updates,
+    updatedAt,
+  };
+}
+
+function summarizeBatchPayload(payload) {
+  const parts = [];
+  if (payload.updates.status) parts.push(`状态改为 ${statusLabels[payload.updates.status] || payload.updates.status}`);
+  if (payload.updates.priority) parts.push(`优先级改为 ${priorityLabels[payload.updates.priority] || payload.updates.priority}`);
+  if (payload.updates.assignedTo) parts.push(`指派给 ${payload.updates.assignedTo}`);
+  return `将对 ${payload.issueIds.length} 条问题执行：${parts.join('、')}`;
+}
+
+function openBatchConfirm() {
+  const payload = buildBatchPayload();
+  if (payload.issueIds.length === 0) {
+    setNotification('batchNotification', '请先选择至少一个问题。', 'error');
+    return;
+  }
+
+  if (Object.keys(payload.updates).length === 0) {
+    setNotification('batchNotification', '请选择至少一种批量更新内容。', 'error');
+    return;
+  }
+
+  state.pendingBatchPayload = payload;
+  document.getElementById('batchConfirmSummary').textContent = summarizeBatchPayload(payload);
+  document.getElementById('batchConfirmModal').hidden = false;
+}
+
+function closeBatchConfirm() {
+  state.pendingBatchPayload = null;
+  document.getElementById('batchConfirmModal').hidden = true;
+}
+
+async function executeBatchUpdate() {
+  if (!state.pendingBatchPayload) {
+    return;
+  }
+
+  const button = document.getElementById('batchConfirmButton');
+  const payload = state.pendingBatchPayload;
+  try {
+    setButtonBusy(button, true, '执行中...');
+    setNotification('batchNotification', '正在执行批量操作...', 'loading');
+    const result = await apiFetch('/admin/issues/batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    closeBatchConfirm();
+    state.selectedIssueIds.clear();
+    document.getElementById('batchStatus').value = '';
+    document.getElementById('batchPriority').value = '';
+    document.getElementById('batchAssignedTo').value = '';
+    await loadDashboard(state.page, { refreshMetrics: true });
+    const failedText = result.failedIds?.length ? `，失败 ${result.failedIds.length} 条` : '';
+    setNotification('batchNotification', `批量操作完成：成功 ${result.updatedCount} 条${failedText}。`, result.failedIds?.length ? 'info' : 'success');
+  } catch (error) {
+    setNotification('batchNotification', error.message, 'error');
+  } finally {
+    setButtonBusy(button, false, '', '确认执行');
+  }
+}
+
 function renderIssueList(items, pagination) {
   const filters = getFilters();
   const container = document.getElementById('issuesList');
   state.issues = items;
+  state.selectedIssueIds = new Set([...state.selectedIssueIds].filter((id) => items.some((item) => item.id === id)));
   updateSearchSuggestions();
   renderActiveFilterChips(filters);
   renderQueueSummary(pagination, filters);
+  syncBatchToolbar();
 
   if (!items.length) {
     container.innerHTML = `
@@ -860,6 +1030,7 @@ function renderIssueList(items, pagination) {
       document.getElementById('resetFilters').click();
     });
     document.getElementById('paginationContainer').innerHTML = '';
+    syncBatchToolbar();
     return;
   }
 
@@ -868,9 +1039,11 @@ function renderIssueList(items, pagination) {
       <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div class="space-y-3">
           <div class="flex flex-wrap items-center gap-2">
+            <label class="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1 text-xs font-semibold text-[#172033]"><input data-issue-select type="checkbox" value="${item.id}" class="h-4 w-4 rounded border-[#b9c3d6] text-[#2457d6] focus:ring-[#2457d6]" ${state.selectedIssueIds.has(item.id) ? 'checked' : ''}>选择</label>
             <span class="status-token" data-status="${escapeHtml(item.status)}">${escapeHtml(statusLabels[item.status] || item.status)}</span>
             <span class="priority-token" data-priority="${escapeHtml(item.priority)}">${escapeHtml(priorityLabels[item.priority] || item.priority)}</span>
             <span class="category-token">${escapeHtml(categoryLabels[item.category] || item.category)}</span>
+            ${renderSlaStatusBadge(item.slaStatus, formatSlaCountdown(item))}
             ${item.category === 'counseling' && item.distressType ? `<span class="mini-token">${escapeHtml(distressTypeLabels[item.distressType] || item.distressType)}</span>` : ''}
             ${item.category === 'counseling' && item.sceneTag ? `<span class="mini-token">${escapeHtml(sceneTagLabels[item.sceneTag] || item.sceneTag)}</span>` : ''}
             ${item.hasNotes ? `<span class="mini-token">备注 ${item.noteCount}</span>` : ''}
@@ -884,10 +1057,13 @@ function renderIssueList(items, pagination) {
             <div><strong class="text-[#172033]">姓名：</strong>${escapeHtml(item.name)}</div>
             <div><strong class="text-[#172033]">学号：</strong>${escapeHtml(item.studentId)}</div>
             <div><strong class="text-[#172033]">指派：</strong>${highlightText(item.assignedTo || '未指派', filters.q)}</div>
+            <div><strong class="text-[#172033]">分配：</strong>${escapeHtml(formatDate(item.assignedAt))}</div>
             <div><strong class="text-[#172033]">公开：</strong>${item.isPublic ? '是' : '否'}</div>
             <div><strong class="text-[#172033]">上报：</strong>${item.isReported ? '是' : '否'}</div>
             <div><strong class="text-[#172033]">困扰：</strong>${item.category === 'counseling' && item.distressType ? escapeHtml(distressTypeLabels[item.distressType] || item.distressType) : '无'}</div>
             <div><strong class="text-[#172033]">场景：</strong>${item.category === 'counseling' && item.sceneTag ? escapeHtml(sceneTagLabels[item.sceneTag] || item.sceneTag) : '无'}</div>
+            <div><strong class="text-[#172033]">SLA 响应：</strong>${escapeHtml(formatDate(item.slaResponseDeadline))}</div>
+            <div><strong class="text-[#172033]">SLA 解决：</strong>${escapeHtml(formatDate(item.slaResolutionDeadline))}</div>
             <div><strong class="text-[#172033]">更新：</strong>${escapeHtml(formatDate(item.updatedAt))}</div>
           </div>
         </div>
@@ -905,8 +1081,20 @@ function renderIssueList(items, pagination) {
   container.querySelectorAll('.open-detail').forEach((button) => {
     button.addEventListener('click', () => openDrawer(Number(button.dataset.id), button));
   });
+  container.querySelectorAll('[data-issue-select]').forEach((input) => {
+    input.addEventListener('change', () => {
+      const issueId = Number(input.value);
+      if (input.checked) {
+        state.selectedIssueIds.add(issueId);
+      } else {
+        state.selectedIssueIds.delete(issueId);
+      }
+      syncBatchToolbar();
+    });
+  });
 
   renderPagination(document.getElementById('paginationContainer'), pagination, (nextPage) => loadDashboard(nextPage, { refreshMetrics: false }).catch((error) => setNotification('adminNotification', error.message, 'error')));
+  syncBatchToolbar();
 }
 
 async function loadIssues(page = 1) {
@@ -940,6 +1128,8 @@ async function loadDashboard(page = 1, { refreshMetrics = false } = {}) {
   const [issuesResult] = await Promise.all([
     loadIssues(page),
     loadMetrics(refreshMetrics),
+    loadAssignStats(),
+    loadSlaAlerts(),
   ]);
   setNotification('adminNotification', '');
   setNotification('metricsNotification', '');
@@ -1297,6 +1487,366 @@ function handleUserListClick(event) {
   }
 }
 
+function getActiveSlaRule() {
+  return state.slaRules.find((item) => item.id === state.editingSlaRuleId) || null;
+}
+
+function renderSlaRules() {
+  const container = document.getElementById('slaRulesList');
+  if (!container) {
+    return;
+  }
+
+  if (state.slaRules.length === 0) {
+    container.innerHTML = '<div class="empty-state rounded-[1.4rem] px-5 py-8 text-center text-sm leading-7 text-[#5f6b80]">暂无 SLA 规则。</div>';
+    return;
+  }
+
+  container.innerHTML = `
+    <table class="w-full min-w-[720px] border-separate border-spacing-y-2 text-left text-sm">
+      <thead class="text-xs uppercase tracking-[0.2em] text-[#72809a]"><tr><th class="px-4 py-2">规则</th><th class="px-4 py-2">优先级</th><th class="px-4 py-2">响应</th><th class="px-4 py-2">解决</th><th class="px-4 py-2">状态</th><th class="px-4 py-2 text-right">操作</th></tr></thead>
+      <tbody>
+        ${state.slaRules.map((rule) => `
+          <tr class="bg-white/72 align-middle">
+            <td class="rounded-l-[1rem] px-4 py-3 font-semibold text-[#172033]">${escapeHtml(rule.name)}</td>
+            <td class="px-4 py-3"><span class="priority-token" data-priority="${escapeHtml(rule.priority)}">${escapeHtml(priorityLabels[rule.priority] || rule.priority)}</span></td>
+            <td class="px-4 py-3 text-[#445069]">${escapeHtml(String(rule.responseHours))} 小时</td>
+            <td class="px-4 py-3 text-[#445069]">${escapeHtml(String(rule.resolutionHours))} 小时</td>
+            <td class="px-4 py-3"><span class="rounded-full px-3 py-1 text-xs font-semibold ${rule.isEnabled ? 'bg-[rgba(19,121,91,0.12)] text-[#13795b]' : 'bg-[rgba(23,32,51,0.08)] text-[#4c566b]'}">${rule.isEnabled ? '启用' : '禁用'}</span></td>
+            <td class="rounded-r-[1rem] px-4 py-3 text-right"><button class="ghost-button rounded-full px-3 py-2 text-xs font-semibold text-[#172033]" type="button" data-sla-edit="${rule.id}">编辑</button></td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+
+  container.querySelectorAll('[data-sla-edit]').forEach((button) => {
+    button.addEventListener('click', () => openSlaRuleModal(Number(button.dataset.slaEdit)));
+  });
+}
+
+async function loadSlaAlerts() {
+  const badge = document.getElementById('slaAlertBadge');
+  const summary = document.getElementById('slaSummary');
+  try {
+    const [warningData, violatedData] = await Promise.all([
+      apiFetch('/admin/sla/violations?status=warning'),
+      apiFetch('/admin/sla/violations?status=violated'),
+    ]);
+    const warningCount = warningData.items?.length || 0;
+    const violatedCount = violatedData.items?.length || 0;
+    badge.textContent = `SLA ${warningCount} / ${violatedCount}`;
+    badge.style.color = violatedCount > 0 ? '#b23a32' : warningCount > 0 ? '#d98a17' : '#13795b';
+    summary.textContent = `即将超时 ${warningCount} 条 · 已超时 ${violatedCount} 条`;
+  } catch (error) {
+    badge.textContent = 'SLA - / -';
+    summary.textContent = error.message;
+  }
+}
+
+async function loadSlaRules() {
+  const container = document.getElementById('slaRulesList');
+  if (!container) {
+    return null;
+  }
+
+  container.setAttribute('aria-busy', 'true');
+  container.innerHTML = renderFeedbackBox('正在加载 SLA 规则', 'loading');
+  try {
+    const data = await apiFetch('/admin/sla/rules');
+    state.slaRules = data.items || [];
+    renderSlaRules();
+    setNotification('slaNotification', '');
+    await loadSlaAlerts();
+    return data;
+  } catch (error) {
+    state.slaRules = [];
+    renderSlaRules();
+    setNotification('slaNotification', error.message, error.message === '权限不足' ? 'info' : 'error');
+    return null;
+  } finally {
+    container.setAttribute('aria-busy', 'false');
+  }
+}
+
+function openSlaRuleModal(ruleId) {
+  const rule = state.slaRules.find((item) => item.id === ruleId);
+  if (!rule) {
+    return;
+  }
+
+  state.editingSlaRuleId = rule.id;
+  document.getElementById('slaRuleName').value = rule.name;
+  document.getElementById('slaRulePriorityLabel').value = priorityLabels[rule.priority] || rule.priority;
+  document.getElementById('slaResponseHours').value = String(rule.responseHours);
+  document.getElementById('slaResolutionHours').value = String(rule.resolutionHours);
+  document.getElementById('slaRuleIsEnabled').checked = rule.isEnabled;
+  document.getElementById('slaRuleModal').hidden = false;
+  window.requestAnimationFrame(() => document.getElementById('slaRuleName')?.focus());
+}
+
+function closeSlaRuleModal() {
+  state.editingSlaRuleId = null;
+  document.getElementById('slaRuleModal').hidden = true;
+  document.getElementById('slaRuleForm').reset();
+}
+
+async function submitSlaRuleForm(event) {
+  event.preventDefault();
+  const rule = getActiveSlaRule();
+  if (!rule) {
+    return;
+  }
+
+  const button = document.getElementById('slaRuleSaveButton');
+  const payload = {
+    updatedAt: rule.updatedAt,
+    name: document.getElementById('slaRuleName').value.trim(),
+    responseHours: Number(document.getElementById('slaResponseHours').value),
+    resolutionHours: Number(document.getElementById('slaResolutionHours').value),
+    isEnabled: document.getElementById('slaRuleIsEnabled').checked,
+  };
+
+  try {
+    setButtonBusy(button, true, '保存中...');
+    await apiFetch(`/admin/sla/rules/${rule.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    closeSlaRuleModal();
+    await loadSlaRules();
+    setNotification('slaNotification', 'SLA 规则已更新。', 'success');
+  } catch (error) {
+    setNotification('slaNotification', error.message, 'error');
+  } finally {
+    setButtonBusy(button, false, '', '保存 SLA');
+  }
+}
+
+function renderAssignRules() {
+  const container = document.getElementById('assignRulesList');
+  if (!container) {
+    return;
+  }
+
+  if (state.assignRules.length === 0) {
+    container.innerHTML = '<div class="empty-state rounded-[1.4rem] px-5 py-8 text-center text-sm leading-7 text-[#5f6b80]">暂无自动分配规则。</div>';
+    return;
+  }
+
+  container.innerHTML = `
+    <table class="w-full min-w-[860px] border-separate border-spacing-y-2 text-left text-sm">
+      <thead class="text-xs uppercase tracking-[0.2em] text-[#72809a]"><tr><th class="px-4 py-2">规则</th><th class="px-4 py-2">分类</th><th class="px-4 py-2">关键词</th><th class="px-4 py-2">处理人</th><th class="px-4 py-2">优先级</th><th class="px-4 py-2">状态</th><th class="px-4 py-2 text-right">操作</th></tr></thead>
+      <tbody>
+        ${state.assignRules.map((rule) => `
+          <tr class="bg-white/72 align-middle">
+            <td class="rounded-l-[1rem] px-4 py-3 font-semibold text-[#172033]">${escapeHtml(rule.name)}</td>
+            <td class="px-4 py-3 text-[#445069]">${escapeHtml(rule.category ? categoryLabels[rule.category] || rule.category : '全部')}</td>
+            <td class="px-4 py-3 text-[#445069]">${escapeHtml((rule.keywords || []).join('、') || '无')}</td>
+            <td class="px-4 py-3 font-semibold text-[#172033]">${escapeHtml(rule.assignTo)}</td>
+            <td class="px-4 py-3 text-[#445069]">${escapeHtml(String(rule.priority))}</td>
+            <td class="px-4 py-3"><span class="rounded-full px-3 py-1 text-xs font-semibold ${rule.isEnabled ? 'bg-[rgba(19,121,91,0.12)] text-[#13795b]' : 'bg-[rgba(23,32,51,0.08)] text-[#4c566b]'}">${rule.isEnabled ? '启用' : '禁用'}</span></td>
+            <td class="rounded-r-[1rem] px-4 py-3 text-right">
+              <button class="ghost-button rounded-full px-3 py-2 text-xs font-semibold text-[#172033]" type="button" data-assign-edit="${rule.id}">编辑</button>
+              <button class="ghost-button rounded-full px-3 py-2 text-xs font-semibold text-[#b23a32]" type="button" data-assign-delete="${rule.id}">删除</button>
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+
+  container.querySelectorAll('[data-assign-edit]').forEach((button) => {
+    button.addEventListener('click', () => openAssignRuleModal(Number(button.dataset.assignEdit)));
+  });
+  container.querySelectorAll('[data-assign-delete]').forEach((button) => {
+    button.addEventListener('click', () => deleteAssignRule(Number(button.dataset.assignDelete)));
+  });
+}
+
+async function loadAssignRules() {
+  const container = document.getElementById('assignRulesList');
+  if (!container) {
+    return null;
+  }
+
+  container.setAttribute('aria-busy', 'true');
+  container.innerHTML = renderFeedbackBox('正在加载分配规则', 'loading');
+  try {
+    const data = await apiFetch('/admin/assign-rules');
+    state.assignRules = data.items || [];
+    renderAssignRules();
+    setNotification('assignRuleNotification', '');
+    return data;
+  } catch (error) {
+    state.assignRules = [];
+    renderAssignRules();
+    setNotification('assignRuleNotification', error.message, error.message === '权限不足' ? 'info' : 'error');
+    return null;
+  } finally {
+    container.setAttribute('aria-busy', 'false');
+  }
+}
+
+function openAssignRuleModal(ruleId = null) {
+  const rule = ruleId ? state.assignRules.find((item) => item.id === ruleId) : null;
+  state.editingAssignRuleId = rule?.id ?? null;
+  document.getElementById('assignRuleModalTitle').textContent = rule ? '编辑规则' : '创建规则';
+  document.getElementById('assignRuleName').value = rule?.name || '';
+  document.getElementById('assignRuleCategory').value = rule?.category || '';
+  document.getElementById('assignRuleKeywords').value = (rule?.keywords || []).join(', ');
+  document.getElementById('assignRuleAssignTo').value = rule?.assignTo || '';
+  document.getElementById('assignRulePriority').value = String(rule?.priority ?? 0);
+  document.getElementById('assignRuleIsEnabled').checked = rule?.isEnabled ?? true;
+  document.getElementById('assignRuleModal').hidden = false;
+  window.requestAnimationFrame(() => document.getElementById('assignRuleName')?.focus());
+}
+
+function closeAssignRuleModal() {
+  state.editingAssignRuleId = null;
+  document.getElementById('assignRuleModal').hidden = true;
+  document.getElementById('assignRuleForm').reset();
+}
+
+function getAssignRulePayload() {
+  return {
+    name: document.getElementById('assignRuleName').value.trim(),
+    category: document.getElementById('assignRuleCategory').value || null,
+    keywords: document.getElementById('assignRuleKeywords').value.split(/[,，]/).map((item) => item.trim()).filter(Boolean),
+    assignTo: document.getElementById('assignRuleAssignTo').value.trim(),
+    priority: Number(document.getElementById('assignRulePriority').value) || 0,
+    isEnabled: document.getElementById('assignRuleIsEnabled').checked,
+  };
+}
+
+async function submitAssignRuleForm(event) {
+  event.preventDefault();
+  const button = document.getElementById('assignRuleSaveButton');
+  const activeRule = state.assignRules.find((item) => item.id === state.editingAssignRuleId);
+  const payload = getAssignRulePayload();
+  if (activeRule) {
+    payload.updatedAt = activeRule.updatedAt;
+  }
+
+  try {
+    setButtonBusy(button, true, '保存中...');
+    await apiFetch(activeRule ? `/admin/assign-rules/${activeRule.id}` : '/admin/assign-rules', {
+      method: activeRule ? 'PATCH' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    closeAssignRuleModal();
+    await loadAssignRules();
+    setNotification('assignRuleNotification', activeRule ? '分配规则已更新。' : '分配规则已创建。', 'success');
+  } catch (error) {
+    setNotification('assignRuleNotification', error.message, 'error');
+  } finally {
+    setButtonBusy(button, false, '', '保存规则');
+  }
+}
+
+async function deleteAssignRule(ruleId) {
+  const rule = state.assignRules.find((item) => item.id === ruleId);
+  if (!rule || !window.confirm(`确定删除「${rule.name}」吗？`)) {
+    return;
+  }
+
+  try {
+    await apiFetch(`/admin/assign-rules/${rule.id}`, { method: 'DELETE' });
+    await loadAssignRules();
+    setNotification('assignRuleNotification', '分配规则已删除。', 'success');
+  } catch (error) {
+    setNotification('assignRuleNotification', error.message, 'error');
+  }
+}
+
+function renderAssignTrend(items) {
+  const container = document.getElementById('assignTrendChart');
+  if (!items || items.length === 0) {
+    container.innerHTML = '<div class="empty-state rounded-[1.4rem] px-5 py-8 text-center text-sm leading-7 text-[#5f6b80]">暂无趋势数据。</div>';
+    return;
+  }
+
+  const maxValue = Math.max(1, ...items.flatMap((item) => [item.created || 0, item.resolved || 0]));
+  container.innerHTML = `
+    <div class="text-xs font-semibold uppercase tracking-[0.28em] text-[#72809a]">Trend</div>
+    <h3 class="display-font mt-2 text-2xl">分配处理趋势</h3>
+    <div class="mt-5 space-y-4">
+      ${items.map((item) => `
+        <div>
+          <div class="mb-2 flex items-center justify-between text-sm text-[#25314a]"><span>${escapeHtml(item.period)}</span><span>新增 ${Number(item.created) || 0} · 解决 ${Number(item.resolved) || 0}</span></div>
+          <div class="grid gap-1">
+            <div class="bar-track"><div class="bar-fill" style="width:${Math.round(((Number(item.created) || 0) / maxValue) * 100)}%"></div></div>
+            <div class="bar-track"><div class="bar-fill" data-tone="mint" style="width:${Math.round(((Number(item.resolved) || 0) / maxValue) * 100)}%"></div></div>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function renderAssignStats(data) {
+  const summary = data.summary || {};
+  document.getElementById('assignTotalIssues').textContent = summary.totalIssues || 0;
+  document.getElementById('assignPendingIssues').textContent = summary.pending || 0;
+  document.getElementById('assignInProgressIssues').textContent = summary.inProgress || 0;
+  document.getElementById('assignResolvedIssues').textContent = summary.resolved || 0;
+  const handlers = data.handlers || [];
+  document.getElementById('assignHandlerStats').innerHTML = handlers.length === 0
+    ? '<div class="empty-state rounded-[1.4rem] px-5 py-8 text-center text-sm leading-7 text-[#5f6b80]">暂无处理人统计。</div>'
+    : `
+      <table class="w-full min-w-[760px] border-separate border-spacing-y-2 text-left text-sm">
+        <thead class="text-xs uppercase tracking-[0.2em] text-[#72809a]"><tr><th class="px-4 py-2">处理人</th><th class="px-4 py-2">待处理</th><th class="px-4 py-2">处理中</th><th class="px-4 py-2">已解决</th><th class="px-4 py-2">平均响应</th><th class="px-4 py-2">平均解决</th></tr></thead>
+        <tbody>
+          ${handlers.map((handler) => `
+            <tr class="bg-white/72 align-middle">
+              <td class="rounded-l-[1rem] px-4 py-3 font-semibold text-[#172033]">${escapeHtml(handler.displayName || handler.username)}</td>
+              <td class="px-4 py-3 text-[#445069]">${Number(handler.pending) || 0}</td>
+              <td class="px-4 py-3 text-[#445069]">${Number(handler.inProgress) || 0}</td>
+              <td class="px-4 py-3 text-[#445069]">${Number(handler.resolved) || 0}</td>
+              <td class="px-4 py-3 text-[#445069]">${escapeHtml(formatHours(handler.avgResponseTime))}</td>
+              <td class="rounded-r-[1rem] px-4 py-3 text-[#445069]">${escapeHtml(formatHours(handler.avgResolutionTime))}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  renderAssignTrend(data.trend || []);
+}
+
+function buildAssignStatsQuery() {
+  const filters = getFilters();
+  const params = new URLSearchParams();
+  params.set('period', state.assignStatsPeriod);
+  appendFilterValue(params, 'startDate', filters.startDate);
+  appendFilterValue(params, 'endDate', filters.endDate);
+  return params.toString();
+}
+
+async function loadAssignStats() {
+  try {
+    const data = await apiFetch(`/admin/assign-stats?${buildAssignStatsQuery()}`);
+    renderAssignStats(data);
+    updateAssignPeriodButtons();
+    setNotification('assignStatsNotification', '');
+    return data;
+  } catch (error) {
+    document.getElementById('assignHandlerStats').innerHTML = '';
+    document.getElementById('assignTrendChart').innerHTML = '';
+    setNotification('assignStatsNotification', error.message, error.message === '权限不足' ? 'info' : 'error');
+    return null;
+  }
+}
+
+async function loadPhase2AdminData() {
+  await Promise.all([
+    loadSlaRules(),
+    loadAssignRules(),
+    loadAssignStats(),
+  ]);
+}
+
 function openDrawerShell(trigger) {
   closeSideNav();
   const drawer = document.getElementById('issueDrawer');
@@ -1479,6 +2029,7 @@ function renderDrawer(detail) {
         <span class="status-token" data-status="${escapeHtml(detail.status)}">${escapeHtml(statusLabels[detail.status] || detail.status)}</span>
         <span class="priority-token" data-priority="${escapeHtml(detail.priority)}">${escapeHtml(priorityLabels[detail.priority] || detail.priority)}</span>
         <span class="category-token">${escapeHtml(categoryLabels[detail.category] || detail.category)}</span>
+        ${renderSlaStatusBadge(detail.slaStatus, formatSlaCountdown(detail))}
         ${detail.category === 'counseling' && detail.distressType ? `<span class="mini-token">${escapeHtml(distressTypeLabels[detail.distressType] || detail.distressType)}</span>` : ''}
         ${detail.category === 'counseling' && detail.sceneTag ? `<span class="mini-token">${escapeHtml(sceneTagLabels[detail.sceneTag] || detail.sceneTag)}</span>` : ''}
       </div>
@@ -1488,8 +2039,11 @@ function renderDrawer(detail) {
         <div><strong class="text-[#172033]">困扰类别：</strong>${detail.category === 'counseling' && detail.distressType ? escapeHtml(distressTypeLabels[detail.distressType] || detail.distressType) : '无'}</div>
         <div><strong class="text-[#172033]">主要场景：</strong>${detail.category === 'counseling' && detail.sceneTag ? escapeHtml(sceneTagLabels[detail.sceneTag] || detail.sceneTag) : '无'}</div>
         <div><strong class="text-[#172033]">提交时间：</strong>${escapeHtml(formatDate(detail.createdAt))}</div>
+        <div><strong class="text-[#172033]">分配时间：</strong>${escapeHtml(formatDate(detail.assignedAt))}</div>
         <div><strong class="text-[#172033]">首次响应：</strong>${escapeHtml(formatDate(detail.firstResponseAt))}</div>
         <div><strong class="text-[#172033]">解决时间：</strong>${escapeHtml(formatDate(detail.resolvedAt))}</div>
+        <div><strong class="text-[#172033]">SLA 响应：</strong>${escapeHtml(formatDate(detail.slaResponseDeadline))}</div>
+        <div><strong class="text-[#172033]">SLA 解决：</strong>${escapeHtml(formatDate(detail.slaResolutionDeadline))}</div>
         <div><strong class="text-[#172033]">是否公开：</strong>${detail.isPublic ? '是' : '否'}</div>
       </div>
       <div class="rounded-[1.3rem] border border-[rgba(23,32,51,0.08)] bg-[rgba(36,87,214,0.05)] px-4 py-4 text-sm leading-7 text-[#172033]">${escapeHtml(detail.content)}</div>
@@ -1746,6 +2300,7 @@ async function login(secretKey) {
     await Promise.all([
       loadDashboard(state.page, { refreshMetrics: false }),
       loadKnowledgeItems(),
+      loadPhase2AdminData(),
     ]);
     showAuthenticatedShell();
     loadUsers();
@@ -1774,6 +2329,9 @@ async function logout() {
   state.activeIssueId = null;
   state.knowledgeItems = [];
   state.users = [];
+  state.slaRules = [];
+  state.assignRules = [];
+  state.selectedIssueIds.clear();
   resetKnowledgeForm();
   document.getElementById('secretKey').value = '';
   closeDrawer();
@@ -1803,6 +2361,24 @@ function bindEvents() {
   document.getElementById('userForm').addEventListener('submit', submitUserForm);
   document.getElementById('userModalClose').addEventListener('click', closeUserModal);
   document.getElementById('userCancelButton').addEventListener('click', closeUserModal);
+  document.getElementById('slaRuleForm').addEventListener('submit', submitSlaRuleForm);
+  document.getElementById('slaRuleModalClose').addEventListener('click', closeSlaRuleModal);
+  document.getElementById('slaRuleCancelButton').addEventListener('click', closeSlaRuleModal);
+  document.getElementById('createAssignRuleButton').addEventListener('click', () => openAssignRuleModal());
+  document.getElementById('assignRuleForm').addEventListener('submit', submitAssignRuleForm);
+  document.getElementById('assignRuleModalClose').addEventListener('click', closeAssignRuleModal);
+  document.getElementById('assignRuleCancelButton').addEventListener('click', closeAssignRuleModal);
+  document.getElementById('executeBatchButton').addEventListener('click', openBatchConfirm);
+  document.getElementById('batchConfirmButton').addEventListener('click', executeBatchUpdate);
+  document.getElementById('batchCancelButton').addEventListener('click', closeBatchConfirm);
+  document.getElementById('selectAllIssues').addEventListener('change', (event) => {
+    if (event.target.checked) {
+      state.issues.forEach((item) => state.selectedIssueIds.add(item.id));
+    } else {
+      state.issues.forEach((item) => state.selectedIssueIds.delete(item.id));
+    }
+    syncBatchToolbar();
+  });
 
   document.getElementById('filterForm').addEventListener('submit', (event) => {
     event.preventDefault();
@@ -1821,7 +2397,10 @@ function bindEvents() {
       advancedFilters.open = false;
     }
     state.metricsPeriod = 'week';
+    state.assignStatsPeriod = 'week';
+    state.selectedIssueIds.clear();
     updatePeriodButtons();
+    updateAssignPeriodButtons();
     loadDashboard(1, { refreshMetrics: true }).catch((error) => setNotification('adminNotification', error.message, 'error'));
   });
   document.getElementById('activeFilterChips').addEventListener('click', (event) => {
@@ -1879,7 +2458,15 @@ function bindEvents() {
     });
   });
 
-  ['assignedToFilter', 'updatedAfterFilter', 'hasNotesFilter', 'hasRepliesFilter', 'isAssignedFilter', 'sortFieldFilter', 'sortOrderFilter'].forEach((id) => {
+  document.querySelectorAll('[data-assign-period-button]').forEach((button) => {
+    button.addEventListener('click', () => {
+      state.assignStatsPeriod = button.dataset.assignPeriodButton;
+      updateAssignPeriodButtons();
+      loadAssignStats().catch((error) => setNotification('assignStatsNotification', error.message, 'error'));
+    });
+  });
+
+  ['assignedToFilter', 'updatedAfterFilter', 'hasNotesFilter', 'hasRepliesFilter', 'isAssignedFilter', 'slaStatusFilter', 'sortFieldFilter', 'sortOrderFilter'].forEach((id) => {
     document.getElementById(id).addEventListener('change', syncAdvancedAdminFiltersState);
   });
 
@@ -1892,6 +2479,7 @@ function bindEvents() {
 
 restoreFiltersFromUrl();
 syncAdvancedAdminFiltersState();
+updateAssignPeriodButtons();
 renderSearchHistory();
 renderExportHistory();
 bindEvents();
@@ -1905,6 +2493,7 @@ if (storedToken) {
   Promise.all([
     loadDashboard(state.page, { refreshMetrics: false }),
     loadKnowledgeItems(),
+    loadPhase2AdminData(),
   ])
     .then(() => loadUsers())
     .catch((error) => setNotification('adminNotification', error.message, 'error'));

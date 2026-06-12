@@ -21,6 +21,11 @@ const RATE_LIMIT_CONFIG = {
     periodSeconds: 60,
     blockDuration: 120,
   },
+  adminBatch: {
+    maxRequests: 10,
+    periodSeconds: 60,
+    blockDuration: 120,
+  },
   adminLogin: {
     maxRequests: 5,
     periodSeconds: 15 * 60,

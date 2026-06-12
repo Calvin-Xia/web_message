@@ -9,3 +9,7 @@ export function parseJsonValue(value, fallback = null) {
     return fallback;
   }
 }
+
+export function toBoolean(value) {
+  return value === true || value === 1 || value === '1';
+}

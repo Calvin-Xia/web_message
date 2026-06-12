@@ -10,6 +10,8 @@ export const PUBLIC_SORT_FIELD_VALUES = ['createdAt', 'updatedAt', 'status'];
 export const ADMIN_SORT_FIELD_VALUES = ['createdAt', 'updatedAt', 'priority'];
 export const SORT_ORDER_VALUES = ['asc', 'desc'];
 export const METRIC_PERIOD_VALUES = ['day', 'week', 'month'];
+export const ASSIGN_STATS_PERIOD_VALUES = ['week', 'month'];
+export const SLA_STATUS_VALUES = ['normal', 'warning', 'violated'];
 export const TRACKING_CODE_PATTERN = /^[A-HJ-NP-Z2-9]{8}$/;
 
 export const STATUS_TRANSITIONS = {

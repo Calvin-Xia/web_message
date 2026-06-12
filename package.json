@@ -48,6 +48,7 @@
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
+    "jieba-wasm": "^2.4.0",
     "jose": "^5.10.0",
     "nanoid": "^5.1.6",
     "zod": "^4.3.6"

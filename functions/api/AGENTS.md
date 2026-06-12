@@ -16,9 +16,19 @@ functions/api/
 └── admin/
     ├── issues.js           # GET /api/admin/issues
     ├── issues/
-    │   └── [id].js         # GET/PATCH /api/admin/issues/:id
-    │       ├── notes.js    # POST /api/admin/issues/:id/notes
-    │       └── replies.js  # POST /api/admin/issues/:id/replies
+    │   ├── [id].js         # GET/PATCH /api/admin/issues/:id
+    │   │   ├── notes.js    # POST /api/admin/issues/:id/notes
+    │   │   └── replies.js  # POST /api/admin/issues/:id/replies
+    │   └── batch.js        # POST /api/admin/issues/batch
+    ├── sla/
+    │   ├── rules.js        # GET/POST /api/admin/sla/rules
+    │   ├── rules/
+    │   │   └── [id].js     # PATCH /api/admin/sla/rules/:id
+    │   └── violations.js   # GET /api/admin/sla/violations
+    ├── assign-rules.js     # GET/POST /api/admin/assign-rules
+    ├── assign-rules/
+    │   └── [id].js         # PATCH/DELETE /api/admin/assign-rules/:id
+    ├── assign-stats.js     # GET /api/admin/assign-stats
     ├── knowledge.js        # GET/POST /api/admin/knowledge
     ├── knowledge/
     │   └── [id].js         # PATCH/DELETE /api/admin/knowledge/:id
@@ -65,8 +75,9 @@ export async function onRequest(context) {
 
 - Origin policy via `getAdminCorsPolicy` from `corsConfig.js`
 - Bearer token via `authorizeAdminRequest` from `auth.js`
+- Role guard via `requireAdminRole` from `auth.js` (restricts to `admin` role)
 - `Cache-Control: no-store` on all responses
-- Optimistic concurrency: PATCH/DELETE require `updatedAt`, return 409 on conflict
+- Optimistic concurrency: PATCH/DELETE and batch update require `updatedAt`, return 409 on conflict
 - Audit logging to `admin_actions` table
 
 ## Imports Convention
