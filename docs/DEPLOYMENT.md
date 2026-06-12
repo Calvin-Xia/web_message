@@ -111,6 +111,7 @@ npm run deploy
 - `0008_replace_counseling_single_column_indexes.sql` 是已运行旧版 `0006` 环境的前向修复迁移，会替换早期单列索引为 `(category, distress_type)` 与 `(category, scene_tag)` 复合索引。
 - `0009_add_knowledge_items.sql` 新增动态公开知识库表、索引与三条初始心理支持建议。
 - `0010_add_admin_auth.sql` 新增 `admin_users` 与 `admin_password_reset_tokens`，并插入默认管理员 `admin/admin123`。上线后应立即用登录页重置或在 D1 中更新该账号密码。
+- `0011_phase2_efficiency_sla_assignment.sql` 新增 `sla_rules` 表（含四个优先级初始规则）、`assign_rules` 表，以及 `issues` 表的 `assigned_at`、`sla_response_deadline`、`sla_resolution_deadline` 三列与对应索引。
 - 新数据库按迁移顺序执行即可；已经应用过旧版 `0006` 的远端数据库也需要继续执行到最新迁移。
 
 预发数据库迁移：
@@ -138,6 +139,8 @@ npm run d1:migrate:preview
 - 如需密码重置邮件投递到指定收件箱，确认 `ADMIN_RESET_EMAIL` 已配置
 - 确认 D1 与 KV 绑定存在
 - 执行 `0010_add_admin_auth.sql` 后，首次使用 `admin/admin123` 登录并立即更改默认密码
+- 执行 `0011_phase2_efficiency_sla_assignment.sql` 后，在后台 SLA 规则页确认四条默认规则已创建，并按需调整响应与解决时间
+- `jieba-wasm` 为自动分配功能的中文分词依赖，首次调用时自动加载；加载失败会降级为 n-gram 分词，不影响服务可用性
 - 访问 `/health.html` 检查 D1 / KV 状态
 - 使用移动端视口检查 `/` 与 `/admin.html` 的侧边菜单：左下角圆形菜单按钮可打开抽屉，点击遮罩、按 `Escape` 或点击导航链接后可关闭，后台详情抽屉层级不被左侧菜单遮挡
 - 在后台分别执行 CSV 与 JSON 导出，确认审计日志、下载文件和 JSON 嵌套备注/回复正常

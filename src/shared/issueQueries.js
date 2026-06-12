@@ -6,6 +6,8 @@ import { createContainsLikePattern } from './sql.js';
 
 const STATUS_SORT_SQL = "CASE {column} WHEN 'submitted' THEN 1 WHEN 'in_review' THEN 2 WHEN 'in_progress' THEN 3 WHEN 'resolved' THEN 4 WHEN 'closed' THEN 5 ELSE 6 END";
 const PRIORITY_SORT_SQL = "CASE {column} WHEN 'urgent' THEN 1 WHEN 'high' THEN 2 WHEN 'normal' THEN 3 WHEN 'low' THEN 4 ELSE 5 END";
+const SLA_RESPONSE_PENDING_SQL = "issues.first_response_at IS NULL AND issues.sla_response_deadline IS NOT NULL";
+const SLA_RESOLUTION_PENDING_SQL = "issues.status NOT IN ('resolved', 'closed') AND issues.sla_resolution_deadline IS NOT NULL";
 const LEGACY_ADMIN_SORT_MAP = {
   newest: { sortField: 'createdAt', sortOrder: 'desc' },
   oldest: { sortField: 'createdAt', sortOrder: 'asc' },
@@ -51,6 +53,21 @@ function pushDateRangeClauses(clauses, bindings, columnName, startDate, endDate)
   }
 }
 
+function getSLAStatusWhere(value) {
+  const violatedSql = `((${SLA_RESPONSE_PENDING_SQL} AND datetime(issues.sla_response_deadline) < datetime('now')) OR (${SLA_RESOLUTION_PENDING_SQL} AND datetime(issues.sla_resolution_deadline) < datetime('now')))`;
+  const warningSql = `((${SLA_RESPONSE_PENDING_SQL} AND datetime(issues.sla_response_deadline) >= datetime('now') AND datetime(issues.sla_response_deadline) <= datetime('now', '+1 hour')) OR (${SLA_RESOLUTION_PENDING_SQL} AND datetime(issues.sla_resolution_deadline) >= datetime('now') AND datetime(issues.sla_resolution_deadline) <= datetime('now', '+1 hour')))`;
+
+  if (value === 'violated') {
+    return violatedSql;
+  }
+
+  if (value === 'warning') {
+    return `(${warningSql} AND NOT ${violatedSql})`;
+  }
+
+  return `(NOT ${violatedSql} AND NOT ${warningSql})`;
+}
+
 function normalizeSortOrder(value, fallback = 'desc') {
   if (value === 'asc') {
     return 'ASC';
@@ -94,6 +111,10 @@ export function buildAdminIssueWhere(filters, { tableAlias = 'issues' } = {}) {
   if (filters.assignedTo) {
     clauses.push(`${getColumnName(tableAlias, 'assigned_to')} = ?`);
     bindings.push(filters.assignedTo);
+  }
+
+  if (Array.isArray(filters.slaStatus) && filters.slaStatus.length > 0) {
+    clauses.push(`(${filters.slaStatus.map(getSLAStatusWhere).join(' OR ')})`);
   }
 
   if (filters.isAssigned === true) {

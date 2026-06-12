@@ -1,6 +1,6 @@
 # 问题反馈系统
 
-一个基于 Cloudflare Pages Functions、D1 与 KV 的校园问题反馈系统。当前仓库已经覆盖公开提交与追踪、后台运营台、动态知识库、心理咨询热区、健康检查、测试基建与安全加固。
+一个基于 Cloudflare Pages Functions、D1 与 KV 的校园问题反馈系统。当前仓库已经覆盖公开提交与追踪、后台运营台、SLA 监控与自动分配、动态知识库、心理咨询热区、健康检查、测试基建与安全加固。
 
 ## 当前状态
 
@@ -11,6 +11,10 @@
 - 首页与后台页已接入共享侧边菜单：桌面端左侧常驻导航，移动端左下角圆形入口打开抽屉式导航，并通过 `side-nav.js` 维护打开状态、键盘关闭和当前分区高亮。
 - 公开首页已接入校园心理压力热区与懒加载校园矢量地图，地图使用预处理静态 GeoJSON 资产与 `/api/insights` 聚合数据渲染。
 - 公开知识库已改为 D1 动态内容，后台可新增、编辑、禁用或删除知识条目，并与心理困扰类别关联。
+- SLA 规则管理已上线：按优先级配置响应与解决截止时间，提交时自动写入截止时间，后台可查看即将超时与已超时问题。
+- 自动分配规则已上线：按分类与关键词匹配处理人，公开提交时自动写入 `assigned_to`，支持中文分词关键词匹配（jieba-wasm，失败时降级为 n-gram）。
+- 批量更新已上线：后台可一次性更新最多 100 条问题的状态、优先级与处理人，使用乐观并发校验避免覆盖冲突。
+- 分配统计已上线：按处理人展示待处理、进行中、已解决数量与平均响应/解决时间，支持按周/月趋势。
 - Vitest 已覆盖核心 API、共享工具、校园地图规则和前端数据处理辅助逻辑，并可生成覆盖率报告。
 - GitHub Actions CI 已配置，提交或 PR 会自动构建样式、执行测试并上传覆盖率产物。
 
@@ -22,6 +26,7 @@
 - 公开心理咨询热区展示，支持校园矢量地图悬停查看公开聚合数据
 - 首页与后台运营台提供侧边分区导航，移动端使用菜单抽屉访问页面入口
 - 后台运营台支持筛选、状态流转、备注、回复、知识库管理、导出与统计
+- 后台支持 SLA 规则管理、自动分配规则管理、批量更新与分配统计
 - 后台支持管理员账号登录、登出、用户创建/编辑/禁用与角色权限
 - 健康检查 API 与可视化健康面板
 - 限流、输入验证、日志脱敏、安全响应头与运维文档
@@ -38,7 +43,7 @@ flowchart LR
     Static --> API["Pages Functions /api/*"]
     Static --> MapAsset["/storage/campus-care-map.json\npreprocessed campus vector data"]
     AdminUI --> API
-    API --> D1["Cloudflare D1\nissues / updates / notes / knowledge_items / admin_actions"]
+    API --> D1["Cloudflare D1\nissues / updates / notes / knowledge_items / admin_actions / sla_rules / assign_rules"]
     API --> KV["Cloudflare KV\nrate limit + observability snapshot"]
     API --> Health["/api/health\nservices + metrics + alerts"]
 ```
@@ -79,6 +84,13 @@ flowchart LR
 - `GET/PATCH /api/admin/issues/:id`
 - `POST /api/admin/issues/:id/notes`
 - `POST /api/admin/issues/:id/replies`
+- `POST /api/admin/issues/batch`
+- `GET/POST /api/admin/sla/rules`
+- `PATCH /api/admin/sla/rules/:id`
+- `GET /api/admin/sla/violations`
+- `GET/POST /api/admin/assign-rules`
+- `PATCH/DELETE /api/admin/assign-rules/:id`
+- `GET /api/admin/assign-stats`
 - `GET/POST /api/admin/knowledge`
 - `PATCH/DELETE /api/admin/knowledge/:id`
 - `GET /api/admin/actions`

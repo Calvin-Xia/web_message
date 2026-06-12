@@ -1,8 +1,7 @@
-import { parseJsonValue } from './utils.js';
+import { parseJsonValue, toBoolean } from './utils.js';
+import { getSLAStatus } from './sla.js';
 
-export function toBoolean(value) {
-  return value === true || value === 1 || value === '1';
-}
+export { toBoolean };
 
 export function mapPublicIssue(row) {
   return {
@@ -63,8 +62,12 @@ export function mapAdminIssue(row) {
     isPublic: toBoolean(row.is_public),
     isReported: toBoolean(row.is_reported),
     assignedTo: row.assigned_to,
+    assignedAt: row.assigned_at,
     firstResponseAt: row.first_response_at,
     resolvedAt: row.resolved_at,
+    slaResponseDeadline: row.sla_response_deadline,
+    slaResolutionDeadline: row.sla_resolution_deadline,
+    slaStatus: getSLAStatus(row),
     hasNotes: toBoolean(row.has_notes),
     hasReplies: toBoolean(row.has_replies),
     noteCount: Number(row.note_count) || 0,

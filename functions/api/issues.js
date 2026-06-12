@@ -3,6 +3,8 @@ import { parseJsonBody } from '../../src/shared/request.js';
 import { createPagination, mapPublicIssue } from '../../src/shared/issueData.js';
 import { successResponse, errorResponse, createOptionsResponse, createPublicCorsHeaders, methodNotAllowedResponse } from '../../src/shared/response.js';
 import { insertWithUniqueTrackingCode } from '../../src/shared/tracking.js';
+import { findAssignmentForIssue } from '../../src/shared/assignment.js';
+import { calculateSLADeadlines, getSLARuleByPriority } from '../../src/shared/sla.js';
 import { publicIssueListQuerySchema, issueSchema, formatZodError } from '../../src/shared/validation.js';
 import { buildPublicIssueWhere, resolvePublicOrderBy } from '../../src/shared/issueQueries.js';
 
@@ -25,6 +27,7 @@ function createIssueCreatedAuditStatement(db, trackingCode, payload, request, cr
         category: payload.category,
         isPublic: payload.isPublic,
         isReported: payload.isReported,
+        assignedTo: payload.assignedTo ?? null,
       }),
       'system',
       createdAt,
@@ -106,14 +109,26 @@ export async function onRequest(context) {
 
     const payload = validationResult.data;
     const now = new Date().toISOString();
+    const priority = 'normal';
+    const [assignmentRule, slaRule] = await Promise.all([
+      findAssignmentForIssue(env.DB, {
+        category: payload.category,
+        content: payload.content,
+      }),
+      getSLARuleByPriority(env.DB, priority),
+    ]);
+    const assignedTo = assignmentRule?.assignTo ?? null;
+    const assignedAt = assignedTo ? now : null;
+    const deadlines = calculateSLADeadlines(slaRule, now);
 
     const { trackingCode } = await insertWithUniqueTrackingCode((nextTrackingCode) => (
       env.DB.batch([
         env.DB.prepare(`
           INSERT INTO issues (
             tracking_code, name, student_id, email, notify_by_email, content,
-            is_public, is_reported, category, distress_type, scene_tag, priority, status, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            is_public, is_reported, category, distress_type, scene_tag, priority, status,
+            assigned_to, assigned_at, sla_response_deadline, sla_resolution_deadline, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `)
           .bind(
             nextTrackingCode,
@@ -127,8 +142,12 @@ export async function onRequest(context) {
             payload.category,
             payload.distressType,
             payload.sceneTag,
-            'normal',
+            priority,
             'submitted',
+            assignedTo,
+            assignedAt,
+            deadlines.responseDeadline,
+            deadlines.resolutionDeadline,
             now,
             now,
           ),
@@ -141,7 +160,34 @@ export async function onRequest(context) {
           WHERE tracking_code = ?
         `)
           .bind('status_change', null, 'submitted', null, 0, 'system', now, nextTrackingCode),
-        createIssueCreatedAuditStatement(env.DB, nextTrackingCode, payload, request, now),
+        createIssueCreatedAuditStatement(env.DB, nextTrackingCode, {
+          ...payload,
+          assignedTo,
+        }, request, now),
+        ...(assignmentRule ? [
+          env.DB.prepare(`
+            INSERT INTO admin_actions (
+              action_type, target_type, target_id, details, performed_by, performed_at, ip_address
+            )
+            SELECT ?, ?, id, ?, ?, ?, ?
+            FROM issues
+            WHERE tracking_code = ?
+          `)
+            .bind(
+              'auto_assigned',
+              'issue',
+              JSON.stringify({
+                trackingCode: nextTrackingCode,
+                ruleId: assignmentRule.id,
+                ruleName: assignmentRule.name,
+                assignedTo,
+              }),
+              'system',
+              now,
+              getClientIP(request),
+              nextTrackingCode,
+            ),
+        ] : []),
       ])
     ));
 

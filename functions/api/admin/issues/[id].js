@@ -254,6 +254,9 @@ export async function onRequest(context) {
       : shouldClearCounselingFields ? null : payload.sceneTag);
     trackFieldChange('priority', 'priority', existingIssue.priority, payload.priority);
     trackFieldChange('assignedTo', 'assigned_to', existingIssue.assigned_to ?? null, payload.assignedTo);
+    trackFieldChange('assignedAt', 'assigned_at', existingIssue.assigned_at ?? null, payload.assignedAt !== undefined
+      ? payload.assignedAt
+      : payload.assignedTo !== undefined ? (payload.assignedTo ? now : null) : undefined);
     trackFieldChange('publicSummary', 'public_summary', existingIssue.public_summary ?? null, payload.publicSummary);
     trackFieldChange('isPublic', 'is_public', toBoolean(existingIssue.is_public), payload.isPublic, {
       dbValue: payload.isPublic === undefined ? undefined : (payload.isPublic ? 1 : 0),

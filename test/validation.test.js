@@ -4,6 +4,9 @@ import {
   adminActionListQuerySchema,
   adminExportQuerySchema,
   adminIssueListQuerySchema,
+  assignRuleSchema,
+  assignStatsQuerySchema,
+  batchUpdateSchema,
   adminMetricsQuerySchema,
   createUserSchema,
   createAdminIssuePatchSchema,
@@ -20,6 +23,8 @@ import {
   publicIssueListQuerySchema,
   replySchema,
   resetPasswordSchema,
+  slaRuleSchema,
+  slaViolationQuerySchema,
   statusUpdateSchema,
   trackingCodeSchema,
   updateUserSchema,
@@ -183,6 +188,51 @@ describe('issueSchema', () => {
 
     expect(result.success).toBe(false);
     expect(result.error.issues[0].message).toBe('邮箱格式无效');
+  });
+});
+
+describe('phase 2 validation schemas', () => {
+  it('validates batch updates, SLA rules and assignment rules', () => {
+    const batch = batchUpdateSchema.safeParse({
+      issueIds: [1, '2', 2],
+      updates: {
+        status: 'in_review',
+        priority: 'high',
+        assignedTo: 'handler1',
+      },
+      updatedAt: '2026-06-05T08:00:00.000Z',
+    });
+    const sla = slaRuleSchema.safeParse({
+      name: '普通问题 24 小时响应',
+      priority: 'normal',
+      responseHours: 24,
+      resolutionHours: 72,
+    });
+    const assign = assignRuleSchema.safeParse({
+      name: '学业压力分配',
+      category: '',
+      keywords: ['考试', '考试', '成绩'],
+      assignTo: 'handler1',
+      priority: '10',
+    });
+
+    expect(batch.success).toBe(true);
+    expect(batch.data.issueIds).toEqual([1, 2]);
+    expect(sla.success).toBe(true);
+    expect(sla.data.isEnabled).toBe(true);
+    expect(assign.success).toBe(true);
+    expect(assign.data).toMatchObject({
+      category: null,
+      keywords: ['考试', '成绩'],
+      priority: 10,
+      isEnabled: true,
+    });
+  });
+
+  it('validates SLA violation and assignment stats queries', () => {
+    expect(slaViolationQuerySchema.safeParse({ status: 'warning' }).success).toBe(true);
+    expect(assignStatsQuerySchema.safeParse({ period: 'month' }).data.period).toBe('month');
+    expect(assignStatsQuerySchema.safeParse({ period: 'day' }).success).toBe(false);
   });
 });
 

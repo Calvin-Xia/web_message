@@ -108,6 +108,7 @@
 - `distressType`：仅 `category` 为 `counseling` 时可选，取值为 `academic_pressure` / `relationship` / `adaptation` / `mood` / `sleep` / `other`
 - `sceneTag`：仅 `category` 为 `counseling` 时可选，取值为 `dormitory` / `classroom` / `library` / `self_study` / `cafeteria` / `playground` / `other`
 - 非心理咨询分类提交非空 `distressType` 或 `sceneTag` 会返回 `400`
+- 提交成功后，后台会按启用的自动分配规则尝试写入 `assigned_to` / `assigned_at`，并按优先级 SLA 规则写入响应与解决截止时间
 
 ### `GET /api/issues/:trackingCode`
 
@@ -347,6 +348,7 @@
 - `status` / `category` / `priority`
 - `distressType` / `sceneTag`（仅命中心理咨询扩展字段）
 - `assignedTo`
+- `slaStatus`：`normal` / `warning` / `violated`
 - `q`
 - `startDate` / `endDate` / `updatedAfter`
 - `hasNotes` / `hasReplies` / `isAssigned`
@@ -366,12 +368,162 @@
 - `category`
 - `priority`
 - `assignedTo`
+- `assignedAt`
 - `publicSummary`
 - `distressType`
 - `sceneTag`
 - `isPublic`
 
 `distressType` 与 `sceneTag` 只能在最终分类为 `counseling` 时设置；当分类改为非心理咨询时，后台会自动清空这两个字段。
+`assignedTo` 发生变化且未显式传入 `assignedAt` 时，后台会自动写入当前分配时间。
+
+### `POST /api/admin/issues/batch`
+
+批量更新问题。`handler` 与 `admin` 可访问，一次最多 100 条。
+请求体必须包含 `updatedAt`，用于乐观并发校验；如果问题在列表加载后被其他管理员更新，该问题会出现在 `failedIds` 中。
+
+```json
+{
+  "issueIds": [1, 2, 3],
+  "updates": {
+    "status": "in_review",
+    "priority": "high",
+    "assignedTo": "handler1"
+  },
+  "updatedAt": "2026-06-12T08:00:00.000Z"
+}
+```
+
+响应包含成功数量与失败 ID：
+
+```json
+{
+  "success": true,
+  "data": {
+    "updatedCount": 2,
+    "failedIds": [3]
+  }
+}
+```
+
+### `GET /api/admin/sla/rules`
+
+获取 SLA 规则列表。仅 `admin` 可访问。
+
+### `POST /api/admin/sla/rules`
+
+创建 SLA 规则。每个优先级只能有一条规则。
+
+```json
+{
+  "name": "普通问题 24 小时响应",
+  "priority": "normal",
+  "responseHours": 24,
+  "resolutionHours": 72,
+  "isEnabled": true
+}
+```
+
+### `PATCH /api/admin/sla/rules/:id`
+
+更新 SLA 规则。请求体必须包含 `updatedAt`；并发冲突返回 `409`。
+
+### `GET /api/admin/sla/violations`
+
+获取即将超时或已超时问题。仅 `admin` 可访问。
+
+查询参数：
+
+- `status`：`warning` / `violated`
+- `startDate` / `endDate`
+
+响应示例：
+
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "issueId": 5,
+        "trackingCode": "ABCD23EF",
+        "priority": "high",
+        "assignedTo": "handler1",
+        "slaStatus": "violated",
+        "responseDeadline": "2026-06-05T16:00:00.000Z",
+        "resolutionDeadline": "2026-06-07T08:00:00.000Z",
+        "createdAt": "2026-06-05T08:00:00.000Z"
+      }
+    ]
+  }
+}
+```
+
+### `GET /api/admin/assign-rules`
+
+获取自动分配规则。仅 `admin` 可访问。
+
+### `POST /api/admin/assign-rules`
+
+创建自动分配规则。
+
+```json
+{
+  "name": "学业压力分配",
+  "category": "academic",
+  "keywords": ["考试", "成绩"],
+  "assignTo": "handler1",
+  "priority": 10,
+  "isEnabled": true
+}
+```
+
+### `PATCH /api/admin/assign-rules/:id`
+
+更新自动分配规则。请求体必须包含 `updatedAt`；并发冲突返回 `409`。
+
+### `DELETE /api/admin/assign-rules/:id`
+
+删除自动分配规则，并记录审计动作。
+
+### `GET /api/admin/assign-stats`
+
+获取分配统计。仅 `admin` 可访问。
+
+查询参数：
+
+- `period`：`week` / `month`，默认 `week`
+- `startDate` / `endDate`
+
+响应包含汇总、按处理人分组的统计与趋势数据：
+
+```json
+{
+  "success": true,
+  "data": {
+    "summary": {
+      "totalIssues": 10,
+      "pending": 3,
+      "inProgress": 2,
+      "resolved": 5
+    },
+    "handlers": [
+      {
+        "username": "handler1",
+        "displayName": "处理员1",
+        "pending": 2,
+        "inProgress": 1,
+        "resolved": 3,
+        "avgResponseTime": 2.5,
+        "avgResolutionTime": 48.0
+      }
+    ],
+    "trend": [
+      { "period": "2026-W23", "created": 4, "resolved": 2 }
+    ]
+  }
+}
+```
 
 ### `POST /api/admin/issues/:id/notes`
 

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
   ADMIN_SORT_VALUES,
   ADMIN_SORT_FIELD_VALUES,
+  ASSIGN_STATS_PERIOD_VALUES,
   CATEGORY_VALUES,
   DISTRESS_TYPE_VALUES,
   METRIC_PERIOD_VALUES,
@@ -9,6 +10,7 @@ import {
   PUBLIC_SORT_VALUES,
   PUBLIC_SORT_FIELD_VALUES,
   SCENE_TAG_VALUES,
+  SLA_STATUS_VALUES,
   SORT_ORDER_VALUES,
   STATUS_VALUES,
   TRACKING_CODE_PATTERN,
@@ -129,6 +131,10 @@ const optionalEmailSchema = z.preprocess(emptyToUndefined, z.string().trim().max
 const distressTypeSchemas = makeCounselingFieldSchemas(DISTRESS_TYPE_VALUES, '困扰类别无效');
 const sceneTagSchemas = makeCounselingFieldSchemas(SCENE_TAG_VALUES, '场景标签无效');
 const timestampSchema = z.string().trim().refine(isValidTimestamp, '更新时间格式无效');
+const nullableTimestampSchema = z.preprocess(emptyToNull, z.union([
+  z.string().trim().refine(isValidTimestamp, '时间格式无效'),
+  z.null(),
+]).optional());
 const knowledgeSortOrderSchema = z.preprocess(
   emptyToUndefined,
   z.coerce.number().int('排序必须为整数').min(0, '排序必须为非负整数')
@@ -226,6 +232,7 @@ export const adminIssueListQuerySchema = paginationSchema.extend({
   status: enumListSchema(STATUS_VALUES, '状态无效'),
   category: enumListSchema(CATEGORY_VALUES, '分类无效'),
   priority: enumListSchema(PRIORITY_VALUES, '优先级无效'),
+  slaStatus: enumListSchema(SLA_STATUS_VALUES, 'SLA状态无效'),
   distressType: enumListSchema(DISTRESS_TYPE_VALUES, '困扰类别无效'),
   sceneTag: enumListSchema(SCENE_TAG_VALUES, '场景标签无效'),
   assignedTo: z.preprocess(emptyToUndefined, z.string().max(50, '指派人不能超过50个字符').optional()),
@@ -252,6 +259,7 @@ const adminIssuePatchBaseSchema = z.object({
     z.string().trim().min(1, '指派人不能为空').max(50, '指派人不能超过50个字符'),
     z.null(),
   ]).optional()),
+  assignedAt: nullableTimestampSchema,
   publicSummary: z.preprocess(emptyToNull, z.union([
     z.string().trim().min(1, '公开摘要不能为空').max(500, '公开摘要不能超过500个字符'),
     z.null(),
@@ -295,6 +303,119 @@ export function createAdminIssuePatchSchema(existingCategory) {
 export const adminIssuePatchSchema = createAdminIssuePatchSchema();
 
 export const statusUpdateSchema = adminIssuePatchSchema;
+
+const batchUpdateFieldsSchema = z.object({
+  status: z.enum(STATUS_VALUES, {
+    error: () => ({ message: '状态无效' }),
+  }).optional(),
+  priority: z.enum(PRIORITY_VALUES, {
+    error: () => ({ message: '优先级无效' }),
+  }).optional(),
+  assignedTo: z.preprocess(emptyToNull, z.union([
+    z.string().trim().min(1, '指派人不能为空').max(50, '指派人不能超过50个字符'),
+    z.null(),
+  ]).optional()),
+}).strict().refine((value) => Object.keys(value).length > 0, {
+  message: '至少提供一个批量更新字段',
+});
+
+export const batchUpdateSchema = z.object({
+  issueIds: z.array(z.coerce.number().int().positive('问题 ID 无效'))
+    .min(1, '至少选择一个问题')
+    .max(100, '一次最多批量更新100个问题')
+    .transform((ids) => Array.from(new Set(ids))),
+  updates: batchUpdateFieldsSchema,
+  updatedAt: timestampSchema,
+}).strict();
+
+const slaRuleBaseSchema = z.object({
+  name: z.string().trim().min(1, '规则名称不能为空').max(100, '规则名称不能超过100个字符'),
+  priority: z.enum(PRIORITY_VALUES, {
+    error: () => ({ message: '优先级无效' }),
+  }),
+  responseHours: z.coerce.number().int('响应时间必须为整数').min(1, '响应时间不能少于1小时').max(720, '响应时间不能超过720小时'),
+  resolutionHours: z.coerce.number().int('解决时间必须为整数').min(1, '解决时间不能少于1小时').max(720, '解决时间不能超过720小时'),
+  isEnabled: z.boolean().default(true),
+});
+
+export const slaRuleSchema = slaRuleBaseSchema.strict().refine((value) => value.responseHours <= value.resolutionHours, {
+  path: ['responseHours'],
+  message: '响应时间不能晚于解决时间',
+});
+
+export const slaRulePatchSchema = z.object({
+  updatedAt: timestampSchema,
+  name: slaRuleBaseSchema.shape.name.optional(),
+  priority: slaRuleBaseSchema.shape.priority.optional(),
+  responseHours: slaRuleBaseSchema.shape.responseHours.optional(),
+  resolutionHours: slaRuleBaseSchema.shape.resolutionHours.optional(),
+  isEnabled: z.boolean().optional(),
+}).strict().refine((value) => Object.keys(value).some((key) => key !== 'updatedAt'), {
+  message: '至少提供一个更新字段',
+}).refine((value) => (
+  value.responseHours === undefined
+  || value.resolutionHours === undefined
+  || value.responseHours <= value.resolutionHours
+), {
+  path: ['responseHours'],
+  message: '响应时间不能晚于解决时间',
+});
+
+function normalizeKeywords(value) {
+  if (!Array.isArray(value)) {
+    return value;
+  }
+
+  return Array.from(new Set(value.map((item) => item.trim()).filter(Boolean)));
+}
+
+const assignRuleBaseSchema = z.object({
+  name: z.string().trim().min(1, '规则名称不能为空').max(100, '规则名称不能超过100个字符'),
+  category: z.preprocess(emptyToNull, z.union([
+    z.enum(CATEGORY_VALUES, {
+      error: () => ({ message: '分类无效' }),
+    }),
+    z.null(),
+  ]).optional()),
+  keywords: z.preprocess(normalizeKeywords, z.array(z.string().trim().min(1, '关键词不能为空').max(40, '关键词不能超过40个字符')).max(20, '关键词不能超过20个').default([])),
+  assignTo: z.string().trim().min(1, '处理人不能为空').max(50, '处理人不能超过50个字符'),
+  priority: z.coerce.number().int('优先级必须为整数').min(0, '优先级不能小于0').max(100, '优先级不能超过100').default(0),
+  isEnabled: z.boolean().default(true),
+});
+
+export const assignRuleSchema = assignRuleBaseSchema.strict().transform((value) => ({
+  ...value,
+  category: value.category ?? null,
+}));
+
+export const assignRulePatchSchema = z.object({
+  updatedAt: timestampSchema,
+  name: assignRuleBaseSchema.shape.name.optional(),
+  category: assignRuleBaseSchema.shape.category.optional(),
+  keywords: z.preprocess(normalizeKeywords, z.array(z.string().trim().min(1, '关键词不能为空').max(40, '关键词不能超过40个字符')).max(20, '关键词不能超过20个').optional()),
+  assignTo: assignRuleBaseSchema.shape.assignTo.optional(),
+  priority: z.coerce.number().int('优先级必须为整数').min(0, '优先级不能小于0').max(100, '优先级不能超过100').optional(),
+  isEnabled: z.boolean().optional(),
+}).strict().refine((value) => Object.keys(value).some((key) => key !== 'updatedAt'), {
+  message: '至少提供一个更新字段',
+}).transform((value) => ({
+  ...value,
+  category: value.category === undefined ? undefined : value.category ?? null,
+}));
+
+export const slaViolationQuerySchema = z.object({
+  status: z.preprocess(emptyToUndefined, z.enum(['warning', 'violated'], {
+    error: () => ({ message: 'SLA状态无效' }),
+  }).optional()),
+  startDate: dateQuerySchema,
+  endDate: dateQuerySchema,
+}).superRefine(validateDateRange);
+
+export const assignStatsQuerySchema = z.object({
+  period: z.preprocess(emptyToUndefined, z.enum(ASSIGN_STATS_PERIOD_VALUES).default('week')),
+  startDate: dateQuerySchema,
+  endDate: dateQuerySchema,
+}).superRefine(validateDateRange);
 
 export const noteSchema = z.object({
   content: z.string().trim().min(1, '备注内容不能为空').max(1000, '备注内容不能超过1000个字符'),
@@ -389,6 +510,7 @@ export const adminExportQuerySchema = z.object({
   status: enumListSchema(STATUS_VALUES, '状态无效'),
   category: enumListSchema(CATEGORY_VALUES, '分类无效'),
   priority: enumListSchema(PRIORITY_VALUES, '优先级无效'),
+  slaStatus: enumListSchema(SLA_STATUS_VALUES, 'SLA状态无效'),
   distressType: enumListSchema(DISTRESS_TYPE_VALUES, '困扰类别无效'),
   sceneTag: enumListSchema(SCENE_TAG_VALUES, '场景标签无效'),
   assignedTo: z.preprocess(emptyToUndefined, z.string().max(50, '指派人不能超过50个字符').optional()),
