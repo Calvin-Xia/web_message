@@ -938,9 +938,14 @@ function buildBatchPayload() {
   if (priority) updates.priority = priority;
   if (assignedTo) updates.assignedTo = assignedTo;
 
+  const selectedIds = getSelectedIssueIds();
+  const selectedIssues = state.issues.filter((item) => selectedIds.includes(item.id));
+  const updatedAt = selectedIssues.reduce((latest, item) => (item.updatedAt > latest ? item.updatedAt : latest), '');
+
   return {
-    issueIds: getSelectedIssueIds(),
+    issueIds: selectedIds,
     updates,
+    updatedAt,
   };
 }
 

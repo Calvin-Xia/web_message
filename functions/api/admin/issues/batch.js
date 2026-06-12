@@ -1,7 +1,7 @@
 import { canTransitionStatus } from '../../../../src/shared/constants.js';
 import { authorizeAdminRequest, createForbiddenOriginResponse } from '../../../../src/shared/auth.js';
 import { getAdminCorsPolicy } from '../../../../src/shared/corsConfig.js';
-import { createAdminActionStatement, getIssueById } from '../../../../src/shared/issueData.js';
+import { getIssueById } from '../../../../src/shared/issueData.js';
 import { parseJsonBody } from '../../../../src/shared/request.js';
 import { checkRateLimit, getClientIP } from '../../../../src/shared/rateLimit.js';
 import { createOptionsResponse, errorResponse, methodNotAllowedResponse, successResponse } from '../../../../src/shared/response.js';
@@ -59,13 +59,40 @@ function buildIssueUpdate({ db, issue, updates, now, updatedAt }) {
   };
 }
 
-function createStatusUpdateStatement(db, { issue, nextStatus, actor, now }) {
+function createStatusUpdateStatement(db, { issue, nextStatus, actor, now, updatedAt }) {
   return db.prepare(`
     INSERT INTO issue_updates (
       issue_id, update_type, old_value, new_value, content, is_public, created_by, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    )
+    SELECT id, ?, ?, ?, ?, ?, ?, ?
+    FROM issues
+    WHERE id = ? AND updated_at = ?
   `)
-    .bind(issue.id, 'status_change', issue.status, nextStatus, null, 1, actor, now);
+    .bind(issue.id, 'status_change', issue.status, nextStatus, null, 1, actor, now, issue.id, updatedAt);
+}
+
+function createConditionalBatchAuditStatement(db, { issue, changes, actor, now, ipAddress, updatedAt }) {
+  return db.prepare(`
+    INSERT INTO admin_actions (
+      action_type, target_type, target_id, details, performed_by, performed_at, ip_address
+    )
+    SELECT ?, ?, id, ?, ?, ?, ?
+    FROM issues
+    WHERE id = ? AND updated_at = ?
+  `)
+    .bind(
+      'batch_update',
+      'issue',
+      JSON.stringify({
+        trackingCode: issue.tracking_code,
+        changes,
+      }),
+      actor,
+      now,
+      ipAddress,
+      issue.id,
+      updatedAt,
+    );
 }
 
 export async function onRequest(context) {
@@ -133,19 +160,17 @@ export async function onRequest(context) {
           nextStatus: updates.status,
           actor: authResult.actor,
           now,
+          updatedAt,
         }));
       }
 
-      statements.push(createAdminActionStatement(env.DB, {
-        actionType: 'batch_update',
-        targetId: issue.id,
-        details: {
-          trackingCode: issue.tracking_code,
-          changes,
-        },
-        performedBy: authResult.actor,
-        performedAt: now,
+      statements.push(createConditionalBatchAuditStatement(env.DB, {
+        issue,
+        changes,
+        actor: authResult.actor,
+        now,
         ipAddress,
+        updatedAt,
       }));
 
       const [updateResult] = await env.DB.batch(statements);
