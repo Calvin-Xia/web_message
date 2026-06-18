@@ -1,4 +1,5 @@
 import { recordRequestObservation, readErrorMessageFromResponse } from '../../src/shared/observability.js';
+import { createPublicCorsHeaders } from '../../src/shared/response.js';
 import { appendSecurityHeaders, createHttpsRedirectResponse, shouldForceHttps } from '../../src/shared/security.js';
 
 function queueBackgroundTask(context, promise) {
@@ -12,7 +13,28 @@ function queueBackgroundTask(context, promise) {
 
 function shouldObserveRequest(request) {
   const url = new URL(request.url);
-  return url.pathname !== '/api/health' && request.method !== 'OPTIONS';
+  return !['/api/health', '/v1/api/health'].includes(url.pathname) && request.method !== 'OPTIONS';
+}
+
+function shouldRedirectToVersionedApi(request) {
+  const url = new URL(request.url);
+  return request.method !== 'OPTIONS'
+    && (url.pathname === '/api' || url.pathname.startsWith('/api/'));
+}
+
+function createVersionedApiRedirectResponse(request) {
+  const url = new URL(request.url);
+  url.pathname = `/v1${url.pathname}`;
+  const corsHeaders = createPublicCorsHeaders();
+
+  return new Response(null, {
+    status: 308,
+    headers: {
+      'Cache-Control': 'no-store',
+      Location: url.toString(),
+      ...corsHeaders,
+    },
+  });
 }
 
 export async function onRequest(context) {
@@ -31,6 +53,27 @@ export async function onRequest(context) {
         status: redirectResponse.status,
         durationMs: Date.now() - startedAt,
         message: 'HTTPS required',
+      }));
+    }
+
+    return redirectResponse;
+  }
+
+  if (shouldRedirectToVersionedApi(request)) {
+    const redirectResponse = appendSecurityHeaders(
+      createVersionedApiRedirectResponse(request),
+      request,
+      env,
+      { api: true },
+    );
+
+    if (shouldObserve) {
+      queueBackgroundTask(context, recordRequestObservation(env, {
+        path: url.pathname,
+        method: request.method,
+        status: redirectResponse.status,
+        durationMs: Date.now() - startedAt,
+        message: 'API v1 redirect',
       }));
     }
 

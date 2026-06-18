@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="校园心理健康反馈平台开发者文档">
+  <title>开发者文档 · 留言处理台</title>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/docs/swagger/swagger-ui.css">
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #f7f3ea;
+      color: #172033;
+      font-family: system-ui, sans-serif;
+    }
+    .api-docs-shell {
+      width: min(100% - 2rem, 1440px);
+      margin: 0 auto;
+      padding: 1.5rem 0 2rem;
+    }
+    .api-docs-header {
+      display: grid;
+      gap: 1rem;
+      margin-bottom: 1rem;
+      padding: 1.25rem;
+      border: 1px solid rgba(23, 32, 51, 0.1);
+      border-radius: 1.5rem;
+      background: rgba(255, 255, 255, 0.78);
+      box-shadow: 0 20px 55px rgba(18, 26, 44, 0.08);
+    }
+    .api-docs-header h1 {
+      margin: 0;
+      font-size: clamp(1.65rem, 4vw, 2.5rem);
+    }
+    .api-docs-header p {
+      margin: 0;
+      color: #4c566b;
+      line-height: 1.7;
+    }
+    .api-docs-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+    .api-docs-links a,
+    .api-docs-auth {
+      display: inline-flex;
+      align-items: center;
+      min-height: 2.6rem;
+      padding: 0.6rem 0.95rem;
+      border-radius: 999px;
+      font-weight: 700;
+    }
+    .api-docs-links a {
+      border: 1px solid rgba(36, 87, 214, 0.22);
+      color: #2147ac;
+      text-decoration: none;
+    }
+    .api-docs-auth {
+      width: fit-content;
+      background: rgba(19, 121, 91, 0.1);
+      color: #0d654b;
+    }
+    #swagger-ui {
+      border: 1px solid rgba(23, 32, 51, 0.12);
+      border-radius: 1.5rem;
+      background: #fff;
+      overflow: hidden;
+    }
+    .swagger-ui .topbar {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <main class="api-docs-shell">
+    <header class="api-docs-header">
+      <div>
+        <p>Developer Docs · API v1</p>
+        <h1>校园心理健康反馈平台 API</h1>
+      </div>
+      <p>公开接口可直接测试。管理接口会读取当前浏览器中已保存的后台 JWT 或共享密钥，并自动添加 Bearer 认证头。</p>
+      <div id="authStatus" class="api-docs-auth" role="status">正在检查认证状态…</div>
+      <nav class="api-docs-links" aria-label="文档相关链接">
+        <a href="/docs/swagger/index.html">在独立页面打开 Swagger UI</a>
+        <a href="/docs/openapi.yaml" download>下载 OpenAPI YAML</a>
+        <a href="/">返回公开页面</a>
+        <a href="/admin.html">前往管理后台</a>
+      </nav>
+    </header>
+    <section id="swagger-ui" aria-label="交互式 API 文档"></section>
+  </main>
+  <script src="/docs/swagger/swagger-ui-bundle.js"></script>
+  <script src="/docs/swagger/swagger-ui-standalone-preset.js"></script>
+  <script src="/docs/swagger/swagger-initializer.js"></script>
+</body>
+</html>

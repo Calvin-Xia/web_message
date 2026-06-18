@@ -4,6 +4,10 @@ Cloudflare Pages Functions route handlers under `functions/api/`.
 
 ## Route Structure
 
+The canonical public path is `/v1/api/*`. Route behavior remains implemented here under
+`functions/api/`; `functions/v1/api/[[path]].js` dispatches versioned requests to these handlers.
+Legacy non-OPTIONS `/api/*` requests receive a 308 redirect from `_middleware.js`.
+
 ```
 functions/api/
 ├── _middleware.js          # Global: HTTPS, security headers, observability
