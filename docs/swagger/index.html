@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="校园心理健康反馈平台 API 交互式文档">
+  <title>API 文档 · 留言处理台</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="./favicon-16x16.png">
+  <link rel="stylesheet" href="./swagger-ui.css">
+  <style>
+    html {
+      box-sizing: border-box;
+      overflow-y: scroll;
+    }
+    *,
+    *::before,
+    *::after {
+      box-sizing: inherit;
+    }
+    body {
+      margin: 0;
+      background: #f7f3ea;
+      color: #172033;
+    }
+    .docs-status {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      padding: 0.85rem 1.25rem;
+      border-bottom: 1px solid rgba(23, 32, 51, 0.12);
+      background: #172033;
+      color: #fff;
+      font: 600 0.9rem/1.5 system-ui, sans-serif;
+    }
+    .docs-status a {
+      color: #dce8ff;
+    }
+    .docs-status__auth {
+      color: #a9efcf;
+    }
+    .swagger-ui .topbar {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <header class="docs-status">
+    <span>校园心理健康反馈平台 · API v1</span>
+    <span id="authStatus" class="docs-status__auth" role="status">正在检查认证状态…</span>
+    <nav aria-label="文档导航">
+      <a href="/docs/api.html">文档首页</a>
+      ·
+      <a href="/docs/openapi.yaml">下载 OpenAPI</a>
+      ·
+      <a href="/">返回公开页面</a>
+    </nav>
+  </header>
+  <main id="swagger-ui" aria-label="Swagger API 文档"></main>
+  <script src="./swagger-ui-bundle.js"></script>
+  <script src="./swagger-ui-standalone-preset.js"></script>
+  <script src="./swagger-initializer.js"></script>
+</body>
+</html>

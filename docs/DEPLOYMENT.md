@@ -82,6 +82,8 @@ npm run dev
 - `http://localhost:8788/admin.html`
 - `http://localhost:8788/tracking.html`
 - `http://localhost:8788/health.html`
+- `http://localhost:8788/docs/api.html`
+- `http://localhost:8788/docs/swagger/index.html`
 
 本地检查首页与后台页时，同时确认桌面端左侧菜单常驻、移动端左下角圆形菜单按钮可打开左侧抽屉，且后台问题详情抽屉仍从右侧覆盖。
 
@@ -90,6 +92,7 @@ npm run dev
 ```bash
 npm test
 npm run test:coverage
+npm run validate:openapi
 ```
 
 覆盖率输出目录：`output/coverage/`
@@ -133,6 +136,9 @@ npm run d1:migrate:preview
 ## 8. 发布检查建议
 
 - 确认本次发布前已经重新生成 `styles.css`。使用 `npm run build`，或直接运行带有自动预编译的 `npm run deploy` / `npm run pages:deploy`。
+- 确认 `npm run build` 已复制 `swagger-ui-dist` 静态资源到 `docs/swagger/`，并通过 OpenAPI 校验。
+- 访问 `/docs/api.html`，确认 36 个 API 操作可见、Try it out 可用，后台登录后认证状态正确。
+- 确认 `/v1/api/health` 正常返回，旧 `/api/health` 返回指向 v1 的 `308`。
 - 如果校园 GeoJSON 源数据有变化，确认已经执行 `npm run build:map -- <geojson>` 并提交更新后的 `storage/campus-care-map.json`
 - 确认 `ADMIN_SECRET_KEY` 与 `ADMIN_JWT_SECRET` 已在目标环境配置
 - 确认 `RESEND_API_KEY` 已在目标环境配置，且 `support@calvin-xia.cn` 可作为 Resend 发件人与回复地址
@@ -149,6 +155,8 @@ npm run d1:migrate:preview
 ## 9. 样式构建说明
 
 - 页面依赖根目录的 `styles.css`，它由 `src/input.css` 编译生成。
+- Swagger UI 的 CSS、bundle 与 preset 由 `scripts/build-swagger.mjs` 从 `swagger-ui-dist` 复制生成，不直接提交到 Git。
+- `docs/openapi.yaml` 在构建时由 `scripts/validate-openapi.mjs` 和 `@apidevtools/swagger-parser` 校验。
 - 如果修改了 `src/input.css`、侧边菜单布局样式，或者新增了页面里使用的 Tailwind 类名，发布前必须重新执行 `npm run build`。
 - 如果通过 Cloudflare Pages Dashboard 配置 Git 自动部署，建议将 Build command 设置为 `npm run build`，Build output directory 设置为 `.`
 

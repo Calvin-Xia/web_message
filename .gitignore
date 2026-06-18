@@ -20,3 +20,8 @@ diff.txt
 diff_output.txt
 coverage/
 temp-validation-coverage/
+docs/swagger/swagger-ui.css
+docs/swagger/swagger-ui-bundle.js
+docs/swagger/swagger-ui-standalone-preset.js
+docs/swagger/favicon-16x16.png
+docs/swagger/favicon-32x32.png

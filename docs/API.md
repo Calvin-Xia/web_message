@@ -1,6 +1,17 @@
 # API 文档
 
-所有 API 路径均挂载在 `/api` 下，响应采用统一 JSON 包装：
+OpenAPI 3.0.3 规范见 [`docs/openapi.yaml`](./openapi.yaml)，交互式文档见
+[`/docs/api.html`](/docs/api.html) 或 [`/docs/swagger/index.html`](/docs/swagger/index.html)。
+
+当前规范版本为 v1。OpenAPI 的服务器地址为 `/v1`，因此本文中的 `/api/...`
+路径实际通过 `/v1/api/...` 访问。旧 `/api/...` 非 OPTIONS 请求会以 `308`
+跳转到对应 v1 路径；OPTIONS 保留在旧路径响应，确保跨域预检兼容。
+
+**308 重定向说明**：308 Permanent Redirect 要求客户端保留原请求方法和请求体。
+主流浏览器和 HTTP 客户端（curl、fetch、axios）均正确实现此行为。
+旧客户端如遇请求体丢失问题，应直接使用 `/v1/api/...` 路径。
+
+所有 API 响应采用统一 JSON 包装：
 
 ```json
 {
@@ -19,6 +30,10 @@
 ```
 
 ## 公开接口
+
+> **路径约定**：为简洁起见，本文档接口标题使用 `/api/...` 格式。
+> 实际访问路径为 `/v1/api/...`（即 servers 前缀 `/v1` + 路径 `/api/...`）。
+> 旧 `/api/*` 请求会通过 308 重定向到对应 v1 路径。
 
 ### `GET /api/health`
 

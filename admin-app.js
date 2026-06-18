@@ -1,7 +1,7 @@
 import { closeSideNav } from './side-nav.js';
 import { distressTypeLabels, sceneTagLabels } from './src/shared/labels.js';
 
-const API_BASE = '/api';
+const API_BASE = '/v1/api';
 const REQUEST_TIMEOUT = 15000;
 const ADMIN_TOKEN_KEY = 'admin_token';
 const ADMIN_USER_KEY = 'admin_user';

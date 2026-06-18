@@ -360,7 +360,7 @@ async function loadHealth() {
   setNotification('正在获取最新健康检查结果...', 'info');
 
   try {
-    const response = await fetchWithTimeout('/api/health');
+    const response = await fetchWithTimeout('/v1/api/health');
     const payload = await response.json();
 
     if (!response.ok || !payload?.success) {

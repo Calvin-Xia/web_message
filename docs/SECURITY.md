@@ -12,6 +12,7 @@
 ## 传输安全
 
 - API 中间件在生产环境对非 HTTPS 请求执行 `308` 跳转。
+- 非 OPTIONS 的旧 `/api/*` 请求使用 `308` 跳转到 `/v1/api/*`，保留原请求方法与请求体；OPTIONS 不跳转，避免破坏跨域预检。
 - 统一附加 `Strict-Transport-Security`、`X-Content-Type-Options`、`X-Frame-Options`、`Referrer-Policy`、`Permissions-Policy`。
 - 静态页面通过 `_headers` 文件附加 CSP 与基础安全头。
 
@@ -32,6 +33,13 @@
 - 后台侧边菜单登录前隐藏后台分区入口，登录后由前端状态显示；这只是界面状态，后台 API 仍必须通过受控 CORS、JWT/备用共享密钥与角色权限鉴权。
 - 侧边菜单不会展示姓名、学号、邮箱、内部备注、导出链接或其它敏感运营字段。
 - 移动端侧边菜单使用遮罩与 `Escape` 关闭，不改变后台问题详情抽屉的鉴权、焦点管理或数据加载逻辑。
+
+## API 文档边界
+
+- `/docs/openapi.yaml` 与 Swagger UI 公开可读，文档示例只使用虚构或脱敏数据。
+- 管理端端点虽然可在公开文档中查看，但实际调用仍必须通过受控 CORS、Bearer 鉴权、角色检查和限流。
+- Swagger UI 只读取当前站点已有的 `admin_token` 或会话级共享密钥并添加到请求头，不在页面中显示、记录或写入 OpenAPI 文件。
+- 未登录时管理端 Try it out 会按正常安全策略返回 `401`；文档页面不会绕过后台认证。
 
 ## 邮箱通知边界
 

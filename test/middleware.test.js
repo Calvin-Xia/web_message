@@ -10,7 +10,7 @@ describe('api middleware', () => {
     const backgroundTasks = [];
 
     const response = await onRequest({
-      request: new Request('http://localhost/api/issues', { method: 'GET' }),
+      request: new Request('http://localhost/v1/api/issues', { method: 'GET' }),
       env: {
         ENVIRONMENT: 'development',
         RATE_LIMIT_KV: kv,
@@ -54,7 +54,7 @@ describe('api middleware', () => {
     const observationStore = createD1Database();
 
     const response = await onRequest({
-      request: new Request('http://localhost/api/health', { method: 'GET' }),
+      request: new Request('http://localhost/v1/api/health', { method: 'GET' }),
       env: {
         ENVIRONMENT: 'development',
         RATE_LIMIT_KV: createRateLimitKv(),
@@ -88,7 +88,7 @@ describe('api middleware', () => {
     const observationStore = createD1Database();
 
     await expect(onRequest({
-      request: new Request('http://localhost/api/issues', { method: 'POST' }),
+      request: new Request('http://localhost/v1/api/issues', { method: 'POST' }),
       env: {
         ENVIRONMENT: 'development',
         RATE_LIMIT_KV: createRateLimitKv(),

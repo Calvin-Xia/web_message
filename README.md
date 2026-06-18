@@ -40,12 +40,12 @@ flowchart LR
     LoginUI --> AdminUI["admin.html + admin-app.js"]
     Static --> SideNav["side-nav.js\nshared sidebar behavior"]
     AdminUI --> SideNav
-    Static --> API["Pages Functions /api/*"]
+    Static --> API["Pages Functions /v1/api/*"]
     Static --> MapAsset["/storage/campus-care-map.json\npreprocessed campus vector data"]
     AdminUI --> API
     API --> D1["Cloudflare D1\nissues / updates / notes / knowledge_items / admin_actions / sla_rules / assign_rules"]
     API --> KV["Cloudflare KV\nrate limit + observability snapshot"]
-    API --> Health["/api/health\nservices + metrics + alerts"]
+    API --> Health["/v1/api/health\nservices + metrics + alerts"]
 ```
 
 ## 主要页面与接口
@@ -57,6 +57,8 @@ flowchart LR
 - `/login.html`：管理员账号登录、忘记密码、共享密钥备用入口
 - `/admin.html`：后台运营台
 - `/health.html`：健康检查面板
+- `/docs/api.html`：开发者文档与嵌入式 Swagger UI
+- `/docs/swagger/index.html`：独立 Swagger UI
 
 ### 前端导航
 
@@ -68,36 +70,38 @@ flowchart LR
 
 ### API
 
-- `GET /api/health`
-- `GET /api/issues`
-- `POST /api/issues`
-- `GET /api/issues/:trackingCode`
-- `GET /api/insights`
-- `GET /api/knowledge`
-- `POST /api/admin/auth/login`
-- `POST /api/admin/auth/logout`
-- `POST /api/admin/auth/forgot-password`
-- `POST /api/admin/auth/reset-password`
-- `GET/POST /api/admin/users`
-- `PATCH/DELETE /api/admin/users/:id`
-- `GET /api/admin/issues`
-- `GET/PATCH /api/admin/issues/:id`
-- `POST /api/admin/issues/:id/notes`
-- `POST /api/admin/issues/:id/replies`
-- `POST /api/admin/issues/batch`
-- `GET/POST /api/admin/sla/rules`
-- `PATCH /api/admin/sla/rules/:id`
-- `GET /api/admin/sla/violations`
-- `GET/POST /api/admin/assign-rules`
-- `PATCH/DELETE /api/admin/assign-rules/:id`
-- `GET /api/admin/assign-stats`
-- `GET/POST /api/admin/knowledge`
-- `PATCH/DELETE /api/admin/knowledge/:id`
-- `GET /api/admin/actions`
-- `GET /api/admin/export`
-- `GET /api/admin/metrics`
+当前规范版本为 v1，canonical 前缀为 `/v1/api`。旧 `/api/*` 请求通过
+`308` 跳转兼容；下面列出 canonical 路径。
 
-详细契约见 [docs/API.md](./docs/API.md)。
+- `GET /v1/api/health`
+- `GET/POST /v1/api/issues`
+- `GET /v1/api/issues/:trackingCode`
+- `GET /v1/api/insights`
+- `GET /v1/api/knowledge`
+- `POST /v1/api/admin/auth/login`
+- `POST /v1/api/admin/auth/logout`
+- `POST /v1/api/admin/auth/forgot-password`
+- `POST /v1/api/admin/auth/reset-password`
+- `GET/POST /v1/api/admin/users`
+- `PATCH/DELETE /v1/api/admin/users/:id`
+- `GET /v1/api/admin/issues`
+- `GET/PATCH /v1/api/admin/issues/:id`
+- `POST /v1/api/admin/issues/:id/notes`
+- `POST /v1/api/admin/issues/:id/replies`
+- `POST /v1/api/admin/issues/batch`
+- `GET/POST /v1/api/admin/sla/rules`
+- `PATCH /v1/api/admin/sla/rules/:id`
+- `GET /v1/api/admin/sla/violations`
+- `GET/POST /v1/api/admin/assign-rules`
+- `PATCH/DELETE /v1/api/admin/assign-rules/:id`
+- `GET /v1/api/admin/assign-stats`
+- `GET/POST /v1/api/admin/knowledge`
+- `PATCH/DELETE /v1/api/admin/knowledge/:id`
+- `GET /v1/api/admin/actions`
+- `GET /v1/api/admin/export`
+- `GET /v1/api/admin/metrics`
+
+详细契约见 [docs/API.md](./docs/API.md) 与 [docs/openapi.yaml](./docs/openapi.yaml)。
 
 ## 环境变量
 
@@ -116,7 +120,8 @@ flowchart LR
 
 ```bash
 npm ci
-npm run build:css
+npm run build
+npm run validate:openapi
 npm run dev
 npm test
 npm run test:coverage
@@ -127,12 +132,16 @@ npm run d1:migrate:local
 
 - `npm test`：执行全部 Vitest 用例
 - `npm run test:coverage`：输出 `output/coverage/` 覆盖率报告
+- `npm run build:swagger`：复制本地 Swagger UI 静态资源
+- `npm run validate:openapi`：校验 OpenAPI 3.0.3 规范
 - `test/sideNavPage.test.js`：覆盖首页与后台侧边菜单结构、移动端按钮、层级关系、桌面滚动过渡高亮和首页表单分组间距。
 - `npm run build:map -- <geojson>`：从校园 GeoJSON 导出生成 `storage/campus-care-map.json`，仅地图源数据变化时需要重新运行
 
 ## 文档结构
 
 - `docs/API.md`：当前 API 与公开静态资产契约。
+- `docs/openapi.yaml`：完整 OpenAPI 3.0.3 规范与示例。
+- `docs/api.html`、`docs/swagger/`：开发者入口与 Swagger UI。
 - `docs/DEPLOYMENT.md`：Cloudflare 资源、迁移、部署与发布检查。
 - `docs/SECURITY.md`：公开/后台数据边界与运行安全约束。
 - `AGENTS.md`：仓库内编码代理使用的命令、约定和代码边界。

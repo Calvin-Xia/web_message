@@ -22,6 +22,7 @@ Repository-specific guide for coding agents working in `web_message/`. It supers
 ```text
 functions/api/              Pages routes
 functions/api/admin/        Admin routes
+functions/v1/api/           Versioned API dispatcher and middleware alias
 scripts/                    Build/preprocessing scripts
 src/shared/                 Shared backend helpers
 src/input.css               Tailwind source
@@ -30,6 +31,8 @@ styles.css                  Generated stylesheet
 test/                       Vitest suite
 test/helpers/               Fake Cloudflare/D1 helpers
 docs/API.md                 API notes
+docs/openapi.yaml           OpenAPI 3.0.3 source
+docs/swagger/               Swagger UI shell and generated local assets
 docs/DEPLOYMENT.md          Deploy and migration notes
 docs/SECURITY.md            Security expectations
 schema.sql                  Base schema
@@ -39,17 +42,23 @@ migrations/                 D1 migrations
 Use `npm ci` in clean environments. Use `npm install` only when lockfile changes are intentional.
 ```bash
 npm ci
+npm run build
 npm run build:css
+npm run build:swagger
+npm run validate:openapi
 npm run build:map -- C:/path/to/export.geojson
 npm run dev:css
 npm run dev
 npm run deploy
 ```
+- `npm run build` builds `styles.css`, copies local Swagger UI assets, and validates `docs/openapi.yaml`.
 - `npm run build:css` builds `styles.css` once.
+- `npm run build:swagger` copies the required assets from `swagger-ui-dist` into `docs/swagger/`.
+- `npm run validate:openapi` validates the OpenAPI document with `@apidevtools/swagger-parser`.
 - `npm run build:map -- <geojson>` builds `storage/campus-care-map.json` from a campus GeoJSON export.
 - `npm run dev:css` watches Tailwind changes.
 - `npm run pages:dev` and `npm run pages:deploy` are aliases for the same Wrangler commands.
-- `npm run deploy` and `npm run pages:deploy` run `npm run build:css` first through npm pre-scripts.
+- `npm run deploy` and `npm run pages:deploy` run the full `npm run build` first through npm pre-scripts.
 ## Database Commands
 ```bash
 npm run d1:create
@@ -121,6 +130,9 @@ npx vitest run test/validation.test.js -t "accepts counseling category"
 - Preserve the current envelope shape: `{ success, data }` or `{ success, error }`.
 - Use ISO timestamps from `new Date().toISOString()`.
 ## Route Patterns
+- Treat `/v1/api/*` as the canonical browser and third-party API path.
+- Keep route behavior in `functions/api/`; `functions/v1/api/[[path]].js` only dispatches versioned requests to those handlers.
+- Preserve the legacy `/api/*` 308 compatibility redirect and the non-redirected OPTIONS preflight behavior in `functions/api/_middleware.js`.
 - Start routes with method guards and CORS/preflight handling.
 - Apply rate limiting before expensive work.
 - For admin routes, enforce origin policy and Bearer auth through `src/shared/auth.js`.

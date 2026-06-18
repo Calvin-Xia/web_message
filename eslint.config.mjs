@@ -12,6 +12,8 @@ export default [
       'node_modules/**',
       'output/**',
       'coverage/**',
+      'docs/swagger/swagger-ui-bundle.js',
+      'docs/swagger/swagger-ui-standalone-preset.js',
       'styles.css',
     ],
   },

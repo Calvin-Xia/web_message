@@ -4,7 +4,7 @@ import { formatSvgNumber, geometryToPath, geometryToPoint } from './src/shared/c
 import { CAMPUS_MAP_VIEWBOX, createCampusProjector } from './src/shared/campusMapProjection.js';
 import { CAMPUS_MAP_DATA_ERROR_MESSAGE, readCampusMapResponse } from './src/shared/campusMapResponse.js';
 
-const API_BASE = '/api';
+const API_BASE = '/v1/api';
 const CAMPUS_MAP_URL = '/storage/campus-care-map.json';
 const REQUEST_TIMEOUT = 12000;
 const SEARCH_HISTORY_KEY = 'public-search-history';
