@@ -1,4 +1,5 @@
 import { recordRequestObservation, readErrorMessageFromResponse } from '../../src/shared/observability.js';
+import { createPublicCorsHeaders } from '../../src/shared/response.js';
 import { appendSecurityHeaders, createHttpsRedirectResponse, shouldForceHttps } from '../../src/shared/security.js';
 
 function queueBackgroundTask(context, promise) {
@@ -24,12 +25,14 @@ function shouldRedirectToVersionedApi(request) {
 function createVersionedApiRedirectResponse(request) {
   const url = new URL(request.url);
   url.pathname = `/v1${url.pathname}`;
+  const corsHeaders = createPublicCorsHeaders();
 
   return new Response(null, {
     status: 308,
     headers: {
       'Cache-Control': 'no-store',
       Location: url.toString(),
+      ...corsHeaders,
     },
   });
 }
