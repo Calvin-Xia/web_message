@@ -937,6 +937,35 @@ components:
           type: integer
         totalPages:
           type: integer
+    PublicIssue:
+      type: object
+      required: [trackingCode, content, category, priority, status, createdAt, updatedAt]
+      properties:
+        trackingCode:
+          type: string
+          example: ABCD23EF
+        content:
+          type: string
+          example: 图书馆空调故障，需要尽快处理。
+        category:
+          $ref: '#/components/schemas/IssueCategory'
+        distressType:
+          $ref: '#/components/schemas/DistressType'
+        sceneTag:
+          $ref: '#/components/schemas/SceneTag'
+        status:
+          $ref: '#/components/schemas/IssueStatus'
+        priority:
+          $ref: '#/components/schemas/IssuePriority'
+        publicSummary:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
     Issue:
       type: object
       required: [id, trackingCode, content, category, priority, status, isPublic, createdAt, updatedAt]
@@ -1194,14 +1223,26 @@ components:
           type: boolean
           default: true
     SLARuleUpdateRequest:
-      allOf:
-        - $ref: '#/components/schemas/SLARuleCreateRequest'
-        - type: object
-          required: [updatedAt]
-          properties:
-            updatedAt:
-              type: string
-              format: date-time
+      type: object
+      required: [updatedAt]
+      properties:
+        name:
+          type: string
+        priority:
+          $ref: '#/components/schemas/IssuePriority'
+        responseHours:
+          type: integer
+          minimum: 1
+          maximum: 720
+        resolutionHours:
+          type: integer
+          minimum: 1
+          maximum: 720
+        isEnabled:
+          type: boolean
+        updatedAt:
+          type: string
+          format: date-time
     AssignRule:
       type: object
       required: [id, name, keywords, assignTo, priority, isEnabled, createdAt, updatedAt]
@@ -1254,14 +1295,30 @@ components:
           type: boolean
           default: true
     AssignRuleUpdateRequest:
-      allOf:
-        - $ref: '#/components/schemas/AssignRuleCreateRequest'
-        - type: object
-          required: [updatedAt]
-          properties:
-            updatedAt:
-              type: string
-              format: date-time
+      type: object
+      required: [updatedAt]
+      properties:
+        name:
+          type: string
+        category:
+          allOf:
+            - $ref: '#/components/schemas/IssueCategory'
+          nullable: true
+        keywords:
+          type: array
+          items:
+            type: string
+        assignTo:
+          type: string
+        priority:
+          type: integer
+          minimum: 0
+          maximum: 100
+        isEnabled:
+          type: boolean
+        updatedAt:
+          type: string
+          format: date-time
     KnowledgeItem:
       type: object
       required: [id, title, tag, content, sortOrder, isEnabled, createdAt, updatedAt]
@@ -1302,14 +1359,23 @@ components:
           type: boolean
           default: true
     KnowledgeUpdateRequest:
-      allOf:
-        - $ref: '#/components/schemas/KnowledgeCreateRequest'
-        - type: object
-          required: [updatedAt]
-          properties:
-            updatedAt:
-              type: string
-              format: date-time
+      type: object
+      required: [updatedAt]
+      properties:
+        title:
+          type: string
+        tag:
+          $ref: '#/components/schemas/DistressType'
+        content:
+          type: string
+        sortOrder:
+          type: integer
+          minimum: 0
+        isEnabled:
+          type: boolean
+        updatedAt:
+          type: string
+          format: date-time
     InternalNote:
       type: object
       properties:
@@ -1408,7 +1474,7 @@ components:
                   items:
                     type: array
                     items:
-                      $ref: '#/components/schemas/Issue'
+                      $ref: '#/components/schemas/PublicIssue'
                   pagination:
                     $ref: '#/components/schemas/Pagination'
           example:
