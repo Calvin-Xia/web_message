@@ -272,6 +272,7 @@ describe('side navigation behavior', () => {
     expect(dom.document.body.hasAttribute('data-side-nav-open')).toBe(true);
     expect(dom.button.getAttribute('aria-expanded')).toBe('true');
     expect(dom.nav.getAttribute('aria-hidden')).toBe('false');
+    expect(dom.nav.inert).toBe(false);
     expect(dom.backdrop.hidden).toBe(false);
     expect(dom.document.activeElement).toBe(dom.nav);
 
@@ -280,6 +281,7 @@ describe('side navigation behavior', () => {
     expect(dom.document.body.hasAttribute('data-side-nav-open')).toBe(false);
     expect(dom.button.getAttribute('aria-expanded')).toBe('false');
     expect(dom.nav.getAttribute('aria-hidden')).toBe('true');
+    expect(dom.nav.inert).toBe(true);
     expect(dom.backdrop.hidden).toBe(true);
     expect(dom.document.activeElement).toBe(dom.button);
   });
@@ -294,6 +296,7 @@ describe('side navigation behavior', () => {
     expect(dom.document.body.hasAttribute('data-side-nav-open')).toBe(false);
     expect(dom.button.getAttribute('aria-expanded')).toBe('false');
     expect(dom.nav.getAttribute('aria-hidden')).toBe('true');
+    expect(dom.nav.inert).toBe(true);
     expect(dom.backdrop.hidden).toBe(true);
   });
 
@@ -308,6 +311,7 @@ describe('side navigation behavior', () => {
     expect(dom.document.body.hasAttribute('data-side-nav-open')).toBe(false);
     expect(dom.button.getAttribute('aria-expanded')).toBe('false');
     expect(dom.nav.getAttribute('aria-hidden')).toBe('false');
+    expect(dom.nav.inert).toBe(false);
     expect(dom.backdrop.hidden).toBe(true);
   });
 

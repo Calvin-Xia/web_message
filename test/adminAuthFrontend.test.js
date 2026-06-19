@@ -15,7 +15,7 @@ describe('admin auth frontend', () => {
     expect(html).toContain('id="forgotPasswordButton"');
     expect(html).toContain('id="sharedKeyLoginForm"');
     expect(html).toContain('id="loginNotification"');
-    expect(html).toContain('src="/login-app.js"');
+    expect(html).toContain('src="/assets/login-app.js"');
   });
 
   it('stores JWT auth state and calls the expected auth endpoints from login-app', () => {

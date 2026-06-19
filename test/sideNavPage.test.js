@@ -69,7 +69,7 @@ describe('side navigation pages', () => {
     expect(html).toContain('href="/tracking.html"');
     expect(html).toContain('href="/admin.html"');
     expect(html).toContain('href="/health.html"');
-    expect(html).toContain('src="/side-nav.js"');
+    expect(html).toContain('src="/assets/side-nav.js"');
   });
 
   it('adds admin page sidebar navigation while keeping issue drawer layering separate', () => {
@@ -85,7 +85,7 @@ describe('side navigation pages', () => {
     expect(html).toContain('href="/"');
     expect(html).toContain('href="/tracking.html"');
     expect(html).toContain('id="issueDrawer"');
-    expect(html).toContain('src="/side-nav.js"');
+    expect(html).toContain('src="/assets/side-nav.js"');
   });
 
   it('closes the mobile side nav before opening the admin issue drawer', () => {

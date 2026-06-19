@@ -136,6 +136,7 @@ npm run d1:migrate:preview
 ## 8. 发布检查建议
 
 - 确认本次发布前已经重新生成 `styles.css`。使用 `npm run build`，或直接运行带有自动预编译的 `npm run deploy` / `npm run pages:deploy`。
+- 确认 `npm run build` 已重新生成 `assets/` 下的压缩 ESM 入口与 `assets/chunks/` 哈希共享模块；页面不应直接引用未压缩的根目录应用脚本。
 - 确认 `npm run build` 已复制 `swagger-ui-dist` 静态资源到 `docs/swagger/`，并通过 OpenAPI 校验。
 - 访问 `/docs/api.html`，确认 36 个 API 操作可见、Try it out 可用，后台登录后认证状态正确。
 - 确认 `/v1/api/health` 正常返回，旧 `/api/health` 返回指向 v1 的 `308`。
@@ -154,7 +155,7 @@ npm run d1:migrate:preview
 
 ## 9. 样式构建说明
 
-- 页面依赖根目录的 `styles.css`，它由 `src/input.css` 编译生成。
+- 页面依赖根目录的 `styles.css`，它由 `src/input.css` 编译生成；浏览器应用入口由根目录源码通过 `npm run build:js` 生成到 `assets/`。
 - Swagger UI 的 CSS、bundle 与 preset 由 `scripts/build-swagger.mjs` 从 `swagger-ui-dist` 复制生成，不直接提交到 Git。
 - `docs/openapi.yaml` 在构建时由 `scripts/validate-openapi.mjs` 和 `@apidevtools/swagger-parser` 校验。
 - 如果修改了 `src/input.css`、侧边菜单布局样式，或者新增了页面里使用的 Tailwind 类名，发布前必须重新执行 `npm run build`。
