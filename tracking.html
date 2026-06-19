@@ -83,10 +83,11 @@
             <span class="rounded-full bg-white/65 px-3 py-2">时间线</span>
           </div>
         </div>
-        <form id="trackingForm" class="surface-panel space-y-4 rounded-[1.8rem] p-5" novalidate>
+        <form id="trackingForm" class="surface-panel space-y-4 rounded-[1.8rem] p-5" novalidate aria-labelledby="trackingFormTitle">
+          <h3 id="trackingFormTitle" class="visually-hidden">查询追踪编号</h3>
           <label class="space-y-2 text-sm font-medium text-[#25314a]">
             <span>追踪编号 <span class="required-mark" aria-hidden="true">*</span></span>
-            <input id="trackingCode" name="trackingCode" class="field-shell h-16 w-full rounded-2xl px-4 text-base font-semibold tracking-[0.18em] uppercase" placeholder="例如 ABCD23EF" required aria-describedby="trackingCodeHelp trackingCodeValidationMessage" autocomplete="off" autocapitalize="characters" spellcheck="false">
+            <input id="trackingCode" name="trackingCode" type="text" inputmode="text" class="field-shell h-16 w-full rounded-2xl px-4 text-base font-semibold tracking-[0.18em] uppercase" placeholder="例如 ABCD23EF" required aria-describedby="trackingCodeHelp trackingCodeValidationMessage" autocomplete="off" autocapitalize="characters" spellcheck="false">
             <span id="trackingCodeValidationMessage" class="field-error" hidden aria-live="polite"></span>
           </label>
           <button id="queryButton" type="submit" class="primary-button inline-flex h-12 w-full items-center justify-center rounded-full px-5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60">查询处理进度</button>
@@ -113,7 +114,7 @@
     <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener" class="transition hover:text-[#172033]">渝ICP备2026000319号</a>
     <br>
     <a href="https://beian.mps.gov.cn/#/query/webSearch?code=50010102001439" rel="noreferrer" target="_blank" class="mt-2 inline-flex items-center gap-2 transition hover:text-[#172033]">
-      <img src="/storage/Beian.png" alt="公安备案" class="h-5 w-5">
+      <img src="/storage/Beian.png" alt="公安备案" class="lazy-image h-5 w-5" width="20" height="20" loading="lazy" decoding="async">
       渝公网安备50010102001439号
     </a>
   </footer>
@@ -121,6 +122,7 @@
   <script type="module">
     import { TRACKING_CODE_PATTERN } from './src/shared/constants.js';
     import { distressTypeLabels, sceneTagLabels } from './src/shared/labels.js';
+    import { renderSkeleton, retryFetch } from './frontend-ux.js';
 
     const API_BASE = '/v1/api';
     const REQUEST_TIMEOUT = 12000;
@@ -227,17 +229,21 @@
     }
 
     async function fetchWithTimeout(url, options = {}, timeout = REQUEST_TIMEOUT) {
-      const controller = new AbortController();
-      const timer = window.setTimeout(() => controller.abort(), timeout);
-      try {
-        return await fetch(url, {
-          cache: 'no-store',
-          ...options,
-          signal: controller.signal,
-        });
-      } finally {
-        clearTimeout(timer);
-      }
+      const request = async () => {
+        const controller = new AbortController();
+        const timer = window.setTimeout(() => controller.abort(), timeout);
+        try {
+          return await fetch(url, {
+            cache: 'no-store',
+            ...options,
+            signal: controller.signal,
+          });
+        } finally {
+          clearTimeout(timer);
+        }
+      };
+      const method = String(options.method || 'GET').toUpperCase();
+      return method === 'GET' ? retryFetch(request) : request();
     }
 
     function buildTimeline(data) {
@@ -321,16 +327,16 @@
 
     function renderTimelineItems(timeline) {
       return timeline.map((item) => `
-        <article class="timeline-item">
-          <div class="timeline-dot">${item.type === 'public_reply' ? '答' : '更'}</div>
-          <div class="rounded-[1.3rem] border border-[rgba(23,32,51,0.08)] bg-white/70 p-4">
-            <div class="flex flex-wrap items-center gap-2">
-              <span class="text-sm font-semibold text-[#172033]">${item.type === 'public_reply' ? '公开回复' : `状态更新为 ${escapeHtml(statusLabels[item.newValue] || item.newValue || '已更新')}`}</span>
-              <span class="text-xs uppercase tracking-[0.24em] text-[#72809a]">${escapeHtml(formatDate(item.createdAt))}</span>
-            </div>
-            <div class="mt-2 text-sm leading-7 text-[#4c566b]">${item.type === 'public_reply' ? escapeHtml(item.content || '暂无内容') : '处理状态已更新，可持续关注后续动作。'}</div>
-          </div>
-        </article>
+        <details class="timeline-card" role="listitem">
+          <summary>
+            <span class="timeline-card__dot" aria-hidden="true">${item.type === 'public_reply' ? '答' : '更'}</span>
+            <span>
+              <span class="timeline-card__title">${item.type === 'public_reply' ? '公开回复' : `状态更新为 ${escapeHtml(statusLabels[item.newValue] || item.newValue || '已更新')}`}</span>
+              <span class="timeline-card__time">${escapeHtml(formatDate(item.createdAt))}</span>
+            </span>
+          </summary>
+          <div class="timeline-card__content">${item.type === 'public_reply' ? escapeHtml(item.content || '暂无内容') : '处理状态已更新，可持续关注后续动作。'}</div>
+        </details>
       `).join('');
     }
 
@@ -339,7 +345,13 @@
         <section class="result-panel-card text-left">
           <div class="text-xs font-semibold uppercase tracking-[0.3em] text-[#72809a]">Timeline</div>
           <h3 class="display-font mt-2 text-2xl">处理时间线</h3>
-          <div class="mt-5 space-y-6">${renderTimelineItems(timeline)}</div>
+          <div class="timeline-shell mt-5" data-timeline-shell data-can-scroll-backward="false" data-can-scroll-forward="true">
+            <button class="timeline-control timeline-control--back" type="button" data-timeline-step="-1" aria-label="向左查看更多时间线">‹</button>
+            <div class="timeline-scroll" data-timeline-scroll role="list" tabindex="0" aria-label="处理时间线，可使用左右方向键浏览">
+              ${renderTimelineItems(timeline)}
+            </div>
+            <button class="timeline-control timeline-control--forward" type="button" data-timeline-step="1" aria-label="向右查看更多时间线">›</button>
+          </div>
         </section>
       `;
     }
@@ -381,7 +393,7 @@
     async function loadTracking(code) {
       const resultState = document.getElementById('resultState');
       resultState.setAttribute('aria-busy', 'true');
-      resultState.innerHTML = renderFeedbackBox('正在查询追踪记录', 'loading');
+      resultState.innerHTML = renderSkeleton('detail');
       setTrackingNotification('正在校验并查询追踪编号...', 'info');
 
       try {
@@ -432,7 +444,14 @@
       }
     }
     document.getElementById('trackingCode').addEventListener('input', () => setTrackingCodeError());
+    window.addEventListener('app:retry', () => {
+      const code = document.getElementById('trackingCode').value.trim().toUpperCase();
+      if (TRACKING_CODE_PATTERN.test(code)) {
+        loadTracking(code);
+      }
+    });
   </script>
+  <script type="module" src="/assets/ux-runtime.js"></script>
 </body>
 </html>
 

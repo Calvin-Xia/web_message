@@ -132,6 +132,7 @@ npm run d1:migrate:local
 
 - `npm test`：执行全部 Vitest 用例
 - `npm run test:coverage`：输出 `output/coverage/` 覆盖率报告
+- `npm run build:js`：生成 `assets/` 下的压缩页面入口与哈希共享 ESM chunk
 - `npm run build:swagger`：复制本地 Swagger UI 静态资源
 - `npm run validate:openapi`：校验 OpenAPI 3.0.3 规范
 - `test/sideNavPage.test.js`：覆盖首页与后台侧边菜单结构、移动端按钮、层级关系、桌面滚动过渡高亮和首页表单分组间距。

@@ -3,6 +3,7 @@ import { normalizeSceneHeat } from './src/shared/campusMapHeat.js';
 import { formatSvgNumber, geometryToPath, geometryToPoint } from './src/shared/campusMapGeometry.js';
 import { CAMPUS_MAP_VIEWBOX, createCampusProjector } from './src/shared/campusMapProjection.js';
 import { CAMPUS_MAP_DATA_ERROR_MESSAGE, readCampusMapResponse } from './src/shared/campusMapResponse.js';
+import { renderSkeleton, retryFetch } from './frontend-ux.js';
 
 const API_BASE = '/v1/api';
 const CAMPUS_MAP_URL = '/storage/campus-care-map.json';
@@ -155,13 +156,17 @@ function formatDate(value) {
 }
 
 async function fetchWithTimeout(url, options = {}, timeout = REQUEST_TIMEOUT) {
-  const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), timeout);
-  try {
-    return await fetch(url, { ...options, signal: controller.signal });
-  } finally {
-    clearTimeout(timer);
-  }
+  const request = async () => {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), timeout);
+    try {
+      return await fetch(url, { ...options, signal: controller.signal });
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+  const method = String(options.method || 'GET').toUpperCase();
+  return method === 'GET' ? retryFetch(request) : request();
 }
 
 function showNotification(message, type = 'error') {
@@ -544,7 +549,7 @@ function renderPublicList(items, pagination) {
     const summary = item.publicSummary || item.content;
     const trackingHref = `/tracking.html?code=${encodeURIComponent(item.trackingCode)}`;
     return `
-      <article class="public-card interactive-card rounded-[1.6rem] p-5 md:p-6">
+      <article role="listitem" class="public-card interactive-card rounded-[1.6rem] p-5 md:p-6">
         <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div class="space-y-4">
             <div class="flex flex-wrap items-center gap-2">
@@ -567,7 +572,7 @@ function renderPublicList(items, pagination) {
           <div class="result-meta-card text-sm text-[#4c566b]">
             <div class="text-xs font-semibold uppercase tracking-[0.3em] text-[#72809a]">Tracking Code</div>
             <div class="mt-2 text-2xl font-black tracking-[0.18em] text-[#172033]">${escapeHtml(item.trackingCode)}</div>
-            <a class="ghost-button mt-4 w-full rounded-full px-4 py-2 text-sm font-semibold text-[#172033] transition" href="${trackingHref}" aria-label="查看问题 ${escapeHtml(item.trackingCode)} 的处理进度">查看处理进度</a>
+            <a class="ghost-button mt-4 w-full rounded-full px-4 py-2 text-sm font-semibold text-[#172033] transition" href="${trackingHref}" aria-label="查看处理进度：问题 ${escapeHtml(item.trackingCode)}">查看处理进度</a>
           </div>
         </div>
       </article>
@@ -907,7 +912,7 @@ async function loadPublicList(page = 1) {
     pushSearchHistory(filters.q);
   }
   list.setAttribute('aria-busy', 'true');
-  list.innerHTML = renderFeedbackBox('正在加载公开列表', 'loading');
+  list.innerHTML = renderSkeleton('list', 3);
 
   try {
     const response = await fetchWithTimeout(`${API_BASE}/issues?${buildQuery(page)}`);
@@ -1149,4 +1154,12 @@ syncContentCounter();
 loadKnowledgeBase();
 loadPublicList(state.page);
 loadInsights();
+
+window.addEventListener('app:retry', () => {
+  Promise.all([
+    loadKnowledgeBase(),
+    loadPublicList(state.page),
+    loadInsights(),
+  ]).catch((error) => console.error('Public UX retry failed:', error));
+});
 

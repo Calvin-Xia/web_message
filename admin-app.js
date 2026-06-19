@@ -1,5 +1,6 @@
 import { closeSideNav } from './side-nav.js';
 import { distressTypeLabels, sceneTagLabels } from './src/shared/labels.js';
+import { renderSkeleton, retryFetch } from './frontend-ux.js';
 
 const API_BASE = '/v1/api';
 const REQUEST_TIMEOUT = 15000;
@@ -259,13 +260,17 @@ function summarizeFilters(filters) {
 }
 
 async function fetchWithTimeout(url, options = {}, timeout = REQUEST_TIMEOUT) {
-  const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), timeout);
-  try {
-    return await fetch(url, { ...options, signal: controller.signal });
-  } finally {
-    clearTimeout(timer);
-  }
+  const request = async () => {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), timeout);
+    try {
+      return await fetch(url, { ...options, signal: controller.signal });
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+  const method = String(options.method || 'GET').toUpperCase();
+  return method === 'GET' ? retryFetch(request) : request();
 }
 
 async function apiFetch(path, options = {}) {
@@ -1035,7 +1040,7 @@ function renderIssueList(items, pagination) {
   }
 
   container.innerHTML = items.map((item) => `
-    <article class="issue-card interactive-card rounded-[1.7rem] p-5 md:p-6">
+    <article role="listitem" class="issue-card interactive-card rounded-[1.7rem] p-5 md:p-6">
       <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div class="space-y-3">
           <div class="flex flex-wrap items-center gap-2">
@@ -1101,7 +1106,7 @@ async function loadIssues(page = 1) {
   state.page = page;
   const issuesList = document.getElementById('issuesList');
   issuesList.setAttribute('aria-busy', 'true');
-  issuesList.innerHTML = renderFeedbackBox('正在加载问题列表', 'loading');
+  issuesList.innerHTML = renderSkeleton('list', 4);
   try {
     const data = await apiFetch(`/admin/issues?${buildListQuery(page)}`);
     state.availableAssignees = data.meta?.availableAssignees || [];
@@ -1114,9 +1119,19 @@ async function loadIssues(page = 1) {
 }
 
 async function loadMetrics(refresh = false) {
-  const data = await apiFetch(`/admin/metrics?${buildMetricsQuery(refresh)}`);
-  renderMetrics(data);
-  return data;
+  const skeleton = document.getElementById('metricsSkeleton');
+  const grid = document.getElementById('metricsGrid');
+  skeleton.innerHTML = renderSkeleton('stats', 6);
+  skeleton.hidden = false;
+  grid.hidden = true;
+  try {
+    const data = await apiFetch(`/admin/metrics?${buildMetricsQuery(refresh)}`);
+    renderMetrics(data);
+    return data;
+  } finally {
+    skeleton.hidden = true;
+    grid.hidden = false;
+  }
 }
 
 async function loadDashboard(page = 1, { refreshMetrics = false } = {}) {
@@ -1197,7 +1212,7 @@ function renderKnowledgeList() {
 async function loadKnowledgeItems() {
   const container = document.getElementById('knowledgeList');
   container.setAttribute('aria-busy', 'true');
-  container.innerHTML = renderFeedbackBox('正在加载知识库', 'loading');
+  container.innerHTML = renderSkeleton('list', 3);
   try {
     const data = await apiFetch('/admin/knowledge');
     state.knowledgeItems = data.items || [];
@@ -1941,18 +1956,26 @@ function renderUpdates(items) {
     return;
   }
 
-  container.innerHTML = items.map((item) => `
-    <article class="timeline-item">
-      <div class="timeline-dot">${item.type === 'public_reply' ? '答' : '更'}</div>
-      <div class="rounded-[1.2rem] border border-[rgba(23,32,51,0.08)] bg-white/70 p-4">
-        <div class="flex flex-wrap items-center gap-2">
-          <strong class="text-[#172033]">${item.type === 'public_reply' ? '公开回复' : `${escapeHtml(statusLabels[item.oldValue] || item.oldValue || '初始状态')} → ${escapeHtml(statusLabels[item.newValue] || item.newValue || '已更新')}`}</strong>
-          <span class="text-xs uppercase tracking-[0.26em] text-[#72809a]">${escapeHtml(formatDate(item.createdAt))}</span>
-        </div>
-        <div class="mt-2 text-sm leading-7 text-[#4c566b]">${escapeHtml(item.content || '状态已更新。')}</div>
+  container.innerHTML = `
+    <div class="timeline-shell" data-timeline-shell data-can-scroll-backward="false" data-can-scroll-forward="true">
+      <button class="timeline-control timeline-control--back" type="button" data-timeline-step="-1" aria-label="向左查看更多时间线">‹</button>
+      <div class="timeline-scroll" data-timeline-scroll role="list" tabindex="0" aria-label="问题更新时间线，可使用左右方向键浏览">
+        ${items.map((item) => `
+          <details class="timeline-card" role="listitem">
+            <summary>
+              <span class="timeline-card__dot" aria-hidden="true">${item.type === 'public_reply' ? '答' : '更'}</span>
+              <span>
+                <span class="timeline-card__title">${item.type === 'public_reply' ? '公开回复' : `${escapeHtml(statusLabels[item.oldValue] || item.oldValue || '初始状态')} → ${escapeHtml(statusLabels[item.newValue] || item.newValue || '已更新')}`}</span>
+                <span class="timeline-card__time">${escapeHtml(formatDate(item.createdAt))}</span>
+              </span>
+            </summary>
+            <div class="timeline-card__content">${escapeHtml(item.content || '状态已更新。')}</div>
+          </details>
+        `).join('')}
       </div>
-    </article>
-  `).join('');
+      <button class="timeline-control timeline-control--forward" type="button" data-timeline-step="1" aria-label="向右查看更多时间线">›</button>
+    </div>
+  `;
 }
 
 function renderNotes(items) {
@@ -2099,7 +2122,7 @@ function renderDrawer(detail) {
 async function openDrawer(issueId, trigger = null) {
   state.activeIssueId = issueId;
   openDrawerShell(trigger);
-  document.getElementById('drawerContent').innerHTML = renderFeedbackBox('正在加载问题详情', 'loading');
+  document.getElementById('drawerContent').innerHTML = renderSkeleton('detail');
   try {
     const detail = await apiFetch(`/admin/issues/${issueId}`);
     renderDrawer(detail);
@@ -2503,6 +2526,15 @@ if (storedToken) {
 } else {
   setNotification('loginNotification', '推荐使用账号密码登录，或在下方输入共享密钥。', 'info');
 }
+
+window.addEventListener('app:retry', () => {
+  if (!state.token && !state.secret) {
+    return;
+  }
+  loadDashboard(state.page).catch((error) => {
+    setNotification('adminNotification', error.message, 'error');
+  });
+});
 
 
 

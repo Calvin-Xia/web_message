@@ -1,3 +1,5 @@
+import { retryFetch } from './frontend-ux.js';
+
 const REQUEST_TIMEOUT = 12000;
 const AUTO_REFRESH_MS = 30000;
 const HEALTH_FAILURE_MESSAGE = '健康检查暂时不可用，请稍后重试。';
@@ -112,18 +114,22 @@ function setNotification(message = '', type = 'info') {
 }
 
 async function fetchWithTimeout(url, options = {}, timeout = REQUEST_TIMEOUT) {
-  const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), timeout);
+  const request = async () => {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), timeout);
 
-  try {
-    return await fetch(url, {
-      cache: 'no-store',
-      ...options,
-      signal: controller.signal,
-    });
-  } finally {
-    clearTimeout(timer);
-  }
+    try {
+      return await fetch(url, {
+        cache: 'no-store',
+        ...options,
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+  const method = String(options.method || 'GET').toUpperCase();
+  return method === 'GET' ? retryFetch(request) : request();
 }
 
 function setLoadingState() {
@@ -410,5 +416,6 @@ syncAutoRefreshButton();
 
 dom.refreshButton.addEventListener('click', loadHealth);
 dom.toggleAutoRefresh.addEventListener('click', toggleAutoRefresh);
+window.addEventListener('app:retry', loadHealth);
 
 

@@ -68,6 +68,7 @@ if (shell) {
     const isDesktop = isDesktopNavMode();
     button.setAttribute('aria-expanded', String(isOpen));
     nav.setAttribute('aria-hidden', String(!isDesktop && !isOpen));
+    nav.inert = !isDesktop && !isOpen;
     if (isDesktop) {
       if (backdrop) {
         backdrop.hidden = true;
@@ -86,6 +87,7 @@ if (shell) {
     document.body.setAttribute('data-side-nav-open', 'true');
     button.setAttribute('aria-expanded', 'true');
     nav.setAttribute('aria-hidden', 'false');
+    nav.inert = false;
     if (backdrop) {
       backdrop.hidden = false;
     }
@@ -99,7 +101,9 @@ if (shell) {
 
     document.body.removeAttribute('data-side-nav-open');
     button.setAttribute('aria-expanded', 'false');
-    nav.setAttribute('aria-hidden', String(!isDesktopNavMode()));
+    const isDesktop = isDesktopNavMode();
+    nav.setAttribute('aria-hidden', String(!isDesktop));
+    nav.inert = !isDesktop;
     if (backdrop) {
       backdrop.hidden = true;
     }

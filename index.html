@@ -53,14 +53,14 @@
       font-weight: 700;
       letter-spacing: 0.24em;
       text-transform: uppercase;
-      color: #72809a;
+      color: #596579;
     }
     .header-keywords {
       display: flex;
       flex-wrap: wrap;
       gap: 0.45rem 1.25rem;
       margin-top: 0.75rem;
-      color: #72809a;
+      color: #596579;
       font-size: 0.75rem;
       font-weight: 600;
       letter-spacing: 0.22em;
@@ -168,33 +168,33 @@
         <div class="flex items-center justify-between gap-3">
           <div>
             <div class="text-xs font-semibold uppercase tracking-[0.28em] text-[#72809a]">New Submission</div>
-            <h3 class="display-font mt-2 text-2xl">提交新留言</h3>
+            <h3 id="newSubmissionTitle" class="display-font mt-2 text-2xl">提交新留言</h3>
           </div>
           <a class="text-sm font-medium text-[#2147ac] underline-offset-4 hover:underline" href="/tracking.html">已有编号？去追踪</a>
         </div>
 
         <div id="submitNotification" class="mt-4" aria-live="polite" aria-atomic="true"></div>
 
-        <form id="issueForm" class="mt-4 space-y-4" novalidate>
+        <form id="issueForm" class="mt-4 space-y-4" novalidate aria-labelledby="newSubmissionTitle">
           <fieldset class="form-section form-section--stacked">
             <legend class="form-section__title">身份信息</legend>
             <p class="form-section__hint">用于校验和后续联系，不在公开列表展示。</p>
-            <div class="grid gap-4 sm:grid-cols-2">
+            <div class="grid issue-identity-grid gap-4 sm:grid-cols-2">
               <label class="space-y-2 text-sm font-medium text-[#25314a]">
                 <span>姓名 <span class="required-mark" aria-hidden="true">*</span></span>
-                <input id="name" name="name" class="field-shell h-12 w-full rounded-2xl px-4 text-[15px]" maxlength="50" autocomplete="name" placeholder="请输入姓名" required aria-describedby="nameValidationMessage">
+                <input id="name" name="name" type="text" inputmode="text" class="field-shell h-12 w-full rounded-2xl px-4 text-[15px]" maxlength="50" autocomplete="name" placeholder="请输入姓名" required aria-describedby="nameValidationMessage" autofocus>
                 <span id="nameValidationMessage" class="field-error" hidden aria-live="polite"></span>
               </label>
               <label class="space-y-2 text-sm font-medium text-[#25314a]">
                 <span>学号 <span class="required-mark" aria-hidden="true">*</span></span>
-                <input id="studentId" name="studentId" class="field-shell h-12 w-full rounded-2xl px-4 text-[15px]" inputmode="numeric" maxlength="13" placeholder="4位 / 5位 / 13位数字" required aria-describedby="studentIdValidationMessage">
+                <input id="studentId" name="studentId" type="text" inputmode="numeric" class="field-shell h-12 w-full rounded-2xl px-4 text-[15px]" maxlength="13" placeholder="4位 / 5位 / 13位数字" required aria-describedby="studentIdValidationMessage">
                 <span id="studentIdValidationMessage" class="field-error" hidden aria-live="polite"></span>
               </label>
             </div>
 
             <label class="space-y-2 text-sm font-medium text-[#25314a]">
               <span>邮箱（选填）</span>
-              <input id="email" name="email" type="email" class="field-shell h-12 w-full rounded-2xl px-4 text-[15px]" maxlength="254" autocomplete="email" placeholder="用于接收关键处理进展提醒" aria-describedby="emailHelpText emailValidationMessage">
+              <input id="email" name="email" type="email" inputmode="email" class="field-shell h-12 w-full rounded-2xl px-4 text-[15px]" maxlength="254" autocomplete="email" placeholder="用于接收关键处理进展提醒" aria-describedby="emailHelpText emailValidationMessage">
               <span id="emailHelpText" class="block text-xs leading-6 text-[#72809a]">仅用于邮件提醒。</span>
               <span id="emailValidationMessage" class="field-error" hidden aria-live="polite"></span>
             </label>
@@ -264,7 +264,7 @@
       </section>
     </section>
 
-    <section id="trackingReceipt" hidden class="surface-panel rounded-[2rem] p-6 md:p-7" aria-live="polite" aria-atomic="true">
+    <section id="trackingReceipt" hidden class="surface-panel rounded-[2rem] p-6 md:p-7" aria-live="polite" aria-atomic="true" tabindex="-1">
       <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <div class="text-xs font-semibold uppercase tracking-[0.3em] text-[#72809a]">Receipt</div>
@@ -330,7 +330,7 @@
       </form>
 
       <div id="searchHistory" class="mt-4 flex flex-wrap gap-2"></div>
-      <div id="publicList" class="mt-6 grid gap-4" aria-live="polite" aria-busy="false"></div>
+      <div id="publicList" class="mt-6 grid gap-4" role="list" aria-live="polite" aria-busy="false"></div>
       <div id="publicPagination" class="mt-6"></div>
     </section>
 
@@ -374,14 +374,15 @@
     <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener" class="transition hover:text-[#172033]">渝ICP备2026000319号</a>
     <br>
     <a href="https://beian.mps.gov.cn/#/query/webSearch?code=50010102001439" rel="noreferrer" target="_blank" class="mt-2 inline-flex items-center gap-2 transition hover:text-[#172033]">
-      <img src="/storage/Beian.png" alt="公安备案" class="h-5 w-5">
+      <img src="/storage/Beian.png" alt="公安备案" class="lazy-image h-5 w-5" width="20" height="20" loading="lazy" decoding="async">
       渝公网安备50010102001439号
     </a>
   </footer>
     </div>
   </div>
 
-  <script type="module" src="/side-nav.js"></script>
-  <script type="module" src="/public-app.js"></script>
+  <script type="module" src="/assets/ux-runtime.js"></script>
+  <script type="module" src="/assets/side-nav.js"></script>
+  <script type="module" src="/assets/public-app.js"></script>
 </body>
 </html>

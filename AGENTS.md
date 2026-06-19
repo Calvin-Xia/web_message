@@ -24,6 +24,7 @@ functions/api/              Pages routes
 functions/api/admin/        Admin routes
 functions/v1/api/           Versioned API dispatcher and middleware alias
 scripts/                    Build/preprocessing scripts
+assets/                     Generated minified browser ESM entrypoints and hashed shared chunks
 src/shared/                 Shared backend helpers
 src/input.css               Tailwind source
 storage/                    Static assets, including generated campus map JSON
@@ -44,6 +45,7 @@ Use `npm ci` in clean environments. Use `npm install` only when lockfile changes
 npm ci
 npm run build
 npm run build:css
+npm run build:js
 npm run build:swagger
 npm run validate:openapi
 npm run build:map -- C:/path/to/export.geojson
@@ -51,8 +53,9 @@ npm run dev:css
 npm run dev
 npm run deploy
 ```
-- `npm run build` builds `styles.css`, copies local Swagger UI assets, and validates `docs/openapi.yaml`.
+- `npm run build` builds `styles.css`, bundles/minifies browser JavaScript, copies local Swagger UI assets, and validates `docs/openapi.yaml`.
 - `npm run build:css` builds `styles.css` once.
+- `npm run build:js` bundles the live root browser scripts into `assets/` as minified ESM entrypoints with hashed shared chunks.
 - `npm run build:swagger` copies the required assets from `swagger-ui-dist` into `docs/swagger/`.
 - `npm run validate:openapi` validates the OpenAPI document with `@apidevtools/swagger-parser`.
 - `npm run build:map -- <geojson>` builds `storage/campus-care-map.json` from a campus GeoJSON export.
